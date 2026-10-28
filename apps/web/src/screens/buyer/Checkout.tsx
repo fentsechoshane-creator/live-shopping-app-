@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { DELIVERY_OPTIONS, orderTotals, type DeliveryOption } from "@app/core";
 import { api, type FeedItem } from "../../api";
 import { Icon } from "../../components/Icon";
+import { ProductArt } from "../../components/Scene";
 import { Choice, ErrorNote, Field, R, Sheet, swatch, useAction } from "../../components/ui";
 
 // [CONFIRM] Replace with the PUDO locker list from their API once we have an account.
@@ -50,7 +51,7 @@ export function CheckoutSheet({ item, onClose }: { item: FeedItem; onClose: () =
         </>
       }>
       <div className="item-row">
-        <div className="thumb" style={{ width: 48, height: 48, background: swatch(p.id) }} />
+        <div className="thumb art" style={{ width: 48, height: 48 }}><ProductArt productId={p.id} fallback={swatch(p.id)} /></div>
         <div className="grow"><b>{p.title}</b><div className="small muted">@{item.shop.handle}</div></div>
         <b style={{ fontSize: 17 }}>{R(p.priceCents)}</b>
       </div>

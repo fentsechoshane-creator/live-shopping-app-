@@ -1,6 +1,8 @@
 # Notes for AI coding agents (Antigravity, Gemini, Claude and others)
 
-Read README.md, docs/ARCHITECTURE.md and docs/DESIGN.md. Then follow these rules.
+Read docs/LOG.md (shared project memory), README.md, docs/ARCHITECTURE.md and docs/DESIGN.md. Then follow these rules.
+
+- **After each piece of work, add a short dated entry to docs/LOG.md** and update its Current state and Next up. Commit it with the work.
 
 - **Design rule for every new version:** screens must match the prototype references in `docs/design/prototype/` and use the Liquid Glass system in docs/DESIGN.md (tokens and classes in `apps/web/src/styles.css` only). Check the e2e screenshots against the references before shipping.
 

@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { DELIVERY_OPTIONS, ORDER_STATUS_TEXT, returnReasonsFor, type ReturnReason } from "@app/core";
 import { api, type Order } from "../../api";
 import { useLoad, useSession } from "../../session";
+import { ProductArt } from "../../components/Scene";
 import { BackButton, ErrorNote, Field, Loading, R, dateText, dateTimeText, swatch, useAction } from "../../components/ui";
 
 const REASON_TEXT: Record<ReturnReason, string> = {
@@ -24,7 +25,7 @@ export function OrderList({ orders }: { orders: Order[] | undefined }) {
     <div className="group">
       {orders.map((o) => (
         <Link key={o.id} to={`/orders/${o.id}`} className="cell">
-          <div className="thumb" style={{ background: swatch(o.product.id), color: "#fff" }}>{o.product.title.slice(0, 10)}</div>
+          <div className="thumb art"><ProductArt productId={o.product.id} fallback={swatch(o.product.id)} /></div>
           <span className="grow">
             <span className="t" style={{ display: "block" }}>{o.product.title}</span>
             <span className="s" style={{ display: "block" }}>{o.shop.name} · {dateText(o.createdAt)}</span>

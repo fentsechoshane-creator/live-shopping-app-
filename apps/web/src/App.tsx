@@ -121,7 +121,6 @@ const guard = (el: ReactNode) => <RequireUser>{el}</RequireUser>;
 export function App() {
   return (
     <div className="phone">
-      {api.mode === "demo" && <div className="demo-bar">Demo mode: test data on this phone only</div>}
       <div className="content">
         <Routes>
           <Route path="/" element={<Feed />} />

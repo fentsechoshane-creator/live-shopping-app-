@@ -6,6 +6,7 @@ import {
 } from "@app/core";
 import { api, type MyShop } from "../../api";
 import { useLoad, useSession } from "../../session";
+import { ProductArt } from "../../components/Scene";
 import { BackButton, Cell, ErrorNote, Field, Loading, R, TierPill, dateText, dateTimeText, swatch, useAction } from "../../components/ui";
 import { Icon } from "../../components/Icon";
 import { statusPill, Timeline } from "../buyer/Orders";
@@ -131,7 +132,7 @@ export function SellingView() {
         <div className="grid2">
           {shop.products.map((p) => (
             <div key={p.id} className="tile">
-              <div className="media" style={{ background: `linear-gradient(160deg, ${swatch(p.id)}, #111)` }}>
+              <div className="media"><ProductArt productId={p.id} fallback={swatch(p.id)} />
                 <span className={`vchip vglass ${p.status === "live" ? "" : "amber"}`}><span className="d" />
                   {p.status === "draft" && p.proofStatus === "pending" ? "Proof checking" : p.status === "live" ? "Live" : p.status === "sold_out" ? "Sold out" : "Draft"}</span>
               </div>

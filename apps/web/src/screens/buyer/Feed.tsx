@@ -3,9 +3,11 @@ import { Link, useNavigate } from "react-router-dom";
 import { LISTING_LABELS, WELCOME_CREDIT } from "@app/core";
 import { api, type FeedItem } from "../../api";
 import { useLoad, useSession } from "../../session";
+import { ProductArt } from "../../components/Scene";
 import { Video } from "../../components/Video";
 import { Icon } from "../../components/Icon";
 import { Loading, R, Segmented, Sheet, TierPill } from "../../components/ui";
+
 import { CheckoutSheet } from "./Checkout";
 
 type Tab = "for_you" | "following" | "live";
@@ -158,19 +160,17 @@ function VideoCard({ item, onBrowse, onBuy }: { item: FeedItem; onBrowse: () => 
             <span className="avatar">{item.shop.name[0]}</span>
             <span className="handle">@{item.shop.handle}</span>
           </Link>
-          {(item.shop.tier === "top" || item.shop.tier === "trusted") && <TierPill tier={item.shop.tier} />}
           <button className="follow-btn vglass" onClick={() => (user ? toggleFollow(item.shop.id) : nav("/signin"))} aria-pressed={isFollowing}>
             {isFollowing ? "Following" : "Follow"}
           </button>
         </div>
         <div className="caption">{item.caption}</div>
-        <button className="product-chip vglass" onClick={onBrowse} style={{ textAlign: "left" }}>
-          <span className="sw" />
+        <button className="product-chip vglass" onClick={onBrowse} style={{ textAlign: "left" }} aria-label={`See details: ${p.title}, ${R(p.priceCents)}`}>
+          <span className="sw art"><ProductArt productId={p.id} fallback="#555" /></span>
           <span className="grow"><span className="t" style={{ display: "block" }}>{p.title}</span><span className="s" style={{ display: "block" }}>{sub}</span></span>
           <span className="p">{R(p.priceCents)}</span>
         </button>
         <div className="actions">
-          <button className="btn vglass browse" onClick={onBrowse}><Icon name="grid" size={16} />Browse</button>
           <BuyButton item={item} onClick={onBuy} />
           <button className="vround vglass" onClick={share} aria-label="Share"><Icon name="share" /></button>
         </div>

@@ -17,7 +17,7 @@ export interface VideoSource {
   muxPlaybackId?: string | null;
   url?: string | null;
   /** Demo only: a coloured placeholder with a label. */
-  demo?: { bg: string; label: string };
+  demo?: { bg: string; label: string; scene?: string };
 }
 
 export interface FeedItem {

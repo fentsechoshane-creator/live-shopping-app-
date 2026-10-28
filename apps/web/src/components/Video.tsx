@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { VideoSource } from "../api";
 import { useSession } from "../session";
+import { Scene, type SceneKind } from "./Scene";
 
 /** Plays a Mux stream (HLS), a direct file, or shows the demo placeholder. Plays only while on screen. */
 export function Video({ src, label }: { src: VideoSource; label: string }) {
@@ -35,6 +36,7 @@ export function Video({ src, label }: { src: VideoSource; label: string }) {
     return () => io.disconnect();
   }, []);
 
+  if (!hlsUrl && !src.url && src.demo?.scene) return <div className="placeholder"><Scene kind={src.demo.scene as SceneKind} animated label={label} /></div>;
   if (!hlsUrl && !src.url) {
     return (
       <div className="placeholder" style={{ background: `radial-gradient(120% 90% at 50% 25%, ${src.demo?.bg ?? "#333"}, #0e0e10)` }} role="img" aria-label={label}>

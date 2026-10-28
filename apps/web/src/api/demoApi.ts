@@ -54,14 +54,14 @@ function seed(): State {
     p({ id: "p-shirt", shopId: "s-luxe", title: "Designer silk shirt", priceCents: 120000, label: "authentic_designer", condition: "like_new", sizes: ["M"], stock: 1, proofStatus: "approved", description: "Receipt and tags checked." }),
     p({ id: "p-cake", shopId: "s-sweet", title: "Celebration cake, 20 cm", priceCents: 65000, mode: "order_now", leadDays: 2, stock: 99, allergens: "Gluten, eggs, dairy", description: "Vanilla, chocolate or red velvet. Add a message." }),
   ];
-  const v = (bg: string, label: string) => ({ demo: { bg, label } });
+  const v = (bg: string, label: string, scene?: string) => ({ demo: { bg, label, scene } });
   const now = Date.now();
   const posts: DPost[] = [
-    { id: "po-1", shopId: "s-lebo", productId: "p-tee", caption: "3 ways to style one oversized tee for summer", video: v("#5b4636", "Seller video: styling the tee"), createdAt: new Date(now - 3600e3).toISOString() },
-    { id: "po-2", shopId: "s-luxe", productId: "p-shirt", caption: "Silk shirt, worn twice. Receipt checked.", video: v("#2f3a4a", "Seller video: shirt close up"), createdAt: new Date(now - 7200e3).toISOString() },
-    { id: "po-3", shopId: "s-sweet", productId: "p-cake", caption: "Decorating a celebration cake", video: v("#6b4a4a", "Seller video: decorating a cake"), createdAt: new Date(now - 9000e3).toISOString() },
-    { id: "po-4", shopId: "s-lebo", productId: "p-denim", caption: "Real denim, every mark on camera", video: v("#34495e", "Seller video: denim jacket"), createdAt: new Date(now - 12000e3).toISOString() },
-    { id: "po-5", shopId: "s-lebo", productId: "p-runner", caption: "Chunky runner, no logos", video: v("#4a4a3a", "Seller video: runners"), createdAt: new Date(now - 15000e3).toISOString() },
+    { id: "po-1", shopId: "s-lebo", productId: "p-tee", caption: "3 ways to style one oversized tee for summer", video: v("#5b4636", "Seller video: styling the tee", "tee"), createdAt: new Date(now - 3600e3).toISOString() },
+    { id: "po-2", shopId: "s-luxe", productId: "p-shirt", caption: "Silk shirt, worn twice. Receipt checked.", video: v("#2f3a4a", "Seller video: shirt close up", "shirt"), createdAt: new Date(now - 7200e3).toISOString() },
+    { id: "po-3", shopId: "s-sweet", productId: "p-cake", caption: "Decorating a celebration cake", video: v("#6b4a4a", "Seller video: decorating a cake", "cake"), createdAt: new Date(now - 9000e3).toISOString() },
+    { id: "po-4", shopId: "s-lebo", productId: "p-denim", caption: "Real denim, every mark on camera", video: v("#34495e", "Seller video: denim jacket", "denim"), createdAt: new Date(now - 12000e3).toISOString() },
+    { id: "po-5", shopId: "s-lebo", productId: "p-runner", caption: "Chunky runner, no logos", video: v("#4a4a3a", "Seller video: runners", "runner"), createdAt: new Date(now - 15000e3).toISOString() },
   ];
   return { users: bots, currentUserId: null, shops, products, posts, orders: [], notifications: [], payouts: [], clockOffsetMs: 0, follows: [] };
 }

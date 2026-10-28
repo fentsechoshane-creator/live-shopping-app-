@@ -4,6 +4,7 @@ import { WELCOME_CREDIT } from "@app/core";
 import { api, type Category, type FeedItem } from "../../api";
 import { useLoad, useSession } from "../../session";
 import { Icon } from "../../components/Icon";
+import { ProductArt } from "../../components/Scene";
 import { ErrorNote, Loading, R, swatch } from "../../components/ui";
 
 const CATS: { id: Category | "all"; label: string }[] = [
@@ -72,7 +73,7 @@ export function Explore() {
           <div className="grid2">
             {filtered.map((it) => (
               <button key={it.postId} className="tile" onClick={() => nav(`/s/${it.shop.handle}`)}>
-                <div className="media" style={{ background: `linear-gradient(160deg, ${it.video.demo?.bg ?? swatch(it.product.id)}, #111)` }}>
+                <div className="media"><ProductArt productId={it.product.id} fallback={it.video.demo?.bg ?? swatch(it.product.id)} />
                   {it.product.mode === "order_now" && <span className="vchip vglass amber"><span className="d" />Made to order</span>}
                 </div>
                 <div className="body">

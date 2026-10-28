@@ -1,5 +1,7 @@
 # Notes for Gemini (same as AGENTS.md)
 
+Read docs/LOG.md first. It is the shared project memory. Add a dated entry after each piece of work.
+
 Read README.md, docs/ARCHITECTURE.md and docs/DESIGN.md. Then follow these rules.
 
 - **Design rule for every new version:** screens must match the prototype references in `docs/design/prototype/` and use the Liquid Glass system in docs/DESIGN.md (tokens and classes in `apps/web/src/styles.css` only). Check the e2e screenshots against the references before shipping.

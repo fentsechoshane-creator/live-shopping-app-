@@ -28,7 +28,8 @@ const server = spawn("npx", ["vite", "preview", "--port", String(PORT), "--stric
 await new Promise((r) => setTimeout(r, 2500));
 
 const browser = await chromium.launch();
-const page = await browser.newPage({ viewport: { width: 400, height: 860 } });
+// iPhone 15 in Safari with its toolbars showing: about 393 x 720 usable, touch, 3x screen.
+const page = await browser.newPage({ viewport: { width: 393, height: 720 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
 page.setDefaultTimeout(15000);
 // Fonts are not needed for the checks, and some test environments block them.
 await page.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.abort());
@@ -69,7 +70,7 @@ try {
   await signIn("buyer@test.co.za");
 
   const tee = page.getByRole("region", { name: /Oversized tee/ });
-  await tee.getByRole("button", { name: "Browse" }).click();
+  await tee.getByRole("button", { name: /See details/ }).click();
   await page.getByRole("dialog").getByText("Buyer protection.").waitFor();
   await page.waitForTimeout(400); // let the sheet finish rising
   await shot("browse");
