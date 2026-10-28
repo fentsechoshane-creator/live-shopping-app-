@@ -131,7 +131,9 @@ begin
     end if;
   end if;
 
-  if looks_counterfeit(new.title || ' ' || new.description) then
+  -- Content checks run when a listing is created or its words change.
+  if (tg_op = 'INSERT' or new.title is distinct from old.title or new.description is distinct from old.description
+      or new.label is distinct from old.label) and looks_counterfeit(new.title || ' ' || new.description) then
     raise exception 'Replicas and fakes are not allowed. Selling counterfeit goods is an offence under the Counterfeit Goods Act.'
       using errcode = 'check_violation';
   end if;
@@ -142,7 +144,10 @@ begin
     raise exception 'Pick a condition for pre loved items.' using errcode = 'check_violation';
   end if;
 
-  if new.status = 'live' then
+  -- Going live checks run when a listing goes live or changes how it sells. Stock updates from orders
+  -- (run by the server) must never fail, or a payment could not be recorded.
+  if new.status = 'live' and not admin
+     and (tg_op = 'INSERT' or old.status <> 'live' or new.mode <> old.mode or new.label <> old.label) then
     select * into ready from seller_ready where shop_id = new.shop_id;
     select category into cat from shops where id = new.shop_id;
     if not coalesce(ready.can_sell, false) then
