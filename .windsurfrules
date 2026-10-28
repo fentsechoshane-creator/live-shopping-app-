@@ -1,0 +1,5 @@
+Before anything else, read `docs/LOG.md`. It is the shared memory of this project: what the app is, every decision, how far we are and what is next. Then follow `AGENTS.md` and `docs/DESIGN.md`.
+
+If someone asks "where are we?", "how far are we?" or "what's next?", answer from docs/LOG.md (or run `npm run status`) and give the latest commit. To run the current version: `npm install` then `npm run dev`.
+
+After every piece of work, add a short dated entry to the top of the Log section in docs/LOG.md, update "Current state" and "Next up", and commit it with the work.

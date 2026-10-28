@@ -4,6 +4,12 @@ The first real build of the app. It covers the **seller side** (sign up, ID and 
 
 Auctions, lives, chat and the wallet are in the clickable prototype but not built yet.
 
+## Where are we? (for anyone, and any AI)
+
+- **Read [docs/LOG.md](docs/LOG.md).** It is the project's shared memory: what we decided, what is built, how far we are and what is next. Every change adds a dated entry.
+- **Or run `npm run status`.** It prints the same summary plus the latest version (commit) and how to run it.
+- **Using an AI tool** (Claude, ChatGPT, Gemini, Copilot, Cursor and others)? Open this repo in it and ask: *"Read docs/LOG.md and tell me how far we are and what's next."* Instruction files for each tool (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.github/copilot-instructions.md`, `.cursorrules`) all point it there and tell it to log its own work.
+
 ## Try it in 1 minute (no accounts needed)
 
 ```bash

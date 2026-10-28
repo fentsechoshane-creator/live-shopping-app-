@@ -1,6 +1,32 @@
 # Project log
 
-Shared memory for every Claude account and agent working on this repo. Newest entries first in the Log section. Keep entries short.
+Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI tool (any Claude account, ChatGPT, Gemini, Copilot, Cursor). Newest entries first in the Log section. Keep entries short.
+
+**Ask any AI:** "Read docs/LOG.md and tell me how far we are and what's next." **Or run** `npm run status`.
+
+**Rule for every AI and person:** after each piece of work, add a dated entry to the top of the Log, update Current state and Next up, and commit it with the work.
+
+## How far we are
+
+| Area | Status |
+| --- | --- |
+| Business rules (fees, credit, returns, payouts, trust) | Done and tested |
+| Database, security rules, server functions | Done, live on Supabase |
+| Seller side (sign up, checks, listings, orders, payouts) | Done in the web app |
+| Buyer side (feed, Explore, checkout, orders, returns) | Done in the web app |
+| Design (Liquid Glass, iPhone first, TikTok style profile) | Done, keeps improving |
+| Real payments (TradeSafe escrow) | Built, waiting for sandbox keys [Lehloma] |
+| Real video (Mux) | Built, waiting for keys [Lehloma] |
+| Sign in by code on the live project | Waiting for 2 Supabase settings [Ofentse] |
+| Mobile app (iPhone and Android) | Not started. Platform is Lehloma's choice |
+| Live streams, auctions, chat, wallet | Not started (shown as "coming next") |
+
+## Run the current version
+
+- `npm install` then `npm run dev`: demo mode at http://localhost:5173, sign in with any email and the code 123456 (an email starting with "admin" is the team view).
+- `npm run build:phone`: the whole app as one HTML file at `apps/web/dist-artifact/index.html`, to host anywhere (for example Netlify Drop) and open on a phone.
+- `npm run dev:live`: the app against the live Supabase project.
+- The latest version is always the newest commit on `main`. `npm run status` prints it.
 
 ## Who and what
 
@@ -37,6 +63,11 @@ Shared memory for every Claude account and agent working on this repo. Newest en
 - Messages tab and live streams with auctions are shown as "coming next".
 
 ## Log
+
+### 2026-10-29: Handover for any AI and for Lehloma
+- Added "How far we are" and "Run the current version" to this log, and `npm run status`, which prints where we are, what's next, the latest work and the current version.
+- Added instruction files for Copilot, Cursor and Windsurf next to CLAUDE.md, AGENTS.md and GEMINI.md. All point to this log and tell the tool to log its own work.
+- Added `npm run build:phone` for a one file version of the app.
 
 ### 2026-10-29: Profile like TikTok, smaller everything
 - Profile rebuilt in the TikTok layout Ofentse showed: pencil, wallet, share and menu at the top; small avatar, name, handle; three numbers; one line; small capsule buttons; then a Seller | Buyer tab strip and a 3 column grid.
