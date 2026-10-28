@@ -9,7 +9,8 @@
     "preview": "vite preview --port 4173",
     "typecheck": "tsc --noEmit",
     "dev:live": "vite --mode live",
-    "build:live": "tsc --noEmit && vite build --mode live"
+    "build:live": "tsc --noEmit && vite build --mode live",
+    "build:artifact": "vite build --config vite.artifact.config.ts"
   },
   "dependencies": {
     "@app/core": "0.1.0",
@@ -24,6 +25,7 @@
     "@types/react-dom": "18.3.1",
     "@vitejs/plugin-react": "4.3.4",
     "typescript": "5.6.3",
-    "vite": "5.4.11"
+    "vite": "5.4.11",
+    "vite-plugin-singlefile": "^2.0.3"
   }
 }
