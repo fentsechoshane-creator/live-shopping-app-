@@ -54,21 +54,21 @@ export interface OrderTotals {
   sellerFee: Cents;
   /** What the seller is paid out once the return window closes (item + delivery - seller fee). */
   sellerPayout: Cents;
-  /** What we keep before escrow and payment costs (seller fee + protection fee - credit we fund). */
+  /** What we keep before escrow and payment costs (seller fee + protection fee - welcome credit). Can be negative. */
   platformRevenue: Cents;
+  /** Our fee taken inside escrow (never below zero). */
+  escrowAgentFee: Cents;
+  /** When the welcome credit is bigger than our cut, we pay the seller this difference ourselves, from the credit budget. */
+  creditTopUp: Cents;
 }
 
 export function orderTotals(input: OrderTotalsInput): OrderTotals {
   const deliveryFee = DELIVERY_OPTIONS[input.delivery].fee;
   const protect = protectionFee(input.itemPrice);
   const fee = sellerFee(input.itemPrice, { foundingUntil: input.foundingUntil, at: input.at });
-  // The credit is funded from our own cut, because escrow can only pay out what the buyer deposited.
-  // So it can never be more than the seller fee plus protection fee on that order. [CONFIRM] keep this cap,
-  // or top up sellers from our own account so the full R50 always applies.
-  const creditUsed =
-    input.welcomeCreditAvailable && input.itemPrice >= WELCOME_CREDIT_MIN_ORDER
-      ? Math.min(WELCOME_CREDIT, Math.floor((fee + protect) / 100) * 100) // whole rand, so totals stay tidy
-      : 0;
+  // The welcome credit is a discount we fund. Escrow holds what the buyer paid, so if the credit is bigger
+  // than our cut on the order, we pay the seller the difference ourselves (creditTopUp).
+  const creditUsed = input.welcomeCreditAvailable && input.itemPrice >= WELCOME_CREDIT_MIN_ORDER ? WELCOME_CREDIT : 0;
   const total = input.itemPrice + deliveryFee + protect - creditUsed;
   return {
     itemPrice: input.itemPrice,
@@ -79,5 +79,7 @@ export function orderTotals(input: OrderTotalsInput): OrderTotals {
     sellerFee: fee,
     sellerPayout: input.itemPrice + deliveryFee - fee,
     platformRevenue: fee + protect - creditUsed,
+    escrowAgentFee: Math.max(0, fee + protect - creditUsed),
+    creditTopUp: Math.max(0, creditUsed - fee - protect),
   };
 }

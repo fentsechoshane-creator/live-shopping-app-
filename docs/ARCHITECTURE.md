@@ -17,7 +17,7 @@
 | Seller is paid | R329 (R350 - R21), once the window closes |
 | TradeSafe's own fee | Paid from our R33 |
 
-Welcome credit (up to R50 off a first order of R200+) is funded from our cut, so it is capped at our fee on that order, in whole rand. Escrow can only pay out what the buyer deposited.
+Welcome credit: R50 off a buyer's first order of R200 or more. It is our discount, paid from the welcome credit budget (R15,000 for 300 buyers). Escrow can only pay out what the buyer deposited, so when the credit is bigger than our cut on that order, our agent fee is R0 and we EFT the seller the difference ourselves (`credit_topup_cents`). The Admin page lists top ups to pay with each payout. Example: R349 tee, buyer pays R311, escrow pays the seller R311, we top up R17.06, seller gets R328.06 as normal.
 
 ## Order statuses
 
@@ -52,6 +52,6 @@ Starts at 50, between 0 and 100. Points are in `trust_rules` (database) and `TRU
 3. **Refund after delivery started**: we use `transactionCancel`. Confirm it works once delivery has started, or use their dispute flow.
 4. **Fees**: TradeSafe's per order fee and card costs, and whether payouts faster than monthly cost R5 per party per order.
 5. **New seller reserve** (10% kept for 30 days): not applied. It needs a second escrow allocation per order. Decide if we want it.
-6. **Welcome credit**: the report says R50. The code caps it at our cut on that order (R32 on a R349 tee). Decide: keep the cap, or top up from our own account.
+6. **Welcome credit top ups** are paid by EFT from our account. Later, this could be automated through our bank's API.
 7. **Delivery**: PUDO lockers are a sample list, and couriers are booked by the seller. Courier tracking webhooks, to mark orders delivered automatically, are not built.
 8. **Public holidays** are not skipped in payout dates yet.

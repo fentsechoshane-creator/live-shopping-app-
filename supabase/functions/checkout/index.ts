@@ -69,7 +69,7 @@ Deno.serve(handler(async (req, body) => {
   must(await db.from("orders").insert({
     id: orderId, buyer_id: uid, shop_id: shop.id, product_id: product.id, mode: product.mode, size: size ?? null,
     item_price_cents: t.itemPrice, delivery, delivery_fee_cents: t.deliveryFee, protection_fee_cents: t.protectionFee,
-    credit_cents: t.creditUsed, total_cents: t.total, seller_fee_cents: t.sellerFee, seller_payout_cents: t.sellerPayout,
+    credit_cents: t.creditUsed, credit_topup_cents: t.creditTopUp, total_cents: t.total, seller_fee_cents: t.sellerFee, seller_payout_cents: t.sellerPayout,
     delivery_details: deliveryDetails, food_date: foodDate ?? null, food_slot: foodSlot ?? null, food_message: foodMessage ?? null,
   }), "create order");
 
@@ -80,7 +80,8 @@ Deno.serve(handler(async (req, body) => {
     description: `${product.title} from ${shop.name}`,
     buyerToken, sellerToken,
     amountCents: t.total,
-    agentFeeCents: t.total - t.sellerPayout,
+    // Our cut inside escrow. If the welcome credit is bigger, it is 0 and we top the seller up ourselves.
+    agentFeeCents: t.escrowAgentFee,
     daysToDeliver: days.deliver, daysToInspect: days.inspect,
   });
   const checkoutUrl = await es.checkoutUrl(tx.transactionId, orderId);

@@ -211,4 +211,20 @@ select pg_temp.act_as('00000000-0000-0000-0000-00000000000a');
 update products set status = 'live' where title = 'Chunky white runner'; -- banned shop: matches no rows
 reset role;
 do $$ begin assert (select status from products where title = 'Chunky white runner') = 'removed', 'still removed'; end $$;
+-- Welcome credit top up: R349 tee, R50 credit, buyer pays R311, we top the seller up R17.06.
+select pg_temp.act_as_service();
+select pg_temp.expect_error($$insert into orders (buyer_id, shop_id, product_id, mode, item_price_cents, delivery, delivery_fee_cents, protection_fee_cents, credit_cents, total_cents, seller_fee_cents, seller_payout_cents)
+  values ('00000000-0000-0000-0000-00000000000b', (select id from shops where handle = 'other.shop'), (select id from products limit 1), 'buy_now', 34900, 'collect_cpt', 0, 1200, 5000, 31100, 2094, 32806)$$, 'orders_topup_exact');
+insert into orders (buyer_id, shop_id, product_id, mode, item_price_cents, delivery, delivery_fee_cents, protection_fee_cents, credit_cents, total_cents, seller_fee_cents, seller_payout_cents, credit_topup_cents)
+  values ('00000000-0000-0000-0000-00000000000b', (select id from shops where handle = 'other.shop'), (select id from products limit 1), 'buy_now', 34900, 'collect_cpt', 0, 1200, 5000, 31100, 2094, 32806, 1706);
+reset role;
 select 'all policy tests passed' as result;
+-- Scheduler secret: only the service role can check it, and only the right value passes.
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000b');
+select pg_temp.expect_error($$select cron_secret_ok('guess')$$, 'permission denied');
+reset role;
+do $$ begin
+  assert not cron_secret_ok('guess'), 'wrong secret rejected';
+  assert cron_secret_ok((select secret from vault.secrets where name = 'run_due_secret')), 'right secret accepted';
+end $$;
+select 'scheduler secret tests passed' as result;

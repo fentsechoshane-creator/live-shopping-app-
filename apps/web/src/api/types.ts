@@ -78,7 +78,7 @@ export interface Order {
   deliveryDetails: Record<string, string>;
   foodDate: string | null;
   foodSlot: string | null;
-  totals: Pick<OrderTotals, "itemPrice" | "deliveryFee" | "protectionFee" | "creditUsed" | "total" | "sellerFee" | "sellerPayout">;
+  totals: Pick<OrderTotals, "itemPrice" | "deliveryFee" | "protectionFee" | "creditUsed" | "total" | "sellerFee" | "sellerPayout" | "creditTopUp">;
   checkoutUrl: string | null;
   trackingRef: string | null;
   paidAt: string | null;
@@ -155,6 +155,14 @@ export interface Payout {
   releasableAt: string;
 }
 
+export interface TopUp {
+  payoutId: string;
+  shopName: string;
+  bank: string;
+  amountCents: Cents;
+  payOn: string | null;
+}
+
 export interface PendingReview {
   shopId: string;
   shopName: string;
@@ -205,6 +213,8 @@ export interface Api {
   adminReview(shopId: string, what: "id" | "cert", approved: boolean): Promise<void>;
   disputedOrders(): Promise<Order[]>;
   decideReturn(orderId: string, uphold: boolean): Promise<void>;
+  topUpsDue(): Promise<TopUp[]>;
+  markTopUpPaid(payoutId: string): Promise<void>;
   // Demo helpers (demo mode only)
   demo?: {
     markDelivered(orderId: string): Promise<void>;

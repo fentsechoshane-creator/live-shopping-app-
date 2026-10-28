@@ -52,6 +52,7 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
     totals: {
       itemPrice: o.item_price_cents, deliveryFee: o.delivery_fee_cents, protectionFee: o.protection_fee_cents,
       creditUsed: o.credit_cents, total: o.total_cents, sellerFee: o.seller_fee_cents, sellerPayout: o.seller_payout_cents,
+      creditTopUp: o.credit_topup_cents ?? 0,
     },
     checkoutUrl: o.checkout_url, trackingRef: o.tracking_ref, paidAt: o.paid_at, shipBy: o.ship_by, shippedAt: o.shipped_at,
     deliveredAt: o.delivered_at, releasableAt: o.releasable_at, createdAt: o.created_at,
@@ -315,6 +316,17 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
     },
     async decideReturn(orderId, uphold) {
       await call("order-action", { orderId, action: "decide_return", uphold });
+    },
+    async topUpsDue() {
+      const rows = check(await sb.from("payouts").select("id, topup_cents, pay_on, shops(name, seller_checks(bank_name, bank_last4))")
+        .gt("topup_cents", 0).is("topup_paid_at", null).neq("status", "cancelled").order("pay_on")) as any[];
+      return rows.map((r) => ({
+        payoutId: r.id, shopName: r.shops?.name ?? "", amountCents: r.topup_cents, payOn: r.pay_on,
+        bank: r.shops?.seller_checks ? `${r.shops.seller_checks.bank_name} ending ${r.shops.seller_checks.bank_last4}` : "",
+      }));
+    },
+    async markTopUpPaid(payoutId) {
+      check(await sb.rpc("admin_mark_topup_paid", { p_payout: payoutId }));
     },
   };
   return api;

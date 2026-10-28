@@ -1,5 +1,21 @@
 # Setup
 
+## Already done (28 October 2026)
+
+A Supabase project called `live-shopping-app` exists in the myHaul organisation (London region, free plan). Project ref: `gingqryoycwtzbfvfbln`.
+- All migrations in `supabase/migrations` are applied.
+- All 7 server functions are deployed (from bundled copies of `supabase/functions`; redeploying with the CLI from source is fine).
+- The scheduled job runs every 15 minutes. Its secret is in Supabase Vault, so nothing to copy.
+- Escrow is in mock mode and video uses Supabase Storage until TradeSafe and Mux keys are added.
+- `apps/web/.env.live` points the app at it: run `npm run dev:live`.
+
+Still to do by hand in the Supabase dashboard (Authentication):
+1. URL configuration: set Site URL to `http://localhost:5173` (and later your real web address).
+2. Email templates, "Magic link": add the line `Your code: {{ .Token }}` so people can sign in with the 6 digit code.
+3. After you sign up in the app, make yourself an admin in the SQL editor (step 7 below).
+
+The rest of this page is the full setup, for a new project.
+
 Order: Supabase first, then TradeSafe, then Mux. The app works at each stage (escrow and video fall back to test mode until their keys are set).
 
 Never put secret keys in the web app, in chat, or in git. Only `VITE_` values go in `apps/web/.env.local`, and those are safe to be public.

@@ -71,9 +71,9 @@ try {
   await sheet.getByRole("button", { name: /Free collection/ }).click();
   await sheet.getByText("Welcome credit").waitFor();
   await shot("checkout");
-  // R349 + R12 protection, minus welcome credit capped at our cut, in whole rand (R32) = R329
-  await check(sheet.getByRole("button", { name: "Pay R329", exact: true }).isVisible(), "total R329 with capped welcome credit");
-  await sheet.getByRole("button", { name: "Pay R329", exact: true }).click();
+  // R349 + R12 protection, minus the full R50 welcome credit = R311. We top the seller up the difference.
+  await check(sheet.getByRole("button", { name: "Pay R311", exact: true }).isVisible(), "total R311 with the R50 welcome credit");
+  await sheet.getByRole("button", { name: "Pay R311", exact: true }).click();
   await page.waitForURL(/mock-pay/);
   await shot("mock-pay");
   await page.getByRole("button", { name: "Pay now" }).click();
@@ -156,6 +156,8 @@ try {
   await signIn("admin@test.co.za");
   await page.goto(`${BASE}/admin`);
   await page.getByRole("heading", { name: "Checks waiting" }).waitFor();
+  // The R349 tee bought with the welcome credit leaves a R17.06 top up for us to pay Lebo's Thrift.
+  await page.getByText("R17.06").waitFor();
   await shot("admin");
 
   if (errors.length) throw new Error("Page errors: " + errors.join(" | "));

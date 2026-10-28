@@ -20,7 +20,7 @@ export interface TransactionInput {
   sellerToken: string;
   /** Everything the buyer pays, in cents. */
   amountCents: number;
-  /** Our cut (seller fee + protection fee - credit), in cents. Taken from the seller's side of the allocation. */
+  /** Our cut inside escrow (seller fee + protection fee - credit, never below 0), in cents. Taken from the seller's side. */
   agentFeeCents: number;
   daysToDeliver: number;
   daysToInspect: number;

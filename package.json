@@ -14,6 +14,8 @@
     "test:e2e": "node apps/web/e2e/run.mjs",
     "sync-core": "node scripts/sync-core.mjs",
     "typecheck": "npm run typecheck -w packages/core && npm run typecheck -w apps/web",
-    "check:functions": "cd supabase/functions && deno check --node-modules-dir=none --no-config */index.ts && deno test --node-modules-dir=none --no-config _shared/"
+    "check:functions": "cd supabase/functions && deno check --node-modules-dir=none --no-config */index.ts && deno test --node-modules-dir=none --no-config _shared/",
+    "dev:live": "npm run dev:live -w apps/web",
+    "build:live": "npm run build:live -w apps/web"
   }
 }

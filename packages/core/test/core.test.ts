@@ -35,24 +35,26 @@ describe("fees", () => {
     expect(sellerFee(rand(350), { foundingUntil: until, at: new Date("2027-03-01") })).toBe(0);
     expect(sellerFee(rand(350), { foundingUntil: until, at: new Date("2027-05-01") })).toBe(rand(21));
   });
-  it("caps the welcome credit at our cut so escrow always balances", () => {
-    const t = orderTotals({ itemPrice: rand(350), delivery: "courier", welcomeCreditAvailable: true });
-    expect(t.creditUsed).toBe(rand(33));
-    expect(t.total - t.sellerPayout).toBeGreaterThanOrEqual(0);
+  it("gives the full R50 welcome credit and tops the seller up from our budget", () => {
+    // R349 tee: our cut is R20.94 + R12 = R32.94, the credit is R50, so we top up R17.06.
+    const tee = orderTotals({ itemPrice: rand(349), delivery: "collect_cpt", welcomeCreditAvailable: true });
+    expect(tee.creditUsed).toBe(rand(50));
+    expect(tee.total).toBe(rand(311));
+    expect(tee.escrowAgentFee).toBe(0);
+    expect(tee.creditTopUp).toBe(1706);
     const big = orderTotals({ itemPrice: rand(900), delivery: "courier", welcomeCreditAvailable: true });
     expect(big.creditUsed).toBe(rand(50));
+    expect(big.creditTopUp).toBe(0);
     const small = orderTotals({ itemPrice: rand(150), delivery: "courier", welcomeCreditAvailable: true });
     expect(small.creditUsed).toBe(0);
-    // R349 tee: our cut is R20.94 + R12 = R32.94, so the credit is R32 and the total a whole R329.
-    const tee = orderTotals({ itemPrice: rand(349), delivery: "collect_cpt", welcomeCreditAvailable: true });
-    expect(tee.creditUsed).toBe(rand(32));
-    expect(tee.total).toBe(rand(329));
   });
-  it("buyer total always covers the seller payout", () => {
+  it("escrow plus our top up always pays the seller exactly", () => {
     for (let p = 20; p <= 3000; p += 7) {
       for (const credit of [true, false]) {
         const t = orderTotals({ itemPrice: rand(p), delivery: "pudo_locker", welcomeCreditAvailable: credit });
-        expect(t.total).toBeGreaterThanOrEqual(t.sellerPayout);
+        expect(t.total - t.escrowAgentFee + t.creditTopUp).toBe(t.sellerPayout);
+        expect(t.escrowAgentFee).toBeGreaterThanOrEqual(0);
+        expect(t.creditTopUp).toBeGreaterThanOrEqual(0);
       }
     }
   });

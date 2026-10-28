@@ -18,9 +18,10 @@ interface DProduct extends ProductPublic { shopId: string; proofStatus: ReviewSt
 interface DPost { id: string; shopId: string; productId: string; caption: string; video: FeedItem["video"]; createdAt: string }
 interface DOrder extends Order { shopOwnerId: string }
 interface DUser extends User { trust: number; welcomeUsed: boolean; admin: boolean }
+type DPayout = Payout & { shopId: string; topUpCents: number; topUpPaid: boolean };
 interface State {
   users: DUser[]; currentUserId: string | null; shops: DShop[]; products: DProduct[]; posts: DPost[]; orders: DOrder[];
-  notifications: (Notification & { userId: string })[]; payouts: (Payout & { shopId: string })[]; clockOffsetMs: number;
+  notifications: (Notification & { userId: string })[]; payouts: DPayout[]; clockOffsetMs: number;
 }
 
 const KEY = "lsa-demo-v1";
@@ -141,7 +142,8 @@ export function createDemoApi(): Api {
     const rel = new Date(o.releasableAt ?? now().toISOString());
     const payOn = payoutDate(tier, rel);
     s.payouts.unshift({ id: id(), orderId: o.id, shopId: o.shop.id, amountCents: o.totals.sellerPayout, releasableAt: rel.toISOString(),
-      payOn: payOn ? payOn.toISOString().slice(0, 10) : null, status: payOn ? "scheduled" : "held" });
+      payOn: payOn ? payOn.toISOString().slice(0, 10) : null, status: payOn ? "scheduled" : "held",
+      topUpCents: o.totals.creditTopUp ?? 0, topUpPaid: false });
   }
 
   /** Same jobs as the run-due server function. */
@@ -470,6 +472,19 @@ export function createDemoApi(): Api {
       if (!o || o.status !== "return_requested" || !o.ret) throw new Error("No open return.");
       if (uphold) { trust(o.shopOwnerId, o.ret.reason === "faulty" ? "flaw_not_shown" : "not_as_described"); o.ret.status = "in_transit"; setStatus(o, "return_in_transit"); }
       else { trust(o.buyerId, "return_claim_rejected"); o.ret.status = "rejected"; setStatus(o, "completed"); }
+      save();
+    },
+
+    async topUpsDue() {
+      return s.payouts.filter((p) => p.topUpCents > 0 && !p.topUpPaid).map((p) => {
+        const sh = shopOf(p.shopId);
+        return { payoutId: p.id, shopName: sh.name, bank: `${sh.checks.bankName} ending ${sh.checks.bankLast4}`, amountCents: p.topUpCents, payOn: p.payOn };
+      });
+    },
+    async markTopUpPaid(payoutId) {
+      if (!(await api.isAdmin())) throw new Error("Admins only");
+      const p = s.payouts.find((x) => x.id === payoutId);
+      if (p) p.topUpPaid = true;
       save();
     },
 

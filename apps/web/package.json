@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --port 4173",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "dev:live": "vite --mode live",
+    "build:live": "tsc --noEmit && vite build --mode live"
   },
   "dependencies": {
     "@app/core": "0.1.0",

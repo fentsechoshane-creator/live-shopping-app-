@@ -292,6 +292,7 @@ export function SellerOrderDetail() {
         <div className="row"><span>Seller fee</span><span>-{R(o.totals.sellerFee)}</span></div>
         <div className="row total"><span>You get</span><span>{R(o.totals.sellerPayout)}</span></div>
       </div>
+      {o.totals.creditTopUp > 0 && <p className="small muted">The buyer used our welcome credit. {R(o.totals.creditTopUp)} of your payout comes straight from us, paid on the same day.</p>}
       <p className="small muted">Paid once the buyer's {o.mode === "buy_now" ? "7 day return window" : "check period"} closes with no claim.</p>
     </div>
   );

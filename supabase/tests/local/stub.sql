@@ -19,3 +19,10 @@ grant usage on schema storage to anon, authenticated, service_role;
 grant usage on schema public to anon, authenticated, service_role;
 grant select, insert on storage.objects to authenticated;
 grant execute on function storage.foldername(text) to anon, authenticated;
+-- Vault and extensions stand ins.
+create schema extensions;
+create extension pgcrypto schema extensions;
+create schema vault;
+create table vault.secrets (id uuid primary key default gen_random_uuid(), name text unique, secret text);
+create view vault.decrypted_secrets as select id, name, secret as decrypted_secret from vault.secrets;
+create function vault.create_secret(s text, n text) returns uuid language sql as $$ insert into vault.secrets (name, secret) values (n, s) returning id $$;

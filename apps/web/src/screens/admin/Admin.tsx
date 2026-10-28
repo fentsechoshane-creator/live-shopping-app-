@@ -8,11 +8,12 @@ export function Admin() {
   const [isAdmin] = useLoad(() => api.isAdmin(), []);
   const [reviews, err1, reload1] = useLoad(() => api.pendingReviews(), []);
   const [disputes, err2, reload2] = useLoad(() => api.disputedOrders(), []);
+  const [topups, , reload3] = useLoad(() => api.topUpsDue(), []);
   const { busy, error, run } = useAction();
   const { toast } = useSession();
   if (isAdmin === undefined) return <div className="screen"><Loading /></div>;
   if (!isAdmin) return <Navigate to="/" replace />;
-  const act = (fn: () => Promise<void>, msg: string) => run(async () => { await fn(); toast(msg); reload1(); reload2(); });
+  const act = (fn: () => Promise<void>, msg: string) => run(async () => { await fn(); toast(msg); reload1(); reload2(); reload3(); });
 
   return (
     <div className="screen">
@@ -31,6 +32,15 @@ export function Admin() {
             <button className="btn green grow" disabled={busy} onClick={() => act(() => api.adminReview(r.shopId, r.what, true), "Approved")}>Approve</button>
             <button className="btn danger grow" disabled={busy} onClick={() => act(() => api.adminReview(r.shopId, r.what, false), "Sent back")}>Reject</button>
           </div>
+        </div>
+      ))}
+      <h2>Welcome credit top ups to pay</h2>
+      <p className="small muted">The welcome credit is our discount. When it is more than our cut, we EFT the seller the difference from the credit budget, on the payout date.</p>
+      {topups?.length === 0 && <div className="empty">Nothing to pay.</div>}
+      {topups?.map((t) => (
+        <div key={t.payoutId} className="card row" style={{ marginBottom: 10 }}>
+          <div className="grow"><b>{R(t.amountCents)}</b> to {t.shopName}<div className="small muted">{t.bank}{t.payOn ? ` · by ${t.payOn}` : " · payout held"}</div></div>
+          <button className="btn dark" disabled={busy} onClick={() => act(() => api.markTopUpPaid(t.payoutId), "Marked as paid")}>Paid</button>
         </div>
       ))}
       <h2>Returns waiting</h2>
