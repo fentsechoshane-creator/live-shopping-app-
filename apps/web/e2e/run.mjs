@@ -1,0 +1,171 @@
+// End to end check of the main journeys in demo mode (no keys needed).
+// Run: npm run build && npm run test:e2e   (from the repo root)
+// Needs Playwright with Chromium: npm i -D playwright && npx playwright install chromium
+import { spawn } from "node:child_process";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
+const { chromium } = loadPlaywright();
+const here = fileURLToPath(new URL(".", import.meta.url));
+const shots = here + "shots/";
+mkdirSync(shots, { recursive: true });
+const PORT = 4173;
+const BASE = `http://localhost:${PORT}`;
+
+function loadPlaywright() {
+  try {
+    const pw = require("playwright");
+    return { chromium: pw.chromium };
+  } catch {
+    console.error("Playwright is not installed. Run: npm i -D playwright && npx playwright install chromium");
+    process.exit(1);
+  }
+}
+
+const server = spawn("npx", ["vite", "preview", "--port", String(PORT), "--strictPort"], { cwd: here + "..", stdio: "pipe" });
+await new Promise((r) => setTimeout(r, 2500));
+
+const browser = await chromium.launch();
+const page = await browser.newPage({ viewport: { width: 400, height: 860 } });
+page.setDefaultTimeout(15000);
+// Fonts are not needed for the checks, and some test environments block them.
+await page.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.abort());
+const errors = [];
+page.on("pageerror", (e) => errors.push(e.message));
+let step = 0;
+const shot = (name) => (console.log("step", step + 1, name), page.screenshot({ path: `${shots}${String(++step).padStart(2, "0")}-${name}.png` }));
+const check = async (cond, msg) => { if (!(await cond)) throw new Error("Check failed: " + msg); };
+const fakeFile = (name, type) => ({ name, mimeType: type, buffer: Buffer.from("demo file") });
+
+async function signIn(email) {
+  await page.goto(`${BASE}/signin`);
+  await page.getByLabel("Email").fill(email);
+  await page.getByRole("button", { name: "Send code" }).click();
+  await page.getByLabel("Code").fill("123456");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.waitForURL((u) => !u.pathname.startsWith("/signin"));
+}
+
+try {
+  // ===== Buyer =====
+  await page.goto(BASE);
+  await page.evaluate(() => localStorage.clear());
+  await page.goto(BASE);
+  await page.getByRole("region", { name: /Oversized tee/ }).waitFor();
+  await shot("feed");
+  await check(page.getByRole("button", { name: "Buy now" }).first().isVisible(), "Buy now visible");
+
+  await page.getByRole("region", { name: /Oversized tee/ }).getByRole("button", { name: "Buy now" }).click();
+  await page.waitForURL(/signin/);
+  await signIn("buyer@test.co.za");
+
+  const tee = page.getByRole("region", { name: /Oversized tee/ });
+  await tee.getByRole("button", { name: "Browse" }).click();
+  await page.getByRole("dialog").getByText("Buyer protection.").waitFor();
+  await shot("browse");
+  await page.getByRole("dialog").getByRole("button", { name: "Buy now" }).click();
+  const sheet = page.getByRole("dialog", { name: "Checkout" });
+  await sheet.getByRole("button", { name: "M", exact: true }).click();
+  await sheet.getByRole("button", { name: /Free collection/ }).click();
+  await sheet.getByText("Welcome credit").waitFor();
+  await shot("checkout");
+  // R349 + R12 protection, minus welcome credit capped at our cut, in whole rand (R32) = R329
+  await check(sheet.getByRole("button", { name: "Pay R329", exact: true }).isVisible(), "total R329 with capped welcome credit");
+  await sheet.getByRole("button", { name: "Pay R329", exact: true }).click();
+  await page.waitForURL(/mock-pay/);
+  await shot("mock-pay");
+  await page.getByRole("button", { name: "Pay now" }).click();
+  await page.waitForURL(/\/orders\//);
+  await page.getByText("Paid, money held safely").waitFor();
+  await shot("order-paid");
+
+  await page.getByRole("button", { name: "Ship and deliver" }).click();
+  await page.getByText("Something wrong?").waitFor();
+  await shot("order-delivered");
+  await page.getByRole("button", { name: "Skip 8 days" }).click();
+  await page.getByText("Complete", { exact: true }).waitFor();
+  await check((await page.getByText("Something wrong?").count()) === 0, "return window closed after 8 days");
+
+  await page.goto(`${BASE}/activity`);
+  await page.getByText("Payment received").waitFor();
+  await shot("activity");
+
+  // ===== Seller =====
+  await page.goto(`${BASE}/me`);
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await signIn("newseller@test.co.za");
+  await page.goto(`${BASE}/sell`);
+  await page.waitForURL(/sell\/start/);
+  await page.getByRole("button", { name: /Clothes and thrift/ }).click();
+  await page.getByLabel("Shop name").fill("Naledi Thrift");
+  await shot("onboard-name");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("heading", { name: "Verify your ID" }).waitFor();
+  await page.getByLabel("Cell number").fill("0821234567");
+  await page.getByLabel("Photo of your ID or passport").setInputFiles(fakeFile("id.jpg", "image/jpeg"));
+  await page.getByLabel("Selfie holding your ID").setInputFiles(fakeFile("selfie.jpg", "image/jpeg"));
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("heading", { name: "Where we pay you" }).waitFor();
+  await page.getByLabel("Bank").selectOption("Capitec");
+  await page.getByLabel("Account number").fill("1234567890");
+  await page.getByLabel("First name").fill("Naledi");
+  await page.getByLabel("Surname").fill("Mokoena");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("heading", { name: "Seller rules" }).waitFor();
+  await check(page.getByRole("button", { name: "Open my shop" }).isDisabled(), "open disabled until rules ticked");
+  for (const r of ["Pack every order on video", "Show every flaw", "Ship within 2 days", "No fakes or replicas", "6% fee per sale"]) {
+    await page.getByRole("button", { name: new RegExp(r) }).click();
+  }
+  await shot("onboard-rules");
+  await page.getByRole("button", { name: "Open my shop" }).click();
+  await page.waitForURL(BASE + "/sell");
+  await page.getByText("Founding seller").waitFor();
+  await shot("seller-home");
+  // Long screens must scroll inside the app frame.
+  await check(page.locator(".screen").evaluate((el) => el.scrollHeight > el.clientHeight && getComputedStyle(el).overflowY === "auto"), "seller home scrolls");
+
+  // Replica listing is blocked.
+  await page.waitForTimeout(3500); // demo ID approval
+  await page.goto(`${BASE}/sell/new`);
+  await page.getByLabel("Title").fill("Jordan 4 reps 1:1");
+  await page.getByLabel("Price (rand)").fill("900");
+  await page.getByRole("button", { name: "Post listing" }).click();
+  await page.getByText(/Counterfeit Goods Act/).first().waitFor();
+  await shot("listing-blocked");
+
+  await page.getByLabel("Title").fill("Vintage denim jacket, size M");
+  await page.getByLabel("Price (rand)").fill("450");
+  await page.getByText(/You get R450 after the 0% founding fee/).waitFor(); // founding sellers pay no fee
+  await page.getByRole("button", { name: /Pre loved/ }).click();
+  await page.getByRole("button", { name: "good", exact: true }).click();
+  await page.getByLabel("Video", { exact: true }).setInputFiles(fakeFile("clip.mp4", "video/mp4"));
+  await page.getByLabel("Video caption").fill("Real denim, every mark on camera");
+  await page.getByRole("button", { name: "Post listing" }).click();
+  await page.waitForURL(BASE + "/sell");
+  await page.getByText("Vintage denim jacket, size M").waitFor();
+  await shot("seller-listed");
+
+  await page.goto(BASE);
+  await page.getByRole("region", { name: /Vintage denim jacket, size M/ }).waitFor();
+
+  // ===== Team =====
+  await page.goto(`${BASE}/me`);
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await signIn("admin@test.co.za");
+  await page.goto(`${BASE}/admin`);
+  await page.getByRole("heading", { name: "Checks waiting" }).waitFor();
+  await shot("admin");
+
+  if (errors.length) throw new Error("Page errors: " + errors.join(" | "));
+  console.log(`E2E passed. Screenshots in ${shots}`);
+} catch (e) {
+  await shot("failure").catch(() => {});
+  console.error(e);
+  process.exitCode = 1;
+} finally {
+  await browser.close();
+  server.kill();
+  process.exit(process.exitCode ?? 0);
+}

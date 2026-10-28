@@ -66,7 +66,9 @@ export function orderTotals(input: OrderTotalsInput): OrderTotals {
   // So it can never be more than the seller fee plus protection fee on that order. [CONFIRM] keep this cap,
   // or top up sellers from our own account so the full R50 always applies.
   const creditUsed =
-    input.welcomeCreditAvailable && input.itemPrice >= WELCOME_CREDIT_MIN_ORDER ? Math.min(WELCOME_CREDIT, fee + protect) : 0;
+    input.welcomeCreditAvailable && input.itemPrice >= WELCOME_CREDIT_MIN_ORDER
+      ? Math.min(WELCOME_CREDIT, Math.floor((fee + protect) / 100) * 100) // whole rand, so totals stay tidy
+      : 0;
   const total = input.itemPrice + deliveryFee + protect - creditUsed;
   return {
     itemPrice: input.itemPrice,

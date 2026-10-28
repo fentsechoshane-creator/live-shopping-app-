@@ -43,6 +43,10 @@ describe("fees", () => {
     expect(big.creditUsed).toBe(rand(50));
     const small = orderTotals({ itemPrice: rand(150), delivery: "courier", welcomeCreditAvailable: true });
     expect(small.creditUsed).toBe(0);
+    // R349 tee: our cut is R20.94 + R12 = R32.94, so the credit is R32 and the total a whole R329.
+    const tee = orderTotals({ itemPrice: rand(349), delivery: "collect_cpt", welcomeCreditAvailable: true });
+    expect(tee.creditUsed).toBe(rand(32));
+    expect(tee.total).toBe(rand(329));
   });
   it("buyer total always covers the seller payout", () => {
     for (let p = 20; p <= 3000; p += 7) {
