@@ -1,0 +1,19 @@
+{
+  "name": "live-shopping-app",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w apps/web",
+    "build": "npm run build -w apps/web",
+    "test": "npm run test -w packages/core && node scripts/check-core-sync.mjs",
+    "test:db": "bash supabase/tests/run-local.sh",
+    "test:e2e": "node apps/web/e2e/run.mjs",
+    "sync-core": "node scripts/sync-core.mjs",
+    "typecheck": "npm run typecheck -w packages/core && npm run typecheck -w apps/web",
+    "check:functions": "cd supabase/functions && deno check --node-modules-dir=none --no-config */index.ts && deno test --node-modules-dir=none --no-config _shared/"
+  }
+}

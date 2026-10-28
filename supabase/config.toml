@@ -1,0 +1,28 @@
+# Supabase CLI config. Only the settings this project relies on; the CLI fills in the rest.
+project_id = "live-shopping-app"
+
+[api]
+port = 54321
+schemas = ["public"]
+
+[db]
+port = 54322
+major_version = 15
+
+[auth]
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://localhost:5173"]
+
+[auth.email]
+enable_signup = true
+enable_confirmations = false
+
+# Webhooks and the scheduled job do not send a Supabase user token.
+[functions.escrow-webhook]
+verify_jwt = false
+
+[functions.mux-webhook]
+verify_jwt = false
+
+[functions.run-due]
+verify_jwt = false
