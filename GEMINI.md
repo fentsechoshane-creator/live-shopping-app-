@@ -1,6 +1,8 @@
 # Notes for Gemini (same as AGENTS.md)
 
-Read README.md, then docs/ARCHITECTURE.md. Then follow these rules.
+Read README.md, docs/ARCHITECTURE.md and docs/DESIGN.md. Then follow these rules.
+
+- **Design rule for every new version:** screens must match the prototype references in `docs/design/prototype/` and use the Liquid Glass system in docs/DESIGN.md (tokens and classes in `apps/web/src/styles.css` only). Check the e2e screenshots against the references before shipping.
 
 - Money is in **cents** (integers) everywhere. Use `formatRand` to show it.
 - Business rules live in `packages/core`. Change them there, add a test in `packages/core/test`, then run `npm run sync-core`. Never edit `supabase/functions/_shared/core` by hand.

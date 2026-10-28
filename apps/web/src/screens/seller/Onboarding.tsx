@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { api, type Category, type MyShop } from "../../api";
 import { useSession } from "../../session";
 import { Choice, ErrorNote, Field, Loading, Progress, useAction } from "../../components/ui";
+import { Icon } from "../../components/Icon";
 
 const CATEGORIES: { id: Category; title: string; sub: string }[] = [
   { id: "clothes", title: "Clothes and thrift", sub: "Pre loved and new fashion" },
@@ -27,7 +28,7 @@ export function Onboarding() {
   const reload = () => api.myShop().then((s) => {
     setShop(s);
     if (!s) return setStep(category ? 2 : 1);
-    if (s.status !== "onboarding") return nav("/sell", { replace: true });
+    if (s.status !== "onboarding") return nav("/me?tab=selling", { replace: true });
     if (s.checks.idStatus === "not_started") return setStep(3);
     if (s.checks.bankStatus === "not_started") return setStep(4);
     setStep(5);
@@ -39,7 +40,7 @@ export function Onboarding() {
   return (
     <div className="screen">
       <div className="row between">
-        <button className="link" onClick={() => (step > 1 && step <= 2 ? setStep(step - 1) : nav("/me"))}>← Back</button>
+        <button className="back" onClick={() => (step > 1 && step <= 2 ? setStep(step - 1) : nav("/me?tab=selling"))}><Icon name="back" size={20} />Back</button>
         <span className="small muted">You can finish later</span>
       </div>
       <Progress step={step} of={5} />
@@ -48,7 +49,7 @@ export function Onboarding() {
       {step === 2 && <StepName category={category ?? shop?.category ?? "clothes"} onDone={reload} />}
       {step === 3 && <StepId food={shop?.category === "food"} onDone={reload} />}
       {step === 4 && <StepBank onDone={reload} />}
-      {step === 5 && <StepRules onDone={() => nav("/sell", { replace: true })} />}
+      {step === 5 && <StepRules onDone={() => nav("/me?tab=selling", { replace: true })} />}
     </div>
   );
 }

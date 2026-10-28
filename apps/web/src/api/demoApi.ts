@@ -17,14 +17,15 @@ interface DShop {
 interface DProduct extends ProductPublic { shopId: string; proofStatus: ReviewStatus }
 interface DPost { id: string; shopId: string; productId: string; caption: string; video: FeedItem["video"]; createdAt: string }
 interface DOrder extends Order { shopOwnerId: string }
-interface DUser extends User { trust: number; welcomeUsed: boolean; admin: boolean }
+interface DUser extends User { trust: number; welcomeUsed: boolean; admin: boolean; createdAt?: string }
 type DPayout = Payout & { shopId: string; topUpCents: number; topUpPaid: boolean };
 interface State {
   users: DUser[]; currentUserId: string | null; shops: DShop[]; products: DProduct[]; posts: DPost[]; orders: DOrder[];
   notifications: (Notification & { userId: string })[]; payouts: DPayout[]; clockOffsetMs: number;
+  follows: { userId: string; shopId: string }[];
 }
 
-const KEY = "lsa-demo-v1";
+const KEY = "lsa-demo-v2";
 const CODE = "123456";
 const id = () => crypto.randomUUID();
 const approvedChecks = (): MyShop["checks"] => ({
@@ -62,13 +63,13 @@ function seed(): State {
     { id: "po-4", shopId: "s-lebo", productId: "p-denim", caption: "Real denim, every mark on camera", video: v("#34495e", "Seller video: denim jacket"), createdAt: new Date(now - 12000e3).toISOString() },
     { id: "po-5", shopId: "s-lebo", productId: "p-runner", caption: "Chunky runner, no logos", video: v("#4a4a3a", "Seller video: runners"), createdAt: new Date(now - 15000e3).toISOString() },
   ];
-  return { users: bots, currentUserId: null, shops, products, posts, orders: [], notifications: [], payouts: [], clockOffsetMs: 0 };
+  return { users: bots, currentUserId: null, shops, products, posts, orders: [], notifications: [], payouts: [], clockOffsetMs: 0, follows: [] };
 }
 
 function load(): State {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) return { ...seed(), ...JSON.parse(raw) };
   } catch { /* storage blocked: start fresh */ }
   return seed();
 }
@@ -101,7 +102,7 @@ export function createDemoApi(): Api {
     return {
       id: sh.id, name: sh.name, handle: sh.handle, category: sh.category, bio: sh.bio, trustScore: t, tier: tierFor(t),
       sales: s.orders.filter((o) => o.shop.id === sh.id && ["delivered", "completed"].includes(o.status)).length,
-      followers: 0, founding: !!sh.foundingUntil && new Date(sh.foundingUntil) > now(),
+      followers: s.follows.filter((f) => f.shopId === sh.id).length, founding: !!sh.foundingUntil && new Date(sh.foundingUntil) > now(),
     };
   };
   const canSell = (sh: DShop) => sh.status === "open" && sh.checks.idStatus === "approved" && sh.checks.bankStatus === "approved" && sh.checks.rulesAccepted;
@@ -186,7 +187,7 @@ export function createDemoApi(): Api {
       const key = contact.trim().toLowerCase();
       let u = s.users.find((x) => x.email === key || x.phone === key);
       if (!u) {
-        u = { id: id(), displayName: key.split("@")[0], trust: 50, welcomeUsed: false, admin: key.startsWith("admin"),
+        u = { id: id(), displayName: key.split("@")[0], trust: 50, welcomeUsed: false, admin: key.startsWith("admin"), createdAt: now().toISOString(),
           ...(key.includes("@") ? { email: key } : { phone: key }) };
         s.users.push(u);
       }
@@ -294,6 +295,32 @@ export function createDemoApi(): Api {
     async markAllRead() {
       const u = me();
       s.notifications.forEach((n) => { if (n.userId === u.id && !n.readAt) n.readAt = now().toISOString(); });
+      save();
+    },
+    async myProfile() {
+      const u = me();
+      return {
+        id: u.id, displayName: u.displayName, email: u.email, trustScore: u.trust, createdAt: u.createdAt ?? now().toISOString(),
+        ordersCount: s.orders.filter((o) => o.buyerId === u.id && !["pending_payment", "cancelled"].includes(o.status)).length,
+      };
+    },
+    async updateProfile(displayName) {
+      me().displayName = displayName.trim();
+      save();
+      listeners.forEach((l) => l(me()));
+    },
+    async following() {
+      const u = me();
+      return s.follows.filter((f) => f.userId === u.id).map((f) => s.shops.find((x) => x.id === f.shopId)).filter(Boolean).map((sh) => publicShop(sh!));
+    },
+    async follow(shopId) {
+      const u = me();
+      if (!s.follows.some((f) => f.userId === u.id && f.shopId === shopId)) s.follows.push({ userId: u.id, shopId });
+      save();
+    },
+    async unfollow(shopId) {
+      const u = me();
+      s.follows = s.follows.filter((f) => !(f.userId === u.id && f.shopId === shopId));
       save();
     },
     async welcomeCreditAvailable() {

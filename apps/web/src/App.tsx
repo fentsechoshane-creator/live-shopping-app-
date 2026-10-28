@@ -1,13 +1,15 @@
-import { NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useState, type ReactNode } from "react";
 import { api } from "./api";
-import { useSession } from "./session";
+import { useLoad, useSession } from "./session";
+import { Icon } from "./components/Icon";
 import { Loading } from "./components/ui";
 import { Feed } from "./screens/buyer/Feed";
+import { Explore } from "./screens/buyer/Explore";
 import { MockPay, OrderDetail, Orders } from "./screens/buyer/Orders";
 import { Activity, Me, ShopPage, SignIn } from "./screens/buyer/Account";
 import { Onboarding } from "./screens/seller/Onboarding";
-import { NewListing, Payouts, SellerOrderDetail, SellerOrders, SellHome } from "./screens/seller/Selling";
+import { NewListing, Payouts, SellerOrderDetail, SellerOrders } from "./screens/seller/Selling";
 import { Admin } from "./screens/admin/Admin";
 
 function RequireUser({ children }: { children: ReactNode }) {
@@ -18,6 +20,7 @@ function RequireUser({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+/** Floating glass tab bar. It turns dark over the video feed. */
 function Tabs() {
   const { user } = useSession();
   const loc = useLocation();
@@ -26,14 +29,90 @@ function Tabs() {
     if (!user) return setUnread(0);
     api.notifications().then((n) => setUnread(n.filter((x) => !x.readAt).length)).catch(() => {});
   }, [user, loc.pathname]);
+  const onVideo = loc.pathname === "/" || loc.pathname.startsWith("/s/");
   return (
-    <nav className="tabs" aria-label="Main">
-      <NavLink to="/" end><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" /></svg>Home</NavLink>
-      <NavLink to="/orders"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 7h12l-1 13H7z" /><path d="M9 7a3 3 0 0 1 6 0" /></svg>Orders</NavLink>
-      <NavLink to="/sell" aria-label="Sell"><span className="plus" aria-hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg></span></NavLink>
-      <NavLink to="/activity"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0c0 6 3 7 3 7H3s3-1 3-7" /><path d="M10 20a2 2 0 0 0 4 0" /></svg>Activity{unread > 0 && <span className="badge">{unread}</span>}</NavLink>
-      <NavLink to="/me"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg>Me</NavLink>
+    <nav className={`tabs glass ${onVideo ? "on-video" : ""}`} aria-label="Main">
+      <NavLink to="/" end aria-label="Home"><Icon name="home" /></NavLink>
+      <NavLink to="/explore" aria-label="Explore"><Icon name="explore" /></NavLink>
+      <NavLink to="/sell/new" className="create" aria-label="Create or start selling"><Icon name="plus" strokeWidth={2.5} /></NavLink>
+      <NavLink to="/activity" aria-label={`Activity${unread ? `, ${unread} new` : ""}`}>
+        <Icon name="bell" />{unread > 0 && <span className="badge">{unread}</span>}
+      </NavLink>
+      <NavLink to="/me" aria-label="My profile"><Icon name="user" /></NavLink>
     </nav>
+  );
+}
+
+/** Side menu with account settings, opened from the menu button on the profile. */
+function SideMenu() {
+  const { user, menuOpen, setMenuOpen, dataSaver, setDataSaver } = useSession();
+  const nav = useNavigate();
+  const [shop] = useLoad(() => (user && menuOpen ? api.myShop() : Promise.resolve(null)), [user?.id, menuOpen]);
+  const [admin] = useLoad(() => (user && menuOpen ? api.isAdmin() : Promise.resolve(false)), [user?.id, menuOpen]);
+  if (!menuOpen || !user) return null;
+  const go = (to: string) => { setMenuOpen(false); nav(to); };
+  const name = user.displayName || user.email?.split("@")[0] || "You";
+  return (
+    <div className="drawer-backdrop" onClick={(e) => e.target === e.currentTarget && setMenuOpen(false)}>
+      <aside className="drawer glass" role="dialog" aria-modal="true" aria-label="Menu and settings">
+        <div className="row between" style={{ marginBottom: 14 }}>
+          <div className="row">
+            <span className="avatar" style={{ width: 44, height: 44, fontSize: 18 }}>{name[0]?.toUpperCase()}</span>
+            <div><b>{name}</b><div className="small muted">{user.email ?? user.phone}</div></div>
+          </div>
+          <button className="icon-btn" onClick={() => setMenuOpen(false)} aria-label="Close menu"><Icon name="close" /></button>
+        </div>
+        <button className="cell" style={{ background: "var(--green-soft)", borderRadius: "var(--r)", marginBottom: 14 }}
+          onClick={() => go(shop && shop.status !== "onboarding" ? "/me?tab=selling" : "/sell/start")}>
+          <span className="icon-btn" style={{ background: "var(--green)", color: "#052e16", width: 36, height: 36, borderRadius: 10 }}><Icon name="store" size={18} /></span>
+          <span className="grow"><span className="t" style={{ display: "block" }}>{shop && shop.status !== "onboarding" ? shop.name : "Start selling"}</span>
+            <span className="s" style={{ display: "block" }}>{shop && shop.status !== "onboarding" ? "Your shop, orders and payouts" : "Open your shop in a few minutes"}</span></span>
+        </button>
+        <div className="group">
+          <MenuRow icon="bag" t="Orders" s="Track, return or rate an order" onClick={() => go("/orders")} />
+          {shop && shop.status !== "onboarding" && <MenuRow icon="truck" t="Orders to ship" s="Ship within 2 days" onClick={() => go("/sell/orders")} />}
+          {shop && shop.status !== "onboarding" && <MenuRow icon="payout" t="Payouts" s="Paid once the return window closes" onClick={() => go("/sell/payouts")} />}
+          <MenuRow icon="bell" t="Notifications" s="Orders, returns and shop updates" onClick={() => go("/activity")} />
+          <MenuRow icon="help" t="Returns and help" s="7 day returns on Buy now, buyer protection" onClick={() => go("/help")} />
+          {admin && <MenuRow icon="team" t="Team" s="Checks, returns and top ups" onClick={() => go("/admin")} />}
+        </div>
+        <div className="group" style={{ marginTop: 14 }}>
+          <div className="cell">
+            <span className="grow"><span className="t" style={{ display: "block" }}>Data saver</span><span className="s" style={{ display: "block" }}>Lower video quality on mobile data</span></span>
+            <button className="switch" role="switch" aria-checked={dataSaver} aria-label="Data saver" onClick={() => setDataSaver(!dataSaver)} />
+          </div>
+        </div>
+        <div style={{ flex: 1 }} />
+        <button className="btn danger block" style={{ marginTop: 18 }} onClick={() => { setMenuOpen(false); api.signOut().then(() => nav("/")); }}>
+          <Icon name="logout" size={18} />Log out
+        </button>
+        {api.demo && <button className="btn line block" style={{ marginTop: 8 }} onClick={() => { setMenuOpen(false); api.demo!.reset().then(() => nav("/")); }}>Reset demo data</button>}
+      </aside>
+    </div>
+  );
+}
+
+function MenuRow({ icon, t, s, onClick }: { icon: string; t: string; s: string; onClick: () => void }) {
+  return (
+    <button type="button" className="cell" onClick={onClick}>
+      <span className="icon-btn" style={{ width: 34, height: 34, borderRadius: 10 }}><Icon name={icon} size={18} /></span>
+      <span className="grow"><span className="t" style={{ display: "block" }}>{t}</span><span className="s" style={{ display: "block" }}>{s}</span></span>
+      <span className="chev"><Icon name="chevron" size={18} /></span>
+    </button>
+  );
+}
+
+function Help() {
+  return (
+    <div className="screen">
+      <h1>Returns and help</h1>
+      <div className="group">
+        <div className="cell"><span className="grow"><span className="t" style={{ display: "block" }}>Change your mind</span><span className="s" style={{ display: "block" }}>Buy now items can be returned within 7 days of delivery. You pay the return postage.</span></span></div>
+        <div className="cell"><span className="grow"><span className="t" style={{ display: "block" }}>Wrong, faulty or not as described</span><span className="s" style={{ display: "block" }}>Ask for a return from the order. The seller pays the postage. Faulty items: up to 6 months.</span></span></div>
+        <div className="cell"><span className="grow"><span className="t" style={{ display: "block" }}>Your money is held safely</span><span className="s" style={{ display: "block" }}>An escrow provider holds every payment until the return window closes.</span></span></div>
+        <div className="cell"><span className="grow"><span className="t" style={{ display: "block" }}>Auctions and made to order food</span><span className="s" style={{ display: "block" }}>No change of mind returns, but you are covered if something is wrong.</span></span></div>
+      </div>
+    </div>
   );
 }
 
@@ -42,18 +121,20 @@ const guard = (el: ReactNode) => <RequireUser>{el}</RequireUser>;
 export function App() {
   return (
     <div className="phone">
-      {api.mode === "demo" && <div className="demo-bar">Demo mode: test data in this browser only</div>}
+      {api.mode === "demo" && <div className="demo-bar">Demo mode: test data on this phone only</div>}
       <div className="content">
         <Routes>
           <Route path="/" element={<Feed />} />
+          <Route path="/explore" element={<Explore />} />
           <Route path="/signin" element={<SignIn />} />
           <Route path="/s/:handle" element={<ShopPage />} />
+          <Route path="/help" element={<Help />} />
           <Route path="/orders" element={guard(<Orders />)} />
           <Route path="/orders/:id" element={guard(<OrderDetail />)} />
           <Route path="/mock-pay/:id" element={guard(<MockPay />)} />
           <Route path="/activity" element={guard(<Activity />)} />
           <Route path="/me" element={guard(<Me />)} />
-          <Route path="/sell" element={guard(<SellHome />)} />
+          <Route path="/sell" element={<Navigate to="/me?tab=selling" replace />} />
           <Route path="/sell/start" element={guard(<Onboarding />)} />
           <Route path="/sell/new" element={guard(<NewListing />)} />
           <Route path="/sell/orders" element={guard(<SellerOrders />)} />
@@ -63,6 +144,7 @@ export function App() {
           <Route path="*" element={<div className="screen"><div className="empty">Page not found.</div></div>} />
         </Routes>
         <Tabs />
+        <SideMenu />
       </div>
     </div>
   );

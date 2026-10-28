@@ -28,6 +28,15 @@ export interface FeedItem {
   video: VideoSource;
 }
 
+export interface MyProfile {
+  id: string;
+  displayName: string;
+  email?: string;
+  trustScore: number;
+  createdAt: string;
+  ordersCount: number;
+}
+
 export interface ProductPublic {
   id: string;
   title: string;
@@ -192,6 +201,11 @@ export interface Api {
   notifications(): Promise<Notification[]>;
   markAllRead(): Promise<void>;
   welcomeCreditAvailable(): Promise<boolean>;
+  myProfile(): Promise<MyProfile>;
+  updateProfile(displayName: string): Promise<void>;
+  following(): Promise<ShopPublic[]>;
+  follow(shopId: string): Promise<void>;
+  unfollow(shopId: string): Promise<void>;
   // Selling
   myShop(): Promise<MyShop | null>;
   startShop(name: string, handle: string, category: Category): Promise<void>;

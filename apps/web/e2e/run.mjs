@@ -39,6 +39,13 @@ const shot = (name) => (console.log("step", step + 1, name), page.screenshot({ p
 const check = async (cond, msg) => { if (!(await cond)) throw new Error("Check failed: " + msg); };
 const fakeFile = (name, type) => ({ name, mimeType: type, buffer: Buffer.from("demo file") });
 
+async function signOut() {
+  await page.goto(`${BASE}/me`);
+  await page.getByRole("button", { name: "Menu and settings" }).click();
+  await page.getByRole("button", { name: "Log out" }).click();
+  await page.waitForURL(BASE + "/");
+}
+
 async function signIn(email) {
   await page.goto(`${BASE}/signin`);
   await page.getByLabel("Email").fill(email);
@@ -64,6 +71,7 @@ try {
   const tee = page.getByRole("region", { name: /Oversized tee/ });
   await tee.getByRole("button", { name: "Browse" }).click();
   await page.getByRole("dialog").getByText("Buyer protection.").waitFor();
+  await page.waitForTimeout(400); // let the sheet finish rising
   await shot("browse");
   await page.getByRole("dialog").getByRole("button", { name: "Buy now" }).click();
   const sheet = page.getByRole("dialog", { name: "Checkout" });
@@ -91,12 +99,32 @@ try {
   await page.goto(`${BASE}/activity`);
   await page.getByText("Payment received").waitFor();
   await shot("activity");
+  await page.getByRole("button", { name: "Orders", exact: true }).click();
+  await page.getByText("Oversized tee, sand").first().waitFor();
+
+  // Follow a seller, then see them in Following and on the profile.
+  await page.goto(BASE);
+  await page.getByRole("region", { name: /Oversized tee/ }).getByRole("button", { name: "Follow" }).click();
+  await page.getByRole("group", { name: "Feed" }).getByRole("button", { name: "Following" }).click();
+  await page.getByRole("region", { name: /Oversized tee/ }).waitFor();
+  await shot("following");
+  await page.goto(`${BASE}/explore`);
+  await page.getByRole("heading", { name: "Shops to follow" }).waitFor();
+  await shot("explore");
+  await page.goto(`${BASE}/me`);
+  await page.getByText("@thrift.with.lebo").waitFor();
+  await shot("me-buying");
+  await page.getByRole("button", { name: "Menu and settings" }).click();
+  await page.getByRole("dialog", { name: "Menu and settings" }).waitFor();
+  await page.waitForTimeout(400);
+  await shot("menu");
+  await page.getByRole("button", { name: "Close menu" }).click();
 
   // ===== Seller =====
-  await page.goto(`${BASE}/me`);
-  await page.getByRole("button", { name: "Sign out" }).click();
+  await signOut();
   await signIn("newseller@test.co.za");
-  await page.goto(`${BASE}/sell`);
+  await page.goto(`${BASE}/me?tab=selling`);
+  await page.getByRole("button", { name: "Open my shop" }).click();
   await page.waitForURL(/sell\/start/);
   await page.getByRole("button", { name: /Clothes and thrift/ }).click();
   await page.getByLabel("Shop name").fill("Naledi Thrift");
@@ -120,8 +148,8 @@ try {
   }
   await shot("onboard-rules");
   await page.getByRole("button", { name: "Open my shop" }).click();
-  await page.waitForURL(BASE + "/sell");
-  await page.getByText("Founding seller").waitFor();
+  await page.waitForURL(/me\?tab=selling/);
+  await page.getByText(/Founding seller/).first().waitFor();
   await shot("seller-home");
   // Long screens must scroll inside the app frame.
   await check(page.locator(".screen").evaluate((el) => el.scrollHeight > el.clientHeight && getComputedStyle(el).overflowY === "auto"), "seller home scrolls");
@@ -143,7 +171,7 @@ try {
   await page.getByLabel("Video", { exact: true }).setInputFiles(fakeFile("clip.mp4", "video/mp4"));
   await page.getByLabel("Video caption").fill("Real denim, every mark on camera");
   await page.getByRole("button", { name: "Post listing" }).click();
-  await page.waitForURL(BASE + "/sell");
+  await page.waitForURL(/me\?tab=selling/);
   await page.getByText("Vintage denim jacket, size M").waitFor();
   await shot("seller-listed");
 
@@ -151,8 +179,7 @@ try {
   await page.getByRole("region", { name: /Vintage denim jacket, size M/ }).waitFor();
 
   // ===== Team =====
-  await page.goto(`${BASE}/me`);
-  await page.getByRole("button", { name: "Sign out" }).click();
+  await signOut();
   await signIn("admin@test.co.za");
   await page.goto(`${BASE}/admin`);
   await page.getByRole("heading", { name: "Checks waiting" }).waitFor();

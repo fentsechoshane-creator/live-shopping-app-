@@ -6,12 +6,16 @@ import {
 } from "@app/core";
 import { api, type MyShop } from "../../api";
 import { useLoad, useSession } from "../../session";
-import { ErrorNote, Field, Loading, R, TierPill, dateText, dateTimeText, useAction } from "../../components/ui";
+import { BackButton, Cell, ErrorNote, Field, Loading, R, TierPill, dateText, dateTimeText, swatch, useAction } from "../../components/ui";
+import { Icon } from "../../components/Icon";
 import { statusPill, Timeline } from "../buyer/Orders";
 
-export function SellHome() {
+/** The Selling side of the profile: shop header, checklist, trust score and items, like the prototype. */
+export function SellingView() {
   const [shop, error, reload] = useLoad(() => api.myShop(), []);
   const [orders] = useLoad(() => api.sellerOrders(), []);
+  const { toast } = useSession();
+  const nav = useNavigate();
   useEffect(() => {
     // Checks are reviewed in the background, so refresh while something is pending.
     if (shop && (shop.checks.idStatus === "pending" || shop.checks.certStatus === "pending")) {
@@ -19,9 +23,24 @@ export function SellHome() {
       return () => window.clearTimeout(t);
     }
   }, [shop, reload]);
-  if (error) return <div className="screen"><ErrorNote error={error} /></div>;
-  if (shop === undefined) return <div className="screen"><Loading /></div>;
-  if (!shop || shop.status === "onboarding") return <Navigate to="/sell/start" replace />;
+  if (error) return <ErrorNote error={error} />;
+  if (shop === undefined) return <Loading />;
+  if (!shop || shop.status === "onboarding") {
+    return (
+      <div className="stack">
+        <div className="card" style={{ background: "var(--green-soft)", boxShadow: "none" }}>
+          <div className="row" style={{ alignItems: "flex-start" }}>
+            <span className="icon-btn" style={{ background: "var(--green)", color: "#052e16" }}><Icon name="store" /></span>
+            <div className="grow">
+              <b style={{ fontSize: 17 }}>{shop ? "Finish opening your shop" : "Start selling"}</b>
+              <p className="small muted" style={{ margin: "4px 0 12px" }}>Sell from video with the money held safely. No monthly fee, 6% only when you sell. The first 50 shops pay 0% for 3 months.</p>
+              <button className="btn green" onClick={() => nav("/sell/start")}>{shop ? "Continue" : "Open my shop"}</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const tier = tierFor(shop.trustScore);
   const sold = (orders ?? []).filter((o) => !["cancelled", "refunded"].includes(o.status)).length;
@@ -34,66 +53,95 @@ export function SellHome() {
     ["Post a video of your items", shop.products.some((p) => p.posted)],
     ["Get your first sale", sold > 0],
   ];
+  const doneCount = steps.filter((x) => x[1]).length;
   const state = { verified: shop.checks.idStatus === "approved" && shop.checks.bankStatus === "approved", goodOrders: shop.goodOrders,
     trustScore: shop.trustScore, category: shop.category, foodCertApproved: shop.checks.certStatus === "approved" };
   const auction = canUse("timed_auction", state);
+  const categoryText = { clothes: "Clothes and thrift", beauty: "Hair and beauty", food: "Food and bakes", designer: "Designer resale" }[shop.category];
+  const share = async () => {
+    try { await navigator.clipboard.writeText(`${location.origin}/s/${shop.handle}`); toast("Shop link copied"); } catch { toast("Could not copy the link"); }
+  };
 
   return (
-    <div className="screen">
-      <div className="row between">
-        <div><h1 style={{ marginBottom: 0 }}>{shop.name}</h1><span className="small muted">@{shop.handle}</span></div>
+    <>
+      <div className="profile-head">
+        <div className="ring green"><div><Icon name="store" size={34} /></div></div>
+        <div className="stats">
+          <div><b>{orders === undefined ? "…" : sold}</b><span>Sales</span></div>
+          <div><b>{shop.products.filter((p) => p.status === "live").length}</b><span>Live items</span></div>
+          <div><b>{shop.trustScore}</b><span>Trust</span></div>
+        </div>
+      </div>
+      <div className="row" style={{ gap: 6 }}>
+        <b style={{ fontSize: 17 }}>{shop.name}</b>
+        {shop.checks.idStatus === "approved" && <span style={{ color: "var(--green)" }} aria-label="Verified"><Icon name="check" size={18} strokeWidth={3} /></span>}
         <TierPill tier={tier} />
       </div>
-      {shop.status === "banned" && <div className="error" style={{ marginTop: 12 }}>This shop has been closed for breaking the seller rules.</div>}
+      <div className="small muted" style={{ margin: "2px 0 14px" }}>{categoryText} · Cape Town · @{shop.handle}</div>
+      {shop.status === "banned" && <div className="error">This shop has been closed for breaking the seller rules.</div>}
+      <div className="row">
+        <button className="btn green grow" onClick={() => nav("/sell/new")}><Icon name="plus" size={18} />List an item</button>
+        <button className="btn grow" onClick={share}>Share shop</button>
+      </div>
       {shop.foundingUntil && new Date(shop.foundingUntil) > new Date() && (
         <div className="note green" style={{ marginTop: 12 }}>Founding seller: 0% seller fee until {dateText(shop.foundingUntil)}.</div>
       )}
 
-      <div className="row" style={{ marginTop: 14 }}>
-        <Link to="/sell/new" className="btn green grow">List an item</Link>
-        <Link to="/sell/orders" className="btn grow">Orders{toShip ? ` (${toShip} to ship)` : ""}</Link>
+      <div className="group" style={{ marginTop: 16 }}>
+        <Cell icon="truck" title="Orders" sub={toShip ? `${toShip} to ship within 2 days` : "Nothing to ship right now"} to="/sell/orders"
+          right={toShip ? <span className="count">{toShip}</span> : undefined} />
+        <Cell icon="payout" title="Payouts" sub="Paid once the return window closes" to="/sell/payouts" />
       </div>
 
-      <h2>Get your shop going</h2>
-      <div className="card checklist">
-        {steps.map(([t, done, sub]) => (
-          <div className="item" key={t}>
-            <span className={`dot ${done ? "done" : ""}`}>{done ? "✓" : ""}</span>
-            <span className={`grow ${done ? "done-text" : ""}`}>{t}{sub && <span className="small muted"> · {sub}</span>}</span>
-          </div>
-        ))}
-        {shop.category === "food" && shop.checks.certStatus !== "approved" && <CertUpload status={shop.checks.certStatus} onDone={reload} />}
-      </div>
+      {doneCount < steps.length && (
+        <div className="card checklist" style={{ marginTop: 16 }}>
+          <div className="row between"><b style={{ fontSize: 16 }}>Get your shop going</b><span className="small muted">{doneCount} of {steps.length} done</span></div>
+          <div className="progress" style={{ margin: "10px 0 4px" }}>{steps.map((x, i) => <span key={i} className={x[1] ? "on" : ""} />)}</div>
+          {steps.map(([t, done, sub]) => (
+            <div className="item" key={t}>
+              <span className={`dot ${done ? "done" : ""}`}>{done && <Icon name="check" size={14} strokeWidth={3} />}</span>
+              <span className={`grow ${done ? "done-text" : ""}`}>{t}{sub && <span className="small muted"> · {sub}</span>}</span>
+            </div>
+          ))}
+          {shop.category === "food" && shop.checks.certStatus !== "approved" && <CertUpload status={shop.checks.certStatus} onDone={reload} />}
+        </div>
+      )}
 
-      <h2>Trust score</h2>
-      <div className="card">
+      <div className="card" style={{ marginTop: 16 }}>
         <div className="score">
-          <div className="ring" style={{ background: `conic-gradient(var(--green) ${shop.trustScore}%, var(--soft) 0)` }}><div>{shop.trustScore}</div></div>
+          <div className="ring2" style={{ background: `conic-gradient(var(--green) ${shop.trustScore}%, var(--surface-2) 0)` }}><div>{shop.trustScore}</div></div>
           <div className="grow"><b>{TIER_INFO[tier].label}</b><div className="small muted">{TIER_INFO[tier].perks}</div></div>
         </div>
-        <p className="small muted" style={{ marginBottom: 0 }}>
-          Earn points: kept order +{TRUST_POINTS.order_kept}, ship in 2 days with a packing video +{TRUST_POINTS.fast_ship_with_video}, five star review +{TRUST_POINTS.five_star_review}.
-          Lose points: item not as described {TRUST_POINTS.not_as_described}, not shipped {TRUST_POINTS.not_shipped}, asking for payment outside the app {TRUST_POINTS.off_app_payment}.
+        <p className="small muted" style={{ marginBottom: 0, lineHeight: 1.5 }}>
+          Earn: kept order +{TRUST_POINTS.order_kept}, ship in 2 days with a packing video +{TRUST_POINTS.fast_ship_with_video}, five star review +{TRUST_POINTS.five_star_review}.
+          Lose: not as described {TRUST_POINTS.not_as_described}, not shipped {TRUST_POINTS.not_shipped}, payment outside the app {TRUST_POINTS.off_app_payment}.
         </p>
       </div>
 
-      <h2>Unlocks</h2>
-      <div className="card small">
-        <div className="row between"><span>Buy now, videos and chat</span><span className="pill green">Open</span></div>
-        <div className="row between" style={{ marginTop: 8 }}><span>Auctions and going live</span><span className={`pill ${auction.ok ? "green" : ""}`}>{auction.ok ? "Open" : `${shop.goodOrders} of 5 good orders`}</span></div>
+      <div className="group" style={{ marginTop: 16 }}>
+        <Cell title="Buy now, videos and chat" right={<span className="pill green">Open</span>} />
+        <Cell title="Auctions and going live" right={<span className={`pill ${auction.ok ? "green" : ""}`}>{auction.ok ? "Open" : `${shop.goodOrders} of 5 good orders`}</span>} />
       </div>
 
-      <h2>Your items</h2>
-      {shop.products.length === 0 && <div className="empty">No items yet.</div>}
-      {shop.products.map((p) => (
-        <div key={p.id} className="list-item">
-          <div className="thumb" style={{ background: "#a8a29e" }}>{p.title.slice(0, 10)}</div>
-          <div className="grow"><b>{p.title}</b><div className="small muted">{R(p.priceCents)} · {LISTING_LABELS[p.label].label} · stock {p.stock}</div></div>
-          <span className={`pill ${p.status === "live" ? "green" : ""}`}>{p.status === "draft" && p.proofStatus === "pending" ? "Proof checking" : p.status.replace("_", " ")}</span>
+      <h2 className="section-title">Your items</h2>
+      {shop.products.length === 0 ? (
+        <div className="empty-card"><span className="grow muted">No items yet. Post a short video of your first item.</span>
+          <button className="btn dark" style={{ minHeight: 40 }} onClick={() => nav("/sell/new")}>List an item</button></div>
+      ) : (
+        <div className="grid2">
+          {shop.products.map((p) => (
+            <div key={p.id} className="tile">
+              <div className="media" style={{ background: `linear-gradient(160deg, ${swatch(p.id)}, #111)` }}>
+                <span className={`vchip vglass ${p.status === "live" ? "" : "amber"}`}><span className="d" />
+                  {p.status === "draft" && p.proofStatus === "pending" ? "Proof checking" : p.status === "live" ? "Live" : p.status === "sold_out" ? "Sold out" : "Draft"}</span>
+              </div>
+              <div className="body"><div className="t">{p.title}</div><div className="p">{R(p.priceCents)}</div>
+                <div className="small muted">{LISTING_LABELS[p.label].label} · {p.mode === "order_now" ? "made to order" : `${p.stock} in stock`}</div></div>
+            </div>
+          ))}
         </div>
-      ))}
-      <Link to="/sell/payouts" className="choice" style={{ marginTop: 16 }}><b>Payouts</b><span>›</span></Link>
-    </div>
+      )}
+    </>
   );
 }
 
@@ -149,7 +197,7 @@ export function NewListing() {
         leadDays: food ? Number(leadDays) || 2 : null, allergens: food ? allergens || null : null, caption: caption.trim() || title.trim(),
       }, video, proof, setProgress);
       toast(res.live ? "Your item is live" : res.message ?? "Saved as a draft");
-      nav("/sell");
+      nav("/me?tab=selling");
     });
   };
 
@@ -157,8 +205,8 @@ export function NewListing() {
   if (!shop || shop.status === "onboarding") return <Navigate to="/sell/start" replace />;
   return (
     <form className="screen" onSubmit={submit}>
-      <button type="button" className="link" onClick={() => nav(-1)}>← Back</button>
-      <h1 style={{ marginTop: 10 }}>List an item</h1>
+      <BackButton />
+      <h1 style={{ marginTop: 6 }}>List an item</h1>
       <ErrorNote error={error} />
       <Field label="Video" hint="Short and honest. Show the whole item and every flaw. Up to 60 seconds works best.">
         <input type="file" accept="video/*" capture="environment" onChange={(e) => setVideo(e.target.files?.[0] ?? null)} />
@@ -208,8 +256,8 @@ export function SellerOrders() {
   const [orders, error] = useLoad(() => api.sellerOrders(), []);
   return (
     <div className="screen">
-      <Link to="/sell" className="link">← Shop</Link>
-      <h1 style={{ marginTop: 10 }}>Orders</h1>
+      <BackButton to="/me?tab=selling" label="Shop" />
+      <h1 style={{ marginTop: 6 }}>Orders</h1>
       <ErrorNote error={error} />
       {!orders && !error && <Loading />}
       {orders?.length === 0 && <div className="empty">No orders yet. Post videos to get your first sale.</div>}
@@ -242,8 +290,8 @@ export function SellerOrderDetail() {
 
   return (
     <div className="screen">
-      <Link to="/sell/orders" className="link">← Orders</Link>
-      <h1 style={{ marginTop: 10 }}>{o.product.title}</h1>
+      <BackButton to="/sell/orders" label="Orders" />
+      <h1 style={{ marginTop: 6 }}>{o.product.title}</h1>
       <div className="row between"><span className="small muted">{o.size ? `Size ${o.size} · ` : ""}{DELIVERY_OPTIONS[o.delivery].label}</span>{statusPill(o, "seller")}</div>
       <ErrorNote error={actErr} />
 
@@ -304,8 +352,8 @@ export function Payouts() {
   const tier = shop ? tierFor(shop.trustScore) : "standard";
   return (
     <div className="screen">
-      <Link to="/sell" className="link">← Shop</Link>
-      <h1 style={{ marginTop: 10 }}>Payouts</h1>
+      <BackButton to="/me?tab=selling" label="Shop" />
+      <h1 style={{ marginTop: 6 }}>Payouts</h1>
       <div className="note" style={{ marginBottom: 12 }}>
         You are paid once the buyer's return window closes. As a <b>{TIER_INFO[tier].label}</b> seller: {tier === "top" ? "the next working day" : tier === "trusted" ? "within 2 working days" : tier === "restricted" ? "held for review" : "in the weekly Friday run"}.
         {shop?.checks.bankLast4 && <> To {shop.checks.bankName} ending {shop.checks.bankLast4}.</>}

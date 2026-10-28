@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { DELIVERY_OPTIONS, ORDER_STATUS_TEXT, returnReasonsFor, type ReturnReason } from "@app/core";
 import { api, type Order } from "../../api";
 import { useLoad, useSession } from "../../session";
-import { ErrorNote, Field, Loading, R, dateText, dateTimeText, useAction } from "../../components/ui";
+import { BackButton, ErrorNote, Field, Loading, R, dateText, dateTimeText, swatch, useAction } from "../../components/ui";
 
 const REASON_TEXT: Record<ReturnReason, string> = {
   changed_mind: "I changed my mind",
@@ -13,29 +13,37 @@ const REASON_TEXT: Record<ReturnReason, string> = {
 };
 
 export function statusPill(o: Order, side: "buyer" | "seller") {
-  const cls = ["refunded", "cancelled"].includes(o.status) ? "" : o.status === "completed" ? "green" : o.status.startsWith("return") ? "amber" : "dark";
+  const cls = ["refunded", "cancelled"].includes(o.status) ? "" : o.status === "completed" ? "green" : o.status.startsWith("return") || o.status === "pending_payment" ? "amber" : "green";
   return <span className={`pill ${cls}`}>{ORDER_STATUS_TEXT[o.status][side]}</span>;
+}
+
+export function OrderList({ orders }: { orders: Order[] | undefined }) {
+  if (!orders) return <Loading />;
+  if (orders.length === 0) return <div className="empty-card"><span className="muted">No orders yet. Things you buy or order show here.</span></div>;
+  return (
+    <div className="group">
+      {orders.map((o) => (
+        <Link key={o.id} to={`/orders/${o.id}`} className="cell">
+          <div className="thumb" style={{ background: swatch(o.product.id), color: "#fff" }}>{o.product.title.slice(0, 10)}</div>
+          <span className="grow">
+            <span className="t" style={{ display: "block" }}>{o.product.title}</span>
+            <span className="s" style={{ display: "block" }}>{o.shop.name} · {dateText(o.createdAt)}</span>
+            <span style={{ display: "block", marginTop: 6 }}>{statusPill(o, "buyer")}</span>
+          </span>
+          <b style={{ fontVariantNumeric: "tabular-nums" }}>{R(o.totals.total)}</b>
+        </Link>
+      ))}
+    </div>
+  );
 }
 
 export function Orders() {
   const [orders, error] = useLoad(() => api.myOrders(), []);
   return (
     <div className="screen">
-      <h1>My orders</h1>
+      <h1 className="large-title" style={{ margin: "8px 0 16px" }}>My orders</h1>
       <ErrorNote error={error} />
-      {!orders && !error && <Loading />}
-      {orders?.length === 0 && <div className="empty">No orders yet. Find something in the feed.</div>}
-      {orders?.map((o) => (
-        <Link key={o.id} to={`/orders/${o.id}`} className="list-item">
-          <div className="thumb" style={{ background: "#a8a29e" }}>{o.product.title.slice(0, 12)}</div>
-          <div className="grow">
-            <b>{o.product.title}</b>
-            <div className="small muted">{o.shop.name} · {dateText(o.createdAt)}</div>
-            <div style={{ marginTop: 4 }}>{statusPill(o, "buyer")}</div>
-          </div>
-          <b>{R(o.totals.total)}</b>
-        </Link>
-      ))}
+      <OrderList orders={orders} />
     </div>
   );
 }
@@ -59,8 +67,8 @@ export function OrderDetail() {
 
   return (
     <div className="screen">
-      <button className="link" onClick={() => nav(-1)}>← Back</button>
-      <h1 style={{ marginTop: 10 }}>{o.product.title}</h1>
+      <BackButton />
+      <h1 style={{ marginTop: 6 }}>{o.product.title}</h1>
       <div className="row between"><span className="muted small">from {o.shop.name}</span>{statusPill(o, "buyer")}</div>
       <ErrorNote error={actErr} />
 
@@ -154,7 +162,7 @@ export function Timeline({ o }: { o: Order }) {
 
 function DemoTools({ orderId, onDone }: { orderId: string; onDone: () => void }) {
   return (
-    <div className="card" style={{ marginTop: 20, background: "#fffbeb", borderColor: "#fde68a" }}>
+    <div className="card" style={{ marginTop: 20, background: "var(--amber-soft)", boxShadow: "none" }}>
       <b>Demo tools</b>
       <p className="small muted" style={{ margin: "4px 0 10px" }}>Only in demo mode, to move the order along.</p>
       <div className="row">

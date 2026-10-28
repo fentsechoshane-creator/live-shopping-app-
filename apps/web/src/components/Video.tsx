@@ -1,9 +1,11 @@
 import { useEffect, useRef } from "react";
 import type { VideoSource } from "../api";
+import { useSession } from "../session";
 
 /** Plays a Mux stream (HLS), a direct file, or shows the demo placeholder. Plays only while on screen. */
 export function Video({ src, label }: { src: VideoSource; label: string }) {
   const ref = useRef<HTMLVideoElement>(null);
+  const { dataSaver } = useSession();
   const hlsUrl = src.muxPlaybackId ? `https://stream.mux.com/${src.muxPlaybackId}.m3u8` : null;
   const poster = src.muxPlaybackId ? `https://image.mux.com/${src.muxPlaybackId}/thumbnail.jpg?width=480` : undefined;
 
@@ -18,10 +20,12 @@ export function Video({ src, label }: { src: VideoSource; label: string }) {
         const hls = new Hls({ capLevelToPlayerSize: true });
         hls.loadSource(hlsUrl);
         hls.attachMedia(v);
+        // Data saver: stay on the lowest quality.
+        if (dataSaver) hls.on(Hls.Events.MANIFEST_PARSED, () => { hls.autoLevelCapping = 0; });
         destroy = () => hls.destroy();
       });
     return () => destroy();
-  }, [hlsUrl]);
+  }, [hlsUrl, dataSaver]);
 
   useEffect(() => {
     const v = ref.current;
@@ -32,7 +36,12 @@ export function Video({ src, label }: { src: VideoSource; label: string }) {
   }, []);
 
   if (!hlsUrl && !src.url) {
-    return <div className="placeholder" style={{ background: src.demo?.bg ?? "#333" }} role="img" aria-label={label}>{src.demo?.label ?? label}</div>;
+    return (
+      <div className="placeholder" style={{ background: `radial-gradient(120% 90% at 50% 25%, ${src.demo?.bg ?? "#333"}, #0e0e10)` }} role="img" aria-label={label}>
+        <div className="silhouette" />
+        <span style={{ position: "relative" }}>{src.demo?.label ?? label}</span>
+      </div>
+    );
   }
   return <video ref={ref} src={hlsUrl ? undefined : src.url ?? undefined} poster={poster} muted loop playsInline aria-label={label} />;
 }

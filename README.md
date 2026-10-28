@@ -29,7 +29,7 @@ See [docs/SETUP.md](docs/SETUP.md): Supabase (database, sign in, storage), Mux (
 | `apps/web` | The web app (React). Works in demo mode or against Supabase. |
 | `docs` | Setup, architecture and the open questions. |
 
-Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before changing how money moves.
+Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before changing how money moves, and [docs/DESIGN.md](docs/DESIGN.md) before changing any screen. Every new version must keep the prototype design.
 
 ## Checks
 

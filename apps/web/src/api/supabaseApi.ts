@@ -2,6 +2,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { validateListing } from "@app/core";
 import type {
+  MyProfile, ShopPublic,
   Api, BankInput, Category, CheckoutInput, FeedItem, ListingInput, MyShop, Notification, Order, Payout, PendingReview,
   ProductPublic, User,
 } from "./types";
@@ -170,6 +171,33 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
     },
     async markAllRead() {
       check(await sb.from("notifications").update({ read_at: new Date().toISOString() }).is("read_at", null));
+    },
+    async myProfile(): Promise<MyProfile> {
+      const { data: u } = await sb.auth.getUser();
+      if (!u.user) throw new Error("Please sign in.");
+      const { data: p } = await sb.from("profiles").select("display_name, trust_score, created_at").eq("id", u.user.id).single();
+      const { count } = await sb.from("orders").select("id", { count: "exact", head: true }).eq("buyer_id", u.user.id)
+        .not("status", "in", "(pending_payment,cancelled)");
+      return {
+        id: u.user.id, displayName: p?.display_name || u.user.email?.split("@")[0] || "", email: u.user.email,
+        trustScore: p?.trust_score ?? 50, createdAt: p?.created_at ?? u.user.created_at, ordersCount: count ?? 0,
+      };
+    },
+    async updateProfile(displayName) {
+      check(await sb.from("profiles").update({ display_name: displayName.trim() }).eq("id", await uid()));
+    },
+    async following() {
+      const rows = check(await sb.from("follows").select("shops(id, name, handle, category)").eq("user_id", await uid())) as any[];
+      return rows.filter((r) => r.shops).map((r): ShopPublic => ({
+        id: r.shops.id, name: r.shops.name, handle: r.shops.handle, category: r.shops.category, trustScore: 50, tier: "standard",
+      }));
+    },
+    async follow(shopId) {
+      const res = await sb.from("follows").insert({ user_id: await uid(), shop_id: shopId });
+      if (res.error && !res.error.message.includes("duplicate")) throw new Error(res.error.message);
+    },
+    async unfollow(shopId) {
+      check(await sb.from("follows").delete().eq("user_id", await uid()).eq("shop_id", shopId));
     },
     async welcomeCreditAvailable() {
       const me = await uid();

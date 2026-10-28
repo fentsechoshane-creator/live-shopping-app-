@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { DELIVERY_OPTIONS, orderTotals, type DeliveryOption } from "@app/core";
 import { api, type FeedItem } from "../../api";
-import { Choice, ErrorNote, Field, R, Sheet, useAction } from "../../components/ui";
+import { Icon } from "../../components/Icon";
+import { Choice, ErrorNote, Field, R, Sheet, swatch, useAction } from "../../components/ui";
 
 // [CONFIRM] Replace with the PUDO locker list from their API once we have an account.
 export const SAMPLE_LOCKERS = ["Rondebosch, Main Road", "Claremont, Cavendish Square", "Gardens Centre, Cape Town", "Observatory, Lower Main", "Woodstock Exchange"];
@@ -45,19 +46,20 @@ export function CheckoutSheet({ item, onClose }: { item: FeedItem; onClose: () =
         <>
           <ErrorNote error={error} />
           <button className="btn green block big" onClick={pay} disabled={busy}>{busy ? "Opening payment…" : `Pay ${R(t.total)}`}</button>
-          <p className="small muted" style={{ textAlign: "center", margin: "8px 0 0" }}>🛡 Held safely until your {food ? "check period" : "return window"} closes.</p>
+          <p className="small muted row" style={{ justifyContent: "center", margin: "8px 0 0", gap: 6 }}><Icon name="shield" size={15} />Held safely until your {food ? "check period" : "return window"} closes.</p>
         </>
       }>
-      <div className="row" style={{ background: "var(--soft)", borderRadius: 14, padding: 12, marginBottom: 14 }}>
+      <div className="item-row">
+        <div className="thumb" style={{ width: 48, height: 48, background: swatch(p.id) }} />
         <div className="grow"><b>{p.title}</b><div className="small muted">@{item.shop.handle}</div></div>
-        <b>{R(p.priceCents)}</b>
+        <b style={{ fontSize: 17 }}>{R(p.priceCents)}</b>
       </div>
 
       {p.sizes.length > 0 && (
         <>
           <h3 style={{ fontSize: 15, margin: "0 0 8px" }}>Size</h3>
           <div className="chips" role="group" aria-label="Size" style={{ marginBottom: 16 }}>
-            {p.sizes.map((s) => <button key={s} type="button" className="chip" aria-pressed={size === s} onClick={() => setSize(s)}>{s}</button>)}
+            {p.sizes.map((s) => <button key={s} type="button" className="chip size-chip" aria-pressed={size === s} onClick={() => setSize(s)}>{s}</button>)}
           </div>
         </>
       )}
@@ -99,6 +101,8 @@ export function CheckoutSheet({ item, onClose }: { item: FeedItem; onClose: () =
       )}
       {delivery === "collect_cpt" && <div className="note" style={{ marginBottom: 14 }}>We send you a collection code when it is ready at our Cape Town pickup point.</div>}
 
+      <h3 style={{ fontSize: 15, margin: "10px 0 8px" }}>Pay with</h3>
+      <div className="note" style={{ marginBottom: 16 }}>Instant EFT, card or SnapScan, on our escrow partner's secure page next.</div>
       <div className="price-rows" style={{ marginTop: 8 }}>
         <div className="row"><span>Item</span><span>{R(t.itemPrice)}</span></div>
         <div className="row"><span>Delivery</span><span>{t.deliveryFee ? R(t.deliveryFee) : "Free"}</span></div>
