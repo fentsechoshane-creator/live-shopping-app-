@@ -7,7 +7,8 @@ import { Loading } from "./components/ui";
 import { Feed } from "./screens/buyer/Feed";
 import { Explore } from "./screens/buyer/Explore";
 import { MockPay, OrderDetail, Orders } from "./screens/buyer/Orders";
-import { Activity, Me, ShopPage, SignIn } from "./screens/buyer/Account";
+import { Activity, ShopPage, SignIn } from "./screens/buyer/Account";
+import { Profile } from "./screens/buyer/Profile";
 import { Onboarding } from "./screens/seller/Onboarding";
 import { NewListing, Payouts, SellerOrderDetail, SellerOrders } from "./screens/seller/Selling";
 import { Admin } from "./screens/admin/Admin";
@@ -132,7 +133,7 @@ export function App() {
           <Route path="/orders/:id" element={guard(<OrderDetail />)} />
           <Route path="/mock-pay/:id" element={guard(<MockPay />)} />
           <Route path="/activity" element={guard(<Activity />)} />
-          <Route path="/me" element={guard(<Me />)} />
+          <Route path="/me" element={guard(<Profile />)} />
           <Route path="/sell" element={<Navigate to="/me?tab=selling" replace />} />
           <Route path="/sell/start" element={guard(<Onboarding />)} />
           <Route path="/sell/new" element={guard(<NewListing />)} />

@@ -7,7 +7,6 @@ import { Icon } from "../../components/Icon";
 import { BackButton, ErrorNote, Field, Loading, R, Segmented, Sheet, TierPill, timeAgo, useAction } from "../../components/ui";
 import { FeedList } from "./Feed";
 import { OrderList } from "./Orders";
-import { SellingView } from "../seller/Selling";
 
 export function SignIn() {
   const [contact, setContact] = useState("");
@@ -44,109 +43,6 @@ export function SignIn() {
         </form>
       )}
     </div>
-  );
-}
-
-/** Profile, with the Buying | Selling switch at the top, like the prototype. */
-export function Me() {
-  const { user, setMenuOpen } = useSession();
-  const [params, setParams] = useSearchParams();
-  const mode = params.get("tab") === "selling" ? "selling" : "buying";
-  const [profile, , reloadProfile] = useLoad(() => (user ? api.myProfile() : Promise.resolve(null)), [user?.id]);
-  const [credit] = useLoad(() => (user ? api.welcomeCreditAvailable() : Promise.resolve(false)), [user?.id]);
-  if (!user) return null;
-  const handle = (profile?.displayName || user.email?.split("@")[0] || "you").toLowerCase().replace(/[^a-z0-9.]+/g, ".");
-
-  return (
-    <div className="screen">
-      <div className="title-row">
-        <b style={{ fontSize: 18 }}>@{handle}</b>
-        <div className="row" style={{ gap: 8 }}>
-          <button className="wallet-chip" style={{ background: "var(--ink)", color: "var(--bg)" }} aria-label={`Wallet, ${credit ? R(WELCOME_CREDIT) : "R0"} credit`}>
-            <Icon name="wallet" /><span className="amt">{credit ? R(WELCOME_CREDIT) : "R0"}</span>
-          </button>
-          <button className="icon-btn" onClick={() => setMenuOpen(true)} aria-label="Menu and settings"><Icon name="menu" /></button>
-        </div>
-      </div>
-      <Segmented label="Mode" value={mode} onChange={(v) => setParams(v === "selling" ? { tab: "selling" } : {})}
-        options={[{ value: "buying", label: "Buying" }, { value: "selling", label: "Selling" }]} />
-      <div style={{ marginTop: 18 }}>
-        {mode === "buying" ? <BuyingView profile={profile ?? null} credit={!!credit} onSaved={reloadProfile} /> : <SellingView />}
-      </div>
-    </div>
-  );
-}
-
-function BuyingView({ profile, credit, onSaved }: { profile: Awaited<ReturnType<typeof api.myProfile>> | null; credit: boolean; onSaved: () => void }) {
-  const { following, toggleFollow, toast } = useSession();
-  const [shops] = useLoad(() => api.following(), [following.size]);
-  const [edit, setEdit] = useState(false);
-  const nav = useNavigate();
-  if (!profile) return <Loading />;
-  const name = profile.displayName || "You";
-  const standing = profile.trustScore >= 70 ? "Trusted buyer" : profile.trustScore >= 40 ? "Good standing" : "Under review";
-  const share = async () => {
-    try { await navigator.clipboard.writeText(`${location.origin}/`); toast("Link copied"); } catch { toast("Could not copy the link"); }
-  };
-
-  return (
-    <>
-      <div className="profile-head">
-        <div className="ring"><div>{name[0]?.toUpperCase()}</div></div>
-        <div className="stats">
-          <div><b>{following.size}</b><span>Following</span></div>
-          <div><b>{profile.ordersCount}</b><span>Orders</span></div>
-          <div><b>{credit ? R(WELCOME_CREDIT) : "R0"}</b><span>Credit</span></div>
-        </div>
-      </div>
-      <b style={{ fontSize: 17 }}>{name}</b>
-      <div className="small muted" style={{ margin: "2px 0 14px" }}>Cape Town · Joined {new Date(profile.createdAt).toLocaleDateString("en-ZA", { month: "long", year: "numeric" })}</div>
-      <div className="row">
-        <button className="btn grow" onClick={() => setEdit(true)}>Edit profile</button>
-        <button className="btn grow" onClick={share}>Share profile</button>
-      </div>
-      <button className="hero-card" style={{ width: "100%", border: 0, marginTop: 14, textAlign: "left" }} onClick={() => nav("/help")}>
-        <span className="badge-ic"><Icon name="shield" /></span>
-        <span className="grow"><b style={{ display: "block" }}>{standing}</b><span className="s">Trust score {profile.trustScore} · buyer protection on every order</span></span>
-        <Icon name="chevron" size={18} />
-      </button>
-      {credit && (
-        <div className="note green" style={{ marginTop: 12 }}><b>{R(WELCOME_CREDIT)} welcome credit.</b> It comes off your first order of R200 or more.</div>
-      )}
-
-      <div className="row between" style={{ marginTop: 22, marginBottom: 10 }}>
-        <h2 className="section-title" style={{ margin: 0 }}>Following</h2>
-        <span className="small muted">{following.size} sellers</span>
-      </div>
-      {shops && shops.length > 0 ? (
-        <div className="group">
-          {shops.map((s) => (
-            <div className="cell" key={s.id}>
-              <Link to={`/s/${s.handle}`} className="row grow"><span className="avatar">{s.name[0]}</span><span className="grow"><span className="t" style={{ display: "block" }}>{s.name}</span><span className="s" style={{ display: "block" }}>@{s.handle}</span></span></Link>
-              <button className="btn" style={{ minHeight: 34, fontSize: 13 }} onClick={() => toggleFollow(s.id)}>Following</button>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="empty-card">
-          <span className="grow muted">Follow sellers to see their drops first.</span>
-          <button className="btn dark" style={{ minHeight: 40 }} onClick={() => nav("/explore")}>Find sellers</button>
-        </div>
-      )}
-      {edit && <EditProfile name={name} onClose={() => setEdit(false)} onSaved={onSaved} />}
-    </>
-  );
-}
-
-function EditProfile({ name, onClose, onSaved }: { name: string; onClose: () => void; onSaved: () => void }) {
-  const [value, setValue] = useState(name);
-  const { busy, error, run } = useAction();
-  return (
-    <Sheet title="Edit profile" onClose={onClose}
-      footer={<button className="btn green block big" disabled={busy || !value.trim()} onClick={() => run(async () => { await api.updateProfile(value); onSaved(); onClose(); })}>Save</button>}>
-      <ErrorNote error={error} />
-      <Field label="Name shown to sellers"><input value={value} onChange={(e) => setValue(e.target.value)} maxLength={40} /></Field>
-    </Sheet>
   );
 }
 

@@ -113,8 +113,12 @@ try {
   await page.getByRole("heading", { name: "Shops to follow" }).waitFor();
   await shot("explore");
   await page.goto(`${BASE}/me`);
-  await page.getByText("@thrift.with.lebo").waitFor();
+  await page.getByRole("tab", { name: "Buyer", selected: true }).waitFor();
+  await page.getByRole("link", { name: /Oversized tee, sand/ }).waitFor(); // bought item shows in the grid
   await shot("me-buying");
+  await page.locator(".pstats button").first().click(); // Following count opens the list
+  await page.getByRole("dialog", { name: "Following" }).getByText("@thrift.with.lebo").waitFor();
+  await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Menu and settings" }).click();
   await page.getByRole("dialog", { name: "Menu and settings" }).waitFor();
   await page.waitForTimeout(400);
@@ -153,7 +157,8 @@ try {
   await page.getByText(/Founding seller/).first().waitFor();
   await shot("seller-home");
   // Long screens must scroll inside the app frame.
-  await check(page.locator(".screen").evaluate((el) => el.scrollHeight > el.clientHeight && getComputedStyle(el).overflowY === "auto"), "seller home scrolls");
+  await check(page.locator(".screen").evaluate((el) => getComputedStyle(el).overflowY === "auto"), "profile scrolls inside the app frame");
+  await check(page.getByRole("tab", { name: "Seller", selected: true }).isVisible(), "seller tab chosen");
 
   // Replica listing is blocked.
   await page.waitForTimeout(3500); // demo ID approval
@@ -173,7 +178,7 @@ try {
   await page.getByLabel("Video caption").fill("Real denim, every mark on camera");
   await page.getByRole("button", { name: "Post listing" }).click();
   await page.waitForURL(/me\?tab=selling/);
-  await page.getByText("Vintage denim jacket, size M").waitFor();
+  await page.getByRole("link", { name: /Vintage denim jacket, size M/ }).waitFor();
   await shot("seller-listed");
 
   await page.goto(BASE);

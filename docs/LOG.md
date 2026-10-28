@@ -22,7 +22,8 @@ Shared memory for every Claude account and agent working on this repo. Newest en
 
 ## Current state
 
-- Buyer: feed (For you, Following, Live), Explore, product sheet, checkout, orders with returns, activity, profile.
+- Buyer: feed (For you, Following, Live), Explore, product sheet, checkout, orders with returns, activity.
+- Profile: one TikTok style page with Seller and Buyer tabs (`apps/web/src/screens/buyer/Profile.tsx`).
 - Seller: 5 step onboarding, listing with counterfeit checks, orders to ship, payouts with credit top ups.
 - Team (admin): checks, returns, top ups to pay.
 - Demo media: drawn product shots (`apps/web/src/components/Scene.tsx`) stand in for seller videos, because this workspace cannot download stock media. Real sellers upload video through Mux.
@@ -36,6 +37,12 @@ Shared memory for every Claude account and agent working on this repo. Newest en
 - Messages tab and live streams with auctions are shown as "coming next".
 
 ## Log
+
+### 2026-10-29: Profile like TikTok, smaller everything
+- Profile rebuilt in the TikTok layout Ofentse showed: pencil, wallet, share and menu at the top; small avatar, name, handle; three numbers; one line; small capsule buttons; then a Seller | Buyer tab strip and a 3 column grid.
+- Decision: the header stays the same on both tabs. Only the numbers, the line under them, the buttons and the grid change. Seller: Sales, Live items, Trust, items grid. Buyer: Following, Orders, Credit, bought items grid.
+- Trust details and the Following list moved into sheets, opened by tapping the number. Shop checklist is a single collapsible card.
+- Made oversized parts smaller across the app: icon buttons, wallet chip, Explore shop cards and tiles.
 
 ### 2026-10-28: iPhone first and demo media
 - Built for iPhone first: removed the demo bar, dropped the separate Browse button (tap the product to see details), one line captions, smaller top controls, no arrow rail on touch screens, 16px inputs so iOS does not zoom.

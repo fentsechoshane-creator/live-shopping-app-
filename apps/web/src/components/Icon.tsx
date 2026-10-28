@@ -8,6 +8,7 @@ const PATHS: Record<string, string> = {
   wallet: "M3 7a2 2 0 0 1 2-2h13v4M3 7v11a2 2 0 0 0 2 2h15V9H5a2 2 0 0 1-2-2zM16 14.5h.01",
   search: "M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3",
   menu: "M4 7h16M4 12h16M4 17h16",
+  edit: "M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4",
   close: "M6 6l12 12M18 6 6 18",
   share: "M12 3v12M7 8l5-5 5 5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6",
   up: "M6 15l6-6 6 6",

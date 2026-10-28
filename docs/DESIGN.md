@@ -17,6 +17,7 @@
 | Shape | Capsule buttons and pills. Cards 18px radius. Sheets 30px top corners. The tab bar floats as a glass capsule above the bottom edge. |
 | Layout | One phone column. Content scrolls under the floating bars. Grouped lists (`.group` with `.cell`) for settings, orders and menus, like iOS. |
 | Motion | Short and soft: sheets rise, the menu slides in, buttons press in slightly. Off when the phone asks for reduced motion. |
+| Size | Compact by default. Top bar icons 38px, small capsule buttons 34px, avatar 64px. Nothing bigger than it needs to be. |
 | Words | Plain South African English. No hyphens or em dashes in app text. Say what happens: "Pay R311", "Ask for a return". |
 
 ## Screen map (prototype to real app)
@@ -28,7 +29,7 @@
 | Browse and checkout sheets | Feed.tsx, Checkout.tsx | Built. |
 | Explore | `/explore` | Built. Lives and auctions section is coming next. |
 | Activity: Notifications, Messages, Orders | `/activity` | Built. Messages is coming next. |
-| Profile with Buying and Selling | `/me` | Built. |
+| Profile | `/me` (Profile.tsx) | Built, TikTok style: small header that never changes, Seller and Buyer tabs that only change the numbers, the line under them, the small buttons and the 3 column grid. Trust and Following open as sheets. |
 | Side menu and settings | Menu button on Me | Built. |
 | Seller sign up (5 steps) | `/sell/start` | Built. |
 | List an item | `/sell/new` | Built. |
