@@ -26,6 +26,8 @@ export interface FeedItem {
   product: ProductPublic;
   shop: ShopPublic;
   video: VideoSource;
+  /** Set when the post shows up because a followed shop reposted it. */
+  repostedBy?: string;
 }
 
 export type Reaction = "like" | "repost";
@@ -211,8 +213,10 @@ export interface Api {
   react(postId: string, kind: Reaction, on: boolean): Promise<void>;
   /** Like and repost counts per post id. */
   postCounts(postIds: string[]): Promise<Record<string, { likes: number; reposts: number }>>;
-  /** Live posts the user liked or reposted, newest reaction first. */
-  reactedPosts(kind: Reaction): Promise<FeedItem[]>;
+  /** Live posts liked or reposted, newest first. By the signed in user, or by a shop's owner when shopId is given. Public. */
+  reactedPosts(kind: Reaction, shopId?: string): Promise<FeedItem[]>;
+  /** Posts reposted by the owners of shops the user follows, for the Following feed. */
+  followingReposts(): Promise<FeedItem[]>;
   following(): Promise<ShopPublic[]>;
   follow(shopId: string): Promise<void>;
   unfollow(shopId: string): Promise<void>;

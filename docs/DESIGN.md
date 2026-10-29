@@ -29,7 +29,7 @@
 | Browse and checkout sheets | Feed.tsx, Checkout.tsx | Built. |
 | Explore | `/explore` | Built. Lives and auctions section is coming next. |
 | Activity: Notifications, Messages, Orders | `/activity` | Built. Messages is coming next. |
-| Profile | `/me` (Profile.tsx) | Built, TikTok style: photo with Posts, Sales, Following beside it; name, rating bubble (out of 5, red to green, black when none), standing pill, bio. This header never changes. Seller and Buyer tabs below only change the small buttons and the 3 column grid. Trust and Following open as sheets. |
+| Profile | `/me` (Profile.tsx) | Built, TikTok style: photo with Posts, Sales, Following beside it; name, rating bubble (out of 5, red to green, black when none), standing pill, bio. This header never changes. Posts, Likes and Reposts tabs below; Posts shows seller buttons and prompts to open a shop or post when empty. Shop pages use the same layout. Trust and Following open as sheets. |
 | Side menu and settings | Menu button on Me | Built. |
 | Seller sign up (5 steps) | `/sell/start` | Built. |
 | List an item | `/sell/new` | Built. |

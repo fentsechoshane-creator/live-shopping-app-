@@ -113,22 +113,31 @@ try {
   await teeCard.getByRole("button", { name: /^Like/ }).click();
   await teeCard.getByRole("button", { name: /^Repost/ }).click();
   await check(teeCard.getByRole("button", { name: /^Like/ }).getAttribute("aria-pressed").then((v) => v === "true"), "liked");
+  await page.getByText("Reposted by @thrift.with.lebo").first().waitFor(); // shops you follow bring their reposts
   await shot("following");
   await page.goto(`${BASE}/explore`);
   await page.getByRole("heading", { name: "Shops to follow" }).waitFor();
   await shot("explore");
   await page.goto(`${BASE}/me`);
-  await page.getByRole("tab", { name: "Buyer", selected: true }).waitFor();
-  await page.getByRole("link", { name: /Oversized tee, sand/ }).waitFor(); // bought item shows in the grid
+  await page.getByRole("tab", { name: "Posts", selected: true }).waitFor();
+  await page.getByText("Open your shop to post").waitFor(); // no shop yet, so Posts asks you to open one
   await shot("me-buying");
   await page.locator(".pstats button", { hasText: "Following" }).click(); // Following count opens the list
   await page.getByRole("dialog", { name: "Following" }).getByText("@thrift.with.lebo").waitFor();
   await page.keyboard.press("Escape");
-  await page.getByRole("tab", { name: "Liked" }).click();
-  await page.getByRole("link", { name: /Oversized tee, sand, R349/ }).waitFor(); // liked video shows on the profile
-  await page.getByRole("tab", { name: "Reposted" }).click();
-  await page.getByRole("link", { name: /Oversized tee, sand, R349/ }).waitFor();
-  await shot("me-reposted");
+  await page.getByRole("tab", { name: "Likes" }).click();
+  await page.getByRole("button", { name: /Oversized tee, sand, R349/ }).waitFor(); // liked video shows on the profile
+  await page.getByRole("tab", { name: "Reposts" }).click();
+  await page.getByRole("button", { name: /Oversized tee, sand, R349/ }).click();
+  await page.getByRole("dialog", { name: "Videos" }).waitFor(); // tapping a tile opens the player
+  await page.getByRole("button", { name: "Close videos" }).click();
+  await shot("me-reposts");
+  // Likes and reposts are public: Lebo's shop page shows the cake Lebo reposted.
+  await page.goto(`${BASE}/s/thrift.with.lebo`);
+  await page.getByRole("tab", { name: "Reposts" }).click();
+  await page.getByRole("button", { name: /Celebration cake/ }).waitFor();
+  await shot("shop-reposts");
+  await page.goto(`${BASE}/me`);
   await page.getByRole("button", { name: "Menu and settings" }).click();
   await page.getByRole("dialog", { name: "Menu and settings" }).waitFor();
   await page.waitForTimeout(400);
@@ -168,7 +177,7 @@ try {
   await shot("seller-home");
   // Long screens must scroll inside the app frame.
   await check(page.locator(".screen").evaluate((el) => getComputedStyle(el).overflowY === "auto"), "profile scrolls inside the app frame");
-  await check(page.getByRole("tab", { name: "Seller", selected: true }).isVisible(), "seller tab chosen");
+  await check(page.getByRole("tab", { name: "Posts", selected: true }).isVisible(), "posts tab chosen");
 
   // Replica listing is blocked.
   await page.waitForTimeout(3500); // demo ID approval

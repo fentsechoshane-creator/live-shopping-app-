@@ -5,7 +5,7 @@ import { api, authMethod } from "../../api";
 import { useLoad, useSession } from "../../session";
 import { Icon } from "../../components/Icon";
 import { BackButton, ErrorNote, Field, Loading, R, Segmented, Sheet, TierPill, timeAgo, useAction } from "../../components/ui";
-import { FeedList } from "./Feed";
+import { PostGrid } from "../../components/PostGrid";
 import { OrderList } from "./Orders";
 
 export function SignIn() {
@@ -100,36 +100,54 @@ export function Activity() {
   );
 }
 
+/** Public shop page, laid out like the profile: header, then Posts, Likes and Reposts. */
 export function ShopPage() {
   const { handle = "" } = useParams();
   const [data, error] = useLoad(() => api.shop(handle), [handle]);
-  const { following, toggleFollow, user } = useSession();
+  const { following, toggleFollow, user, toast } = useSession();
+  const [tab, setTab] = useState<"posts" | "likes" | "reposts">("posts");
+  const [reacted] = useLoad(() => (data && tab !== "posts" ? api.reactedPosts(tab === "likes" ? "like" : "repost", data.shop.id) : Promise.resolve([])), [data?.shop.id, tab]);
   const nav = useNavigate();
   if (error) return <div className="screen"><ErrorNote error={error} /></div>;
   if (data === undefined) return <div className="screen"><Loading /></div>;
-  if (!data) return <div className="screen"><div className="empty">Shop not found.</div></div>;
+  if (!data) return <div className="screen"><BackButton /><div className="empty">Shop not found.</div></div>;
   const { shop, items } = data;
   const isFollowing = following.has(shop.id);
+  const share = async () => {
+    const url = `${location.origin}/s/${shop.handle}`;
+    try { if (navigator.share) await navigator.share({ url }); else { await navigator.clipboard.writeText(url); toast("Link copied"); } } catch { /* cancelled */ }
+  };
   return (
-    <div className="fill" style={{ overflowY: "auto" }}>
-      <div style={{ padding: "12px 16px 16px" }}>
-        <BackButton />
-        <div className="profile-head">
-          <div className="ring green"><div>{shop.name[0]}</div></div>
-          <div className="stats">
-            <div><b>{shop.followers ?? 0}</b><span>Followers</span></div>
-            <div><b>{shop.sales ?? 0}</b><span>Sales</span></div>
-            <div><b>{shop.trustScore}</b><span>Trust</span></div>
-          </div>
+    <div className="screen profile">
+      <div className="pbar">
+        <button className="bare" onClick={() => nav(-1)} aria-label="Back"><Icon name="back" /></button>
+        <button className="bare" onClick={share} aria-label="Share shop"><Icon name="share" /></button>
+      </div>
+      <div className="phead">
+        <div className="pavatar green">{shop.name[0]}</div>
+        <div className="pstats">
+          <button onClick={() => setTab("posts")}><b>{items.length}</b><span>Posts</span></button>
+          <div><b>{shop.sales ?? 0}</b><span>Sales</span></div>
+          <div><b>{shop.followers ?? 0}</b><span>Followers</span></div>
         </div>
-        <div className="row" style={{ gap: 8 }}><b style={{ fontSize: 18 }}>{shop.name}</b><TierPill tier={shop.tier} />{shop.founding && <span className="pill green">Founding seller</span>}</div>
-        <div className="small muted" style={{ margin: "2px 0 12px" }}>@{shop.handle}{shop.bio ? ` · ${shop.bio}` : ""}</div>
-        <button className={`btn block ${isFollowing ? "" : "dark"}`} onClick={() => (user ? toggleFollow(shop.id) : nav("/signin"))}>{isFollowing ? "Following" : "Follow"}</button>
       </div>
-      <div style={{ height: "calc(100% - 60px)", position: "relative", background: "#0b0b0d" }}>
-        {items.length ? <FeedList items={items} /> : <div className="feed-empty">No videos yet.</div>}
+      <div className="pname"><b>{shop.name}</b><TierPill tier={shop.tier} /></div>
+      <div className="phandle">
+        <span>@{shop.handle}</span>
+        {shop.founding && <span className="standing green"><Icon name="check" size={12} strokeWidth={2.6} />Founding seller</span>}
       </div>
+      {shop.bio && <p className="pbio">{shop.bio}</p>}
+      <button className={`btn block ${isFollowing ? "" : "dark"}`} style={{ marginTop: 12, minHeight: 40 }}
+        onClick={() => (user ? toggleFollow(shop.id) : nav("/signin"))}>{isFollowing ? "Following" : "Follow"}</button>
+
+      <div className="ptabs" role="tablist" aria-label="Shop">
+        <button role="tab" aria-selected={tab === "posts"} onClick={() => setTab("posts")}>Posts</button>
+        <button role="tab" aria-selected={tab === "likes"} onClick={() => setTab("likes")}>Likes</button>
+        <button role="tab" aria-selected={tab === "reposts"} onClick={() => setTab("reposts")}>Reposts</button>
+      </div>
+      {tab === "posts"
+        ? <PostGrid items={items} empty={<div className="pempty">No videos yet.</div>} />
+        : !reacted ? <Loading /> : <PostGrid items={reacted} empty={<div className="pempty">{tab === "likes" ? "No likes yet." : "No reposts yet."}</div>} />}
     </div>
   );
 }
-

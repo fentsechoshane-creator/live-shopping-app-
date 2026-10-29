@@ -208,13 +208,33 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
       const rows = check(await sb.rpc("post_counts", { p_ids: ids })) as any[];
       return Object.fromEntries(rows.map((r) => [r.post_id, { likes: r.likes, reposts: r.reposts }]));
     },
-    async reactedPosts(kind) {
-      const rows = check(await sb.from("post_reactions").select("post_id").eq("user_id", await uid()).eq("kind", kind)
+    async reactedPosts(kind, shopId) {
+      let who: string;
+      if (shopId) {
+        const { data } = await sb.from("shops").select("owner_id").eq("id", shopId).single();
+        if (!data) return [];
+        who = data.owner_id;
+      } else who = await uid();
+      const rows = check(await sb.from("post_reactions").select("post_id").eq("user_id", who).eq("kind", kind)
         .order("created_at", { ascending: false })) as any[];
       const order = rows.map((r) => r.post_id as string);
       // Version 1: match against the live feed, which is fine while the catalogue is small. Move to a server function at scale.
       const live = (check(await sb.rpc("feed", { p_limit: 50, p_offset: 0 })) as any[]).map(feedItem);
       return order.map((id) => live.find((it) => it.postId === id)).filter((x): x is FeedItem => !!x);
+    },
+    async followingReposts() {
+      const follows = check(await sb.from("follows").select("shops(owner_id, handle)").eq("user_id", await uid())) as any[];
+      const owners = new Map<string, string>(follows.filter((f) => f.shops).map((f) => [f.shops.owner_id, f.shops.handle]));
+      if (!owners.size) return [];
+      const rows = check(await sb.from("post_reactions").select("post_id, user_id").eq("kind", "repost").in("user_id", [...owners.keys()])
+        .order("created_at", { ascending: false }).limit(50)) as any[];
+      const live = (check(await sb.rpc("feed", { p_limit: 50, p_offset: 0 })) as any[]).map(feedItem);
+      const out: FeedItem[] = [];
+      for (const r of rows) {
+        const it = live.find((x) => x.postId === r.post_id);
+        if (it) out.push({ ...it, repostedBy: owners.get(r.user_id) });
+      }
+      return out;
     },
     async following() {
       const rows = check(await sb.from("follows").select("shops(id, name, handle, category)").eq("user_id", await uid())) as any[];

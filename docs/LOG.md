@@ -57,12 +57,22 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 
 ## Next up
 
+- Apply migration 0009 (public likes and reposts) to the live Supabase project.
+
 - Real seller video clips for the demo (Ofentse to send short clips, or allow Pexels in Claude settings).
 - Supabase dashboard: set Site URL and add `{{ .Token }}` to the magic link email so the 6 digit sign in code works. [Ofentse]
 - TradeSafe sandbox keys and Mux keys as server secrets, then test a real escrow payment. [Lehloma]
 - Messages tab and live streams with auctions are shown as "coming next".
 
 ## Log
+
+### 2026-10-29: Posts, Likes and Reposts tabs; reposts in Following
+- Profile tabs are now Posts, Likes and Reposts (Seller renamed Posts; the Buyer tab is gone, Orders has its own page).
+- Empty Posts tab prompts: "Open your shop to post" (no shop), "Finish opening your shop" (half done), or "Post your first item" (shop open, nothing listed).
+- Likes and reposts are public. Shop pages now use the same layout with Posts, Likes and Reposts. Tapping any tile opens the full screen player at that video.
+- Following feed now includes what the shops you follow reposted, marked "Reposted by @shop".
+- Migration 0009 makes likes and reposts readable by everyone (people can still only add or remove their own). Tested locally. **Not yet applied to the live project**: the Supabase connector asked for approval and timed out. Apply `supabase/migrations/20261029000009_public_reactions.sql` next session. [Open]
+- Demo data key bumped to `lsa-demo-v3` (fresh sample data, including a sample repost by Lebo's Thrift).
 
 ### 2026-10-29: Likes and reposts
 - Feed: a heart (like) and a repost button now sit beside the product card, with counts (1.2K style). Buy now and Share stay on the row below.

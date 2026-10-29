@@ -30,7 +30,7 @@ function Tabs() {
     if (!user) return setUnread(0);
     api.notifications().then((n) => setUnread(n.filter((x) => !x.readAt).length)).catch(() => {});
   }, [user, loc.pathname]);
-  const onVideo = loc.pathname === "/" || loc.pathname.startsWith("/s/");
+  const onVideo = loc.pathname === "/";
   return (
     <nav className={`tabs glass ${onVideo ? "on-video" : ""}`} aria-label="Main">
       <NavLink to="/" end aria-label="Home"><Icon name="home" /></NavLink>

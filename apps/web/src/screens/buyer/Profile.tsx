@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { canUse, ORDER_STATUS_TEXT, TIER_INFO, tierFor, TRUST_POINTS, WELCOME_CREDIT } from "@app/core";
+import { canUse, TIER_INFO, tierFor, TRUST_POINTS, WELCOME_CREDIT } from "@app/core";
 import { api, type MyShop, type Order } from "../../api";
 import { useLoad, useSession } from "../../session";
 import { Icon } from "../../components/Icon";
 import { ProductArt } from "../../components/Scene";
 import { ErrorNote, Field, Loading, R, Sheet, dateText, swatch, useAction } from "../../components/ui";
 import { CertUpload } from "../seller/Selling";
+import { PostGrid } from "../../components/PostGrid";
 
-type Side = "seller" | "buyer";
+type Tab = "posts" | "likes" | "reposts";
 
 /**
  * One profile page, laid out like a TikTok profile. The header stays put; the Seller | Buyer
@@ -21,14 +22,14 @@ export function Profile() {
   const [credit] = useLoad(() => (user ? api.welcomeCreditAvailable() : Promise.resolve(false)), [user?.id]);
   const [shop, shopError, reloadShop] = useLoad(() => (user ? api.myShop() : Promise.resolve(null)), [user?.id]);
   const [sales] = useLoad(() => (shop && shop.status !== "onboarding" ? api.sellerOrders() : Promise.resolve([] as Order[])), [shop?.id, shop?.status]);
-  const [buys] = useLoad(() => api.myOrders(), [user?.id]);
   const [sheet, setSheet] = useState<null | "edit" | "following" | "trust">(null);
   const nav = useNavigate();
 
   const hasShop = !!shop && shop.status !== "onboarding";
   const asked = params.get("tab");
-  const side: Side = asked === "selling" ? "seller" : asked === "buying" ? "buyer" : hasShop ? "seller" : "buyer";
-  const setSide = (s: Side) => setParams(s === "seller" ? { tab: "selling" } : { tab: "buying" }, { replace: true });
+  // "selling" is the old name for the Posts tab; links from onboarding still use it.
+  const tab: Tab = asked === "likes" ? "likes" : asked === "reposts" ? "reposts" : "posts";
+  const setTab = (t: Tab) => setParams(t === "posts" ? {} : { tab: t }, { replace: true });
 
   useEffect(() => {
     // ID and certificate checks finish in the background, so refresh while one is pending.
@@ -43,7 +44,7 @@ export function Profile() {
   const name = profile.displayName || user.email?.split("@")[0] || "You";
   const handle = name.toLowerCase().replace(/[^a-z0-9.]+/g, ".");
   const share = async () => {
-    const url = side === "seller" && hasShop ? `${location.origin}/s/${shop!.handle}` : `${location.origin}/`;
+    const url = hasShop ? `${location.origin}/s/${shop!.handle}` : `${location.origin}/`;
     try {
       if (navigator.share) await navigator.share({ url });
       else { await navigator.clipboard.writeText(url); toast("Link copied"); }
@@ -77,7 +78,7 @@ export function Profile() {
       <div className="phead">
         <div className={`pavatar ${hasShop ? "green" : ""}`}>{name[0]?.toUpperCase()}</div>
         <div className="pstats">
-          <button onClick={() => { setSide("seller"); document.getElementById("grid")?.scrollIntoView({ behavior: "smooth" }); }}>
+          <button onClick={() => { setTab("posts"); document.getElementById("grid")?.scrollIntoView({ behavior: "smooth" }); }}>
             <b>{hasShop ? shop!.products.filter((p) => p.status === "live").length : 0}</b><span>Posts</span></button>
           <button onClick={() => hasShop && nav("/sell/orders")}><b>{sold}</b><span>Sales</span></button>
           <button onClick={() => setSheet("following")}><b>{following.size}</b><span>Following</span></button>
@@ -100,37 +101,27 @@ export function Profile() {
         : <button className="pbio add" onClick={() => setSheet("edit")}>Add a bio</button>}
 
       <div className="ptabs" role="tablist" aria-label="Profile">
-        <button role="tab" aria-selected={side === "seller"} onClick={() => setSide("seller")}>Seller</button>
-        <button role="tab" aria-selected={side === "buyer"} onClick={() => setSide("buyer")}>Buyer</button>
+        <button role="tab" aria-selected={tab === "posts"} onClick={() => setTab("posts")}>Posts</button>
+        <button role="tab" aria-selected={tab === "likes"} onClick={() => setTab("likes")}>Likes</button>
+        <button role="tab" aria-selected={tab === "reposts"} onClick={() => setTab("reposts")}>Reposts</button>
       </div>
 
-      <div className="ppills">
-        {side === "seller" ? (
-          hasShop ? (
-            <>
-              <button className="pill-btn green" onClick={() => nav("/sell/new")}><Icon name="plus" size={14} strokeWidth={2.5} />List an item</button>
-              <button className="pill-btn" onClick={() => nav("/sell/orders")}><Icon name="truck" size={14} />Orders{toShip > 0 && <span className="count">{toShip}</span>}</button>
-              <button className="pill-btn" onClick={() => nav("/sell/payouts")}><Icon name="payout" size={14} />Payouts</button>
-            </>
-          ) : (
-            <button className="pill-btn green" onClick={() => nav("/sell/start")}><Icon name="store" size={14} />{shop ? "Continue" : "Open my shop"}</button>
-          )
-        ) : (
-          <>
-            <button className="pill-btn" onClick={() => nav("/orders")}><Icon name="bag" size={14} />My orders</button>
-            <button className="pill-btn" onClick={() => nav("/help")}><Icon name="shield" size={14} />Returns and help</button>
-          </>
-        )}
-      </div>
-      {side === "seller" && founding && <div className="pnote">{shop!.name} · Founding seller, 0% fee until {dateText(shop!.foundingUntil)}</div>}
-      {side === "seller" && hasShop && !founding && <div className="pnote muted">{shop!.name} · {categoryText}</div>}
+      {tab === "posts" && hasShop && (
+        <>
+          <div className="ppills">
+            <button className="pill-btn green" onClick={() => nav("/sell/new")}><Icon name="plus" size={14} strokeWidth={2.5} />List an item</button>
+            <button className="pill-btn" onClick={() => nav("/sell/orders")}><Icon name="truck" size={14} />Orders{toShip > 0 && <span className="count">{toShip}</span>}</button>
+            <button className="pill-btn" onClick={() => nav("/sell/payouts")}><Icon name="payout" size={14} />Payouts</button>
+          </div>
+          {founding
+            ? <div className="pnote">{shop!.name} · Founding seller, 0% fee until {dateText(shop!.foundingUntil)}</div>
+            : <div className="pnote muted">{shop!.name} · {categoryText}</div>}
+        </>
+      )}
 
       <div id="grid">
-        {side === "seller" ? (
-          <SellerGrid shop={shop} error={shopError} sold={sold} reload={reloadShop} />
-        ) : (
-          <BuyerGrid orders={buys} />
-        )}
+        {tab === "posts" && <SellerGrid shop={shop} error={shopError} sold={sold} reload={reloadShop} />}
+        {tab !== "posts" && <ReactionGrid kind={tab === "likes" ? "like" : "repost"} />}
       </div>
 
       {sheet === "edit" && <EditProfile name={name} bio={profile.bio} onClose={() => setSheet(null)} onSaved={reloadProfile} />}
@@ -157,7 +148,14 @@ function SellerGrid({ shop, error, sold, reload }: { shop: MyShop | null | undef
   if (error) return <ErrorNote error={error} />;
   if (shop === undefined) return <Loading />;
   if (!shop || shop.status === "onboarding") {
-    return <div className="pempty">Open a shop in a few minutes. The first 50 shops pay 0% for 3 months, then 6% only when you sell.</div>;
+    return (
+      <div className="pprompt">
+        <span className="pprompt-ic"><Icon name="store" size={22} /></span>
+        <b>{shop ? "Finish opening your shop" : "Open your shop to post"}</b>
+        <span>Sell from short videos with the money held safely. The first 50 shops pay 0% for 3 months, then 6% only when you sell.</span>
+        <button className="btn green" onClick={() => nav("/sell/start")}>{shop ? "Continue" : "Open my shop"}</button>
+      </div>
+    );
   }
   const steps: [string, boolean, string?][] = [
     ["Open your shop", true],
@@ -193,7 +191,12 @@ function SellerGrid({ shop, error, sold, reload }: { shop: MyShop | null | undef
         </div>
       )}
       {shop.products.length === 0 ? (
-        <div className="pempty">No items yet. Tap List an item and post a short video.</div>
+        <div className="pprompt">
+          <span className="pprompt-ic"><Icon name="plus" size={22} strokeWidth={2.5} /></span>
+          <b>Post your first item</b>
+          <span>A short video of the item sells best. Show it from every side, and any marks.</span>
+          <button className="btn green" onClick={() => nav("/sell/new")}>Post an item</button>
+        </div>
       ) : (
         <div className="grid3">
           {shop.products.map((p) => (
@@ -209,52 +212,15 @@ function SellerGrid({ shop, error, sold, reload }: { shop: MyShop | null | undef
   );
 }
 
-type BuyerView = "bought" | "liked" | "reposted";
-
-/** Buyer tab: what you bought, liked and reposted, switched with three small icons like TikTok. */
-function BuyerGrid({ orders }: { orders: Order[] | undefined }) {
-  const [view, setView] = useState<BuyerView>("bought");
+/** Likes or reposts. Public, so the same grid shows on shop pages. */
+function ReactionGrid({ kind }: { kind: "like" | "repost" }) {
   const { liked, reposted } = useSession();
-  const [posts] = useLoad(() => (view === "bought" ? Promise.resolve([]) : api.reactedPosts(view === "liked" ? "like" : "repost")),
-    [view, liked.size, reposted.size]);
-  const tabs: [BuyerView, string, string][] = [["bought", "bag", "Bought"], ["liked", "heart", "Liked"], ["reposted", "repost", "Reposted"]];
-  return (
-    <>
-      <div className="subtabs" role="tablist" aria-label="Buyer">
-        {tabs.map(([v, icon, label]) => (
-          <button key={v} role="tab" aria-selected={view === v} onClick={() => setView(v)}><Icon name={icon} size={15} />{label}</button>
-        ))}
-      </div>
-      {view === "bought" ? <BoughtGrid orders={orders} /> : !posts ? <Loading /> : posts.length === 0 ? (
-        <div className="pempty">{view === "liked" ? "Videos you like show here. Tap the heart on any video." : "Videos you repost show here, so people who visit your profile can see them."}</div>
-      ) : (
-        <div className="grid3">
-          {posts.map((it) => (
-            <Link key={it.postId} to={`/s/${it.shop.handle}`} className="g3" aria-label={`${it.product.title}, ${R(it.product.priceCents)}`}>
-              <ProductArt productId={it.product.id} fallback={it.video.demo?.bg ?? swatch(it.product.id)} />
-              <span className="g3foot">{R(it.product.priceCents)}</span>
-            </Link>
-          ))}
-        </div>
-      )}
-    </>
-  );
-}
-
-function BoughtGrid({ orders }: { orders: Order[] | undefined }) {
-  if (!orders) return <Loading />;
-  if (orders.length === 0) return <div className="pempty">Things you buy show here. Your money is held safely until the return window closes.</div>;
-  return (
-    <div className="grid3">
-      {orders.map((o) => (
-        <Link key={o.id} to={`/orders/${o.id}`} className="g3" aria-label={`${o.product.title}, ${ORDER_STATUS_TEXT[o.status].buyer}`}>
-          <ProductArt productId={o.product.id} fallback={swatch(o.product.id)} />
-          <span className="g3chip">{ORDER_STATUS_TEXT[o.status].buyer}</span>
-          <span className="g3foot">{R(o.totals.total)}</span>
-        </Link>
-      ))}
-    </div>
-  );
+  const [posts, error] = useLoad(() => api.reactedPosts(kind), [kind, liked.size, reposted.size]);
+  if (error) return <ErrorNote error={error} />;
+  if (!posts) return <Loading />;
+  return <PostGrid items={posts} empty={
+    <div className="pempty">{kind === "like" ? "Videos you like show here. Tap the heart on any video." : "Videos you repost show here and in your followers' Following feed."}<br />Everyone can see them.</div>
+  } />;
 }
 
 function FollowingSheet({ onClose }: { onClose: () => void }) {

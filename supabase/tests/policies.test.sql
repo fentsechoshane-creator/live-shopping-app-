@@ -236,9 +236,11 @@ select pg_temp.expect_error($$insert into post_reactions (user_id, post_id, kind
 reset role;
 select pg_temp.act_as('00000000-0000-0000-0000-00000000000c');
 do $$ begin
-  assert (select count(*) from post_reactions) = 0, 'cannot see other people''s likes';
+  assert (select count(*) from post_reactions) = 2, 'likes and reposts are public';
   assert (select likes from post_counts(array(select id from posts limit 1))) = 1, 'like counted';
   assert (select reposts from post_counts(array(select id from posts limit 1))) = 1, 'repost counted';
 end $$;
+delete from post_reactions where user_id = '00000000-0000-0000-0000-00000000000b'; -- as someone else: matches no rows
 reset role;
+do $$ begin assert (select count(*) from post_reactions) = 2, 'others cannot remove your likes'; end $$;
 select 'like and repost tests passed' as result;

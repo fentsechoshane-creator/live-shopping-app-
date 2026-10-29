@@ -18,7 +18,12 @@ export function Feed() {
   const { following, user } = useSession();
   const [credit] = useLoad(() => (user ? api.welcomeCreditAvailable() : Promise.resolve(false)), [user?.id]);
   const nav = useNavigate();
-  const shown = tab === "following" ? (items ?? []).filter((it) => following.has(it.shop.id)) : items ?? [];
+  const [reposts] = useLoad(() => (user && tab === "following" ? api.followingReposts() : Promise.resolve([] as FeedItem[])), [user?.id, tab, following.size]);
+  // Following: posts from shops you follow, plus what those shops reposted.
+  const shown = tab === "following"
+    ? [...(items ?? []).filter((it) => following.has(it.shop.id)), ...(reposts ?? [])]
+        .filter((it, i, all) => all.findIndex((x) => x.postId === it.postId) === i)
+    : items ?? [];
 
   return (
     <div className="fill">
@@ -64,13 +69,18 @@ function FeedEmpty({ title, body, action }: { title: string; body: string; actio
 }
 
 /** Full screen video list with Browse and checkout sheets. Used by the feed and shop pages. */
-export function FeedList({ items }: { items: FeedItem[] }) {
+export function FeedList({ items, start = 0 }: { items: FeedItem[]; start?: number }) {
   const [browse, setBrowse] = useState<FeedItem | null>(null);
   const [buy, setBuy] = useState<FeedItem | null>(null);
   const [index, setIndex] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
   const { user } = useSession();
   const nav = useNavigate();
+
+  useEffect(() => {
+    const el = ref.current;
+    if (el && start) { el.scrollTop = start * el.clientHeight; setIndex(start); }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const el = ref.current;
@@ -167,7 +177,12 @@ function VideoCard({ item, counts, onBrowse, onBuy }: { item: FeedItem; counts?:
       <Video src={item.video} label={`Video: ${item.caption}`} />
       <div className="shade" />
       <div className="info">
-        {chip && <span className={`vchip vglass ${chip.tone}`}><span className="d" />{chip.text}</span>}
+        {(item.repostedBy || chip) && (
+          <div className="row" style={{ gap: 6 }}>
+            {item.repostedBy && <span className="vchip vglass"><Icon name="repost" size={13} />Reposted by @{item.repostedBy}</span>}
+            {chip && <span className={`vchip vglass ${chip.tone}`}><span className="d" />{chip.text}</span>}
+          </div>
+        )}
         <div className="seller-row">
           <Link to={`/s/${item.shop.handle}`} className="row" style={{ gap: 8 }}>
             <span className="avatar">{item.shop.name[0]}</span>

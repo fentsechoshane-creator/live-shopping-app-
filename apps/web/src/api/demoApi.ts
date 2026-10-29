@@ -26,7 +26,7 @@ interface State {
   reactions?: { userId: string; postId: string; kind: "like" | "repost"; at: string }[];
 }
 
-const KEY = "lsa-demo-v2";
+const KEY = "lsa-demo-v3";
 const CODE = "123456";
 const id = () => crypto.randomUUID();
 const approvedChecks = (): MyShop["checks"] => ({
@@ -64,7 +64,9 @@ function seed(): State {
     { id: "po-4", shopId: "s-lebo", productId: "p-denim", caption: "Real denim, every mark on camera", video: v("#34495e", "Seller video: denim jacket", "denim"), createdAt: new Date(now - 12000e3).toISOString() },
     { id: "po-5", shopId: "s-lebo", productId: "p-runner", caption: "Chunky runner, no logos", video: v("#4a4a3a", "Seller video: runners", "runner"), createdAt: new Date(now - 15000e3).toISOString() },
   ];
-  return { users: bots, currentUserId: null, shops, products, posts, orders: [], notifications: [], payouts: [], clockOffsetMs: 0, follows: [] };
+  return { users: bots, currentUserId: null, shops, products, posts, orders: [], notifications: [], payouts: [], clockOffsetMs: 0, follows: [],
+    // Sample activity: Lebo reposted the cake and liked the silk shirt, so the Following feed shows a repost.
+    reactions: [{ userId: "u-lebo", postId: "po-3", kind: "repost", at: new Date(now - 1800e3).toISOString() }, { userId: "u-lebo", postId: "po-2", kind: "like", at: new Date(now - 1800e3).toISOString() }] };
 }
 
 function load(): State {
@@ -331,10 +333,18 @@ export function createDemoApi(): Api {
         return [pid, { likes: l + rs.filter((x) => x.kind === "like").length, reposts: r + rs.filter((x) => x.kind === "repost").length }];
       }));
     },
-    async reactedPosts(kind) {
-      const u = me();
-      return (s.reactions ?? []).filter((r) => r.userId === u.id && r.kind === kind)
+    async reactedPosts(kind, shopId) {
+      const who = shopId ? shopOf(shopId).ownerId : me().id;
+      return (s.reactions ?? []).filter((r) => r.userId === who && r.kind === kind)
         .map((r) => s.posts.find((po) => po.id === r.postId)).filter((po): po is DPost => !!po && visible(po)).map(toFeed);
+    },
+    async followingReposts() {
+      const u = me();
+      const owners = new Map(s.follows.filter((f) => f.userId === u.id).map((f) => [shopOf(f.shopId).ownerId, shopOf(f.shopId).handle]));
+      return (s.reactions ?? []).filter((r) => r.kind === "repost" && owners.has(r.userId))
+        .map((r) => ({ r, po: s.posts.find((x) => x.id === r.postId) }))
+        .filter((x): x is { r: typeof x.r; po: DPost } => !!x.po && visible(x.po))
+        .map(({ r, po }) => ({ ...toFeed(po), repostedBy: owners.get(r.userId) }));
     },
     async following() {
       const u = me();

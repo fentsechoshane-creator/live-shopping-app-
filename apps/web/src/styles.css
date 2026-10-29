@@ -320,7 +320,7 @@ a { color: inherit; text-decoration: none; }
 .standing.green { background: var(--green-soft); color: var(--green-text); }
 .standing.amber { background: var(--amber-soft, #fef3c7); color: var(--amber-text, #92400e); }
 .pstats { display: flex; flex: 1; justify-content: space-around; }
-.pstats button { border: 0; background: none; padding: 0; text-align: center; color: var(--ink); }
+.pstats button, .pstats > div { border: 0; background: none; padding: 0; text-align: center; color: var(--ink); }
 .pstats b { display: block; font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
 .pstats span { font-size: 13px; color: var(--ink-3); }
 .pbio { margin: 8px 0 0; font-size: 14px; line-height: 1.4; color: var(--ink); white-space: pre-line; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
@@ -398,3 +398,12 @@ a { color: inherit; text-decoration: none; }
 .subtabs { display: flex; gap: 4px; margin: 10px 0 8px; }
 .subtabs button { display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 10px; border: 0; border-radius: 999px; background: none; color: var(--ink-3); font-weight: 650; font-size: 13px; }
 .subtabs button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 0 0 0.5px var(--hairline); }
+.viewer { position: absolute; inset: 0; z-index: 30; background: #0b0b0d; }
+.viewer .video-card .info { bottom: calc(14px + env(safe-area-inset-bottom, 0px)); }
+.viewer-back { position: absolute; top: calc(10px + env(safe-area-inset-top, 0px)); left: 12px; width: 40px; height: 40px; border-radius: 50%; border: 0; color: var(--on-video); display: grid; place-items: center; z-index: 2; }
+button.g3 { border: 0; padding: 0; display: block; width: 100%; }
+.pprompt { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; padding: 26px 18px 10px; }
+.pprompt b { font-size: 16px; }
+.pprompt span { font-size: 13.5px; color: var(--ink-3); line-height: 1.45; max-width: 300px; }
+.pprompt .btn { margin-top: 6px; min-height: 40px; padding: 0 20px; }
+.pprompt-ic { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; background: var(--green-soft); color: var(--green-text) !important; }
