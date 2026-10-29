@@ -77,8 +77,41 @@ function load(): State {
   return seed();
 }
 
+// Demo uploads are kept in IndexedDB on this phone so they still play after a reload.
+const MEDIA_DB = "lsa-demo-media";
+function mediaDb(): Promise<IDBDatabase> {
+  return new Promise((ok, no) => {
+    const r = indexedDB.open(MEDIA_DB, 1);
+    r.onupgradeneeded = () => r.result.createObjectStore("blobs");
+    r.onsuccess = () => ok(r.result);
+    r.onerror = () => no(r.error);
+  });
+}
+async function keepBlob(key: string, blob: Blob) {
+  try {
+    const d = await mediaDb();
+    await new Promise((ok, no) => { const t = d.transaction("blobs", "readwrite"); t.objectStore("blobs").put(blob, key); t.oncomplete = ok; t.onerror = no; });
+  } catch { /* no IndexedDB: works until reload */ }
+}
+async function loadBlobs(): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  try {
+    const d = await mediaDb();
+    await new Promise<void>((ok) => {
+      const req = d.transaction("blobs").objectStore("blobs").openCursor();
+      req.onsuccess = () => { const c = req.result; if (!c) return ok(); out.set(String(c.key), URL.createObjectURL(c.value as Blob)); c.continue(); };
+      req.onerror = () => ok();
+    });
+  } catch { /* ignore */ }
+  return out;
+}
+
 export function createDemoApi(): Api {
   let s = load();
+  let blobUrls = new Map<string, string>();
+  const mediaReady = loadBlobs().then((m) => { blobUrls = m; });
+  const mediaUrl = (u: string | null | undefined) => (u?.startsWith("idb:") ? blobUrls.get(u.slice(4)) ?? null : u ?? null);
+  const stash = async (blob: Blob) => { const key = id(); blobUrls.set(key, URL.createObjectURL(blob)); await keepBlob(key, blob); return `idb:${key}`; };
   const listeners = new Set<(u: User | null) => void>();
   const save = () => {
     try { localStorage.setItem(KEY, JSON.stringify(s)); } catch { /* ignore */ }
@@ -163,7 +196,7 @@ export function createDemoApi(): Api {
 
   const toFeed = (po: DPost): FeedItem => {
     const p = s.products.find((x) => x.id === po.productId)!;
-    return { postId: po.id, caption: po.caption, product: p, shop: publicShop(shopOf(po.shopId)), video: po.video };
+    return { postId: po.id, caption: po.caption, product: p, shop: publicShop(shopOf(po.shopId)), video: { ...po.video, url: mediaUrl(po.video.url) } };
   };
   const visible = (po: DPost) => {
     const p = s.products.find((x) => x.id === po.productId);
@@ -206,6 +239,7 @@ export function createDemoApi(): Api {
     },
 
     async feed(offset = 0) {
+      await mediaReady;
       await wait(150);
       runDue();
       const sales = (shopId: string) => s.orders.filter((o) => o.shop.id === shopId && !["pending_payment", "cancelled", "refunded"].includes(o.status)).length;
@@ -214,6 +248,7 @@ export function createDemoApi(): Api {
       return s.posts.filter(visible).sort((a, b) => rank(b) - rank(a)).slice(offset, offset + 20).map(toFeed);
     },
     async shop(handle) {
+      await mediaReady;
       const sh = s.shops.find((x) => x.handle === handle && x.status === "open");
       if (!sh) return null;
       return { shop: publicShop(sh), items: s.posts.filter((p) => p.shopId === sh.id && visible(p)).map(toFeed) };
@@ -334,11 +369,13 @@ export function createDemoApi(): Api {
       }));
     },
     async reactedPosts(kind, shopId) {
+      await mediaReady;
       const who = shopId ? shopOf(shopId).ownerId : me().id;
       return (s.reactions ?? []).filter((r) => r.userId === who && r.kind === kind)
         .map((r) => s.posts.find((po) => po.id === r.postId)).filter((po): po is DPost => !!po && visible(po)).map(toFeed);
     },
     async followingReposts() {
+      await mediaReady;
       const u = me();
       const owners = new Map(s.follows.filter((f) => f.userId === u.id).map((f) => [shopOf(f.shopId).ownerId, shopOf(f.shopId).handle]));
       return (s.reactions ?? []).filter((r) => r.kind === "repost" && owners.has(r.userId))
@@ -347,7 +384,8 @@ export function createDemoApi(): Api {
         .map(({ r, po }) => ({ ...toFeed(po), repostedBy: owners.get(r.userId) }));
     },
     async productPhotos(productId) {
-      return s.posts.find((p) => p.productId === productId)?.photos ?? [];
+      await mediaReady;
+      return (s.posts.find((p) => p.productId === productId)?.photos ?? []).map((u) => mediaUrl(u)).filter((u): u is string => !!u);
     },
     async suggestListing() {
       // Demo mode can't read the photo: it returns a clearly labelled example so you can see how suggestions work.
@@ -470,8 +508,8 @@ export function createDemoApi(): Api {
       });
       if (video && sh.status === "open") {
         s.posts.unshift({ id: id(), shopId: sh.id, productId: pid, caption: input.caption, createdAt: now().toISOString(),
-          photos: photos.slice(0, 9).map((p) => URL.createObjectURL(p)),
-          video: { url: URL.createObjectURL(video), kind: video.type.startsWith("image/") ? "image" : "video", demo: { bg: "#3f3f46", label: "Your post (this browser only)" } } });
+          photos: await Promise.all(photos.slice(0, 9).map((p) => stash(p))),
+          video: { url: await stash(video), kind: video.type.startsWith("image/") ? "image" : "video", demo: { bg: "#3f3f46", label: "Your post (this browser only)" } } });
       }
       save();
       return { live, message };

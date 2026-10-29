@@ -61,7 +61,7 @@ export function Post() {
 }
 
 /** "Only sellers can post." Yes opens the shop sign up; No closes and changes nothing. */
-export function SellerGate({ open, onClose, unfinished }: { open: boolean; onClose: () => void; unfinished?: boolean }) {
+export function SellerGate({ open, onClose, onYes, unfinished }: { open: boolean; onClose: () => void; onYes?: () => void; unfinished?: boolean }) {
   const nav = useNavigate();
   if (!open) return null;
   return (
@@ -74,7 +74,7 @@ export function SellerGate({ open, onClose, unfinished }: { open: boolean; onClo
           <p>Only sellers can post items or go live. Opening a shop takes a few minutes, and the first 50 shops pay 0% for 3 months.</p>
         </div>
         <div className="sheet-foot stack" style={{ gap: 8 }}>
-          <button className="btn green block big" onClick={() => nav("/sell/start")}>Yes, open my shop</button>
+          <button className="btn green block big" onClick={() => { onYes?.(); nav("/sell/start"); }}>Yes, open my shop</button>
           <button className="btn block" onClick={onClose}>No, not now</button>
         </div>
       </div>

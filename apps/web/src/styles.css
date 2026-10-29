@@ -534,3 +534,35 @@ button.g3 { border: 0; padding: 0; display: block; width: 100%; }
 .wz-more { position: absolute; right: 6px; bottom: 6px; padding: 1px 7px; border-radius: 999px; background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 11px; font-weight: 800; }
 .photo-row { display: flex; gap: 8px; overflow-x: auto; margin: 0 -16px; padding: 0 16px; scrollbar-width: none; }
 .photo-row img { width: 120px; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 14px; flex-shrink: 0; background: var(--surface-2); }
+
+/* ===== Video player: tap to pause, sound, drag to rewind ===== */
+.video-card { --bar-bottom: calc(var(--tab-space) + 4px); }
+.viewer .video-card { --bar-bottom: calc(8px + env(safe-area-inset-bottom, 0px)); }
+.video-card .info { z-index: 2; margin-bottom: 14px; }
+.tap-layer { position: absolute; inset: 0; z-index: 1; border: 0; padding: 0; background: none; display: grid; place-items: center; -webkit-tap-highlight-color: transparent; }
+.big-play { width: 74px; height: 74px; border-radius: 50%; display: grid; place-items: center; color: #fff; padding-left: 4px; }
+.big-play svg { fill: #fff; stroke: #fff; }
+.sound-btn { position: absolute; z-index: 3; right: 12px; top: calc(66px + env(safe-area-inset-top, 0px)); width: 38px; height: 38px; border-radius: 50%; border: 0; color: #fff; display: grid; place-items: center; }
+.viewer .sound-btn { top: calc(10px + env(safe-area-inset-top, 0px)); }
+.vbar { position: absolute; z-index: 3; left: 12px; right: 12px; bottom: var(--bar-bottom); display: flex; flex-direction: column; align-items: center; }
+.vtrack { position: relative; width: 100%; height: 18px; display: flex; align-items: center; touch-action: none; cursor: pointer; }
+.vtrack::before { content: ""; position: absolute; left: 0; right: 0; height: 3px; border-radius: 2px; background: rgba(255, 255, 255, 0.28); transition: height 0.15s ease; }
+.vfill { position: absolute; left: 0; height: 3px; border-radius: 2px; background: rgba(255, 255, 255, 0.9); transition: height 0.15s ease; }
+.vknob { position: absolute; width: 0; height: 0; border-radius: 50%; background: #fff; transform: translateX(-50%); transition: width 0.15s ease, height 0.15s ease; }
+.vbar.big .vtrack::before, .vbar.big .vfill { height: 6px; }
+.vbar.big .vknob { width: 14px; height: 14px; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35); }
+.tap-layer { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; }
+.vtime { font-size: 17px; font-weight: 800; color: #fff; text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6); font-variant-numeric: tabular-nums; }
+.vlen { align-self: flex-end; font-size: 11px; font-weight: 700; color: rgba(255, 255, 255, 0.85); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5); margin-bottom: -2px; font-variant-numeric: tabular-nums; }
+.g3len { position: absolute; right: 6px; top: 6px; display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 999px; font-size: 11px; font-weight: 800; color: #fff; background: rgba(24, 24, 28, 0.35); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+.g3len svg { fill: #fff; }
+
+/* Photo posts: a slideshow */
+.slides { position: absolute; inset: 0; display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; z-index: 1; }
+.slides::-webkit-scrollbar { display: none; }
+.slides img { flex: 0 0 100%; width: 100%; height: 100%; object-fit: cover; scroll-snap-align: center; }
+.slide-dots { position: absolute; z-index: 3; left: 0; right: 0; top: calc(64px + env(safe-area-inset-top, 0px)); display: flex; justify-content: center; align-items: center; gap: 5px; pointer-events: none; }
+.slide-dots span { width: 6px; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.45); transition: width 0.2s ease; }
+.slide-dots span.on { width: 16px; background: #fff; }
+.slide-dots em { font-style: normal; font-size: 11px; font-weight: 800; color: #fff; margin-left: 6px; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5); }
+.product-chip .sw img, .product-chip .sw video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }

@@ -57,6 +57,9 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 
 ## Next up
 
+- Store must haves: Report a post or user, Block a user, Delete my account in the app, a privacy policy. See docs/LAUNCH.md.
+- Set up Apple and Google developer accounts now (D-U-N-S first for a company account) and start Google's 12 tester, 14 day closed test early. [Ofentse and Lehloma]
+
 - Apply migrations 0009 (public likes and reposts) and 0010 (listing photos) to the live Supabase project, and deploy the `suggest-listing` function.
 - Add the `ANTHROPIC_API_KEY` secret in Supabase (Edge Functions, Secrets) so photo suggestions work. Never paste it in chat or git. [Lehloma]
 
@@ -66,6 +69,15 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 - Messages tab and live streams with auctions are shown as "coming next".
 
 ## Log
+
+### 2026-10-29: Video player, slideshow, store readiness
+- Fix: the "Open a shop?" question now closes when you tap Yes (it stayed on screen over the shop set up).
+- Video player like TikTok (`apps/web/src/components/Video.tsx`): plays when on screen, tap to pause or play (big play button with time), sound button (top right, remembered on the phone; phones only allow sound after a tap), a bar at the bottom you can drag to rewind or skip, and the time left. Video tiles on profiles and shops show the length ("0:45").
+- Photo posts with several photos are a slideshow: swipe, dots and "1/3", moving on by itself every 4 seconds until you swipe.
+- The product strip on the feed shows the real photo or video frame for uploaded posts.
+- Demo uploads are saved in IndexedDB so they still play after a reload.
+- Ofentse's two sample clips (TikTok downloads of another creator) were used for local testing only and are not in git or the preview, because they are someone else's content. Note: iPhone clips are often HEVC (.mov); Safari plays them, other browsers may not. In the real app Mux converts every upload, so all phones can play them.
+- New `docs/LAUNCH.md`: App Store and Google Play rules, timelines and a December plan. Must build before submitting: Report, Block, Delete account, privacy policy, native shell.
 
 ### 2026-10-29: Several photos, suggestions from the photo, drafts
 - **Several photos:** Create's first page takes up to 10 items: a cover (video or photo) plus photos. Tap a photo to make it the cover, X to remove, Add or Camera for more. Only the cover can be a video. Extra photos show in the item sheet on the feed. Migration 0010 adds `listing_photos` (public for live items, sellers add only to their own items and folder, max 10). Tested locally.

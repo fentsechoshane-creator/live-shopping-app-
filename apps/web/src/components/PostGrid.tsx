@@ -4,6 +4,7 @@ import { FeedList } from "../screens/buyer/Feed";
 import { ProductArt } from "./Scene";
 import { Icon } from "./Icon";
 import { R, swatch } from "./ui";
+import { clock, useVideoLength } from "./Video";
 
 /** Three across grid of videos, like a TikTok profile. Tapping one opens the full screen player at that video. */
 export function PostGrid({ items, empty }: { items: FeedItem[]; empty: React.ReactNode }) {
@@ -16,6 +17,7 @@ export function PostGrid({ items, empty }: { items: FeedItem[]; empty: React.Rea
           <button key={it.postId} className="g3" onClick={() => setOpen(i)} aria-label={`${it.product.title}, ${R(it.product.priceCents)}`}>
             <ProductArt productId={it.product.id} fallback={it.video.demo?.bg ?? swatch(it.product.id)} />
             <span className="g3foot">{R(it.product.priceCents)}</span>
+            {it.video.url && it.video.kind !== "image" && <TileLength url={it.video.url} />}
           </button>
         ))}
       </div>
@@ -37,4 +39,10 @@ export function Viewer({ items, start, onClose }: { items: FeedItem[]; start: nu
       <button className="viewer-back vglass" onClick={onClose} aria-label="Close videos"><Icon name="back" size={20} /></button>
     </div>
   );
+}
+
+/** "0:45" on a video tile, so people can see how long it is before they tap. */
+function TileLength({ url }: { url: string }) {
+  const len = useVideoLength(url);
+  return len ? <span className="g3len"><Icon name="play" size={10} />{clock(len)}</span> : null;
 }

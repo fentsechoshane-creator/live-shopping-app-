@@ -258,7 +258,36 @@ try {
   await page.goto(BASE);
   await page.getByRole("region", { name: /Vintage denim jacket, size M/ }).waitFor();
   await page.getByRole("region", { name: /Vintage denim jacket, size M/ }).getByRole("button", { name: /See details/ }).click();
-  await page.getByRole("img", { name: /Vintage denim jacket, size M, photo 2/ }).waitFor(); // the extra photo shows in the item sheet
+  await page.getByRole("img", { name: /Vintage denim jacket, size M, photo 2/ }).first().waitFor(); // the extra photo shows in the item sheet
+  await page.keyboard.press("Escape");
+  // Photo posts are a slideshow with dots.
+  await page.getByRole("region", { name: /Vintage denim jacket, size M/ }).getByText("1/2").waitFor();
+  await shot("slideshow");
+
+  // A video post: pause, sound and a bar to rewind, with the length.
+  await page.goto(`${BASE}/post?mode=create`);
+  const startOver = page.getByRole("button", { name: "Start over" });
+  if (await startOver.count()) await startOver.click();
+  await page.getByLabel("Photo or video", { exact: true }).setInputFiles(here + "fixtures/clip.webm");
+  await page.getByRole("button", { name: "Next" }).click();
+  await page.getByRole("button", { name: "Use these" }).click(); // a suggestion from a frame of the video
+  await page.getByRole("button", { name: "Next" }).click();
+  await page.getByRole("button", { name: "Next" }).click();
+  await page.getByRole("button", { name: /^(Next|Skip)$/ }).click();
+  await page.getByRole("button", { name: "Post listing" }).click();
+  await page.waitForURL((u) => u.pathname === "/me");
+  await page.reload(); // demo uploads must survive a reload
+  await page.getByRole("link", { name: "Home" }).click();
+  const clipCard = page.getByRole("region", { name: /Denim jacket, light wash/ });
+  await clipCard.waitFor();
+  await clipCard.scrollIntoViewIfNeeded();
+  await clipCard.getByRole("button", { name: "Pause" }).click(); // it plays by itself once on screen
+  await clipCard.getByRole("button", { name: "Play" }).waitFor(); // paused: big play button and the time shows
+  await clipCard.getByText(/\d:\d\d \/ 0:08/).waitFor();
+  await check(clipCard.getByRole("slider", { name: "Video position" }).isVisible(), "rewind bar");
+  await clipCard.getByRole("button", { name: "Sound on" }).click();
+  await check(clipCard.getByRole("button", { name: "Sound off" }).isVisible(), "sound turned on");
+  await shot("video-paused");
 
   // ===== Team =====
   await signOut();

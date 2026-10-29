@@ -15,6 +15,9 @@ interface Session {
   /** Lower video quality on mobile data. Saved on this phone only. */
   dataSaver: boolean;
   setDataSaver: (on: boolean) => void;
+  /** Video sound for the whole app, like TikTok. Remembered on this phone. */
+  soundOn: boolean;
+  setSoundOn: (on: boolean) => void;
   /** Side menu with settings, opened from the profile. */
   menuOpen: boolean;
   setMenuOpen: (open: boolean) => void;
@@ -23,7 +26,7 @@ interface Session {
 const Ctx = createContext<Session>({
   user: null, ready: false, toast: () => {}, following: new Set(), toggleFollow: async () => {},
   liked: new Set(), reposted: new Set(), toggleReaction: async () => {},
-  dataSaver: false, setDataSaver: () => {}, menuOpen: false, setMenuOpen: () => {},
+  dataSaver: false, setDataSaver: () => {}, soundOn: false, setSoundOn: () => {}, menuOpen: false, setMenuOpen: () => {},
 });
 
 const readPref = (k: string) => {
@@ -39,6 +42,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [reposted, setReposted] = useState<Set<string>>(new Set());
   const [dataSaver, setDataSaverState] = useState(readPref("lsa-data-saver"));
   const [menuOpen, setMenuOpen] = useState(false);
+  const [soundOn, setSoundOnState] = useState(readPref("lsa-sound"));
+  const setSoundOn = (on: boolean) => {
+    setSoundOnState(on);
+    try { localStorage.setItem("lsa-sound", on ? "1" : "0"); } catch { /* ignore */ }
+  };
 
   useEffect(() => {
     api.currentUser().then((u) => { setUser(u); setReady(true); });
@@ -87,7 +95,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <Ctx.Provider value={{ user, ready, toast, following, toggleFollow, liked, reposted, toggleReaction, dataSaver, setDataSaver, menuOpen, setMenuOpen }}>
+    <Ctx.Provider value={{ user, ready, toast, following, toggleFollow, liked, reposted, toggleReaction, dataSaver, setDataSaver, soundOn, setSoundOn, menuOpen, setMenuOpen }}>
       {children}
       {msg && <div className="toast" role="status">{msg}</div>}
     </Ctx.Provider>

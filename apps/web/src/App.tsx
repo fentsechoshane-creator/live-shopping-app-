@@ -51,7 +51,7 @@ function Tabs() {
       </NavLink>
       <NavLink to="/me" aria-label="My profile"><Icon name="user" /></NavLink>
     </nav>
-    <SellerGate open={ask} onClose={() => setAsk(false)} unfinished={!!shop} />
+    <SellerGate open={ask} onClose={() => setAsk(false)} onYes={() => setAsk(false)} unfinished={!!shop} />
     </>
   );
 }

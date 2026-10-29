@@ -174,7 +174,7 @@ function VideoCard({ item, counts, onBrowse, onBuy }: { item: FeedItem; counts?:
 
   return (
     <section className="video-card" aria-label={`${p.title} from ${item.shop.name}`}>
-      <Video src={item.video} label={`Video: ${item.caption}`} />
+      <Video src={item.video} label={`Video: ${item.caption}`} productId={p.id} />
       <div className="shade" />
       <div className="info">
         {(item.repostedBy || chip) && (
@@ -195,7 +195,9 @@ function VideoCard({ item, counts, onBrowse, onBuy }: { item: FeedItem; counts?:
         <div className="caption">{item.caption}</div>
         <div className="prod-row">
         <button className="product-chip vglass" onClick={onBrowse} style={{ textAlign: "left" }} aria-label={`See details: ${p.title}, ${R(p.priceCents)}`}>
-          <span className="sw art"><ProductArt productId={p.id} fallback="#555" /></span>
+          <span className="sw art">{item.video.url
+            ? (item.video.kind === "image" ? <img src={item.video.url} alt="" /> : <video src={`${item.video.url}#t=0.1`} muted playsInline preload="metadata" />)
+            : <ProductArt productId={p.id} fallback="#555" />}</span>
           <span className="grow"><span className="t" style={{ display: "block" }}>{p.title}</span><span className="s" style={{ display: "block" }}>{sub}</span></span>
           <span className="p">{R(p.priceCents)}</span>
         </button>
