@@ -27,9 +27,10 @@ function loadPlaywright() {
 const server = spawn("npx", ["vite", "preview", "--port", String(PORT), "--strictPort"], { cwd: here + "..", stdio: "pipe" });
 await new Promise((r) => setTimeout(r, 2500));
 
-const browser = await chromium.launch();
+// A fake camera and microphone so the camera screen can be tested.
+const browser = await chromium.launch({ args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"] });
 // iPhone 15 in Safari with its toolbars showing: about 393 x 720 usable, touch, 3x screen.
-const page = await browser.newPage({ viewport: { width: 393, height: 720 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
+const page = await browser.newPage({ viewport: { width: 393, height: 720 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, permissions: ["camera", "microphone"] });
 page.setDefaultTimeout(15000);
 // Fonts are not needed for the checks, and some test environments block them.
 await page.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.abort());
@@ -193,12 +194,28 @@ try {
   await page.getByText(/You get R450 after the 0% founding fee/).waitFor(); // founding sellers pay no fee
   await page.getByRole("button", { name: /Pre loved/ }).click();
   await page.getByRole("button", { name: "good", exact: true }).click();
-  await page.getByLabel("Video", { exact: true }).setInputFiles(fakeFile("clip.mp4", "video/mp4"));
-  await page.getByLabel("Video caption").fill("Real denim, every mark on camera");
+  await page.getByLabel("Photo or video", { exact: true }).setInputFiles(fakeFile("clip.mp4", "video/mp4"));
+  await page.getByLabel("Caption", { exact: true }).fill("Real denim, every mark on camera");
   await page.getByRole("button", { name: "Post listing" }).click();
-  await page.waitForURL(/me\?tab=selling/);
+  await page.waitForURL((u) => u.pathname === "/me");
   await page.getByRole("link", { name: /Vintage denim jacket, size M/ }).waitFor();
   await shot("seller-listed");
+  // The + tab: Camera first. Tap the shutter for a photo, then Next takes it to Create.
+  await page.goto(`${BASE}/post`);
+  const shutter = page.getByRole("button", { name: /Tap for a photo/ });
+  await page.waitForFunction(() => document.querySelector(".cam-feed")?.videoWidth > 0, null, { timeout: 15000 });
+  await shot("camera");
+  await shutter.click();
+  await page.getByRole("button", { name: "Next" }).click();
+  await page.getByRole("heading", { name: "Create a listing" }).waitFor();
+  await page.locator(".media-thumb img").waitFor(); // the photo carried over
+  // Live: blocked without 5 items in stock.
+  await page.getByRole("tab", { name: "Live" }).click();
+  await page.getByRole("button", { name: "Go live" }).click();
+  await page.getByRole("dialog", { name: "Can't go live yet" }).getByText(/can't go live without stock/).waitFor();
+  await page.waitForTimeout(400);
+  await shot("live-blocked");
+
 
   await page.goto(BASE);
   await page.getByRole("region", { name: /Vintage denim jacket, size M/ }).waitFor();

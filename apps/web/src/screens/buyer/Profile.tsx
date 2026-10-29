@@ -109,7 +109,7 @@ export function Profile() {
       {tab === "posts" && hasShop && (
         <>
           <div className="ppills">
-            <button className="pill-btn green" onClick={() => nav("/sell/new")}><Icon name="plus" size={14} strokeWidth={2.5} />List an item</button>
+            <button className="pill-btn green" onClick={() => nav("/post?mode=create")}><Icon name="plus" size={14} strokeWidth={2.5} />List an item</button>
             <button className="pill-btn" onClick={() => nav("/sell/orders")}><Icon name="truck" size={14} />Orders{toShip > 0 && <span className="count">{toShip}</span>}</button>
             <button className="pill-btn" onClick={() => nav("/sell/payouts")}><Icon name="payout" size={14} />Payouts</button>
           </div>
@@ -195,7 +195,7 @@ function SellerGrid({ shop, error, sold, reload }: { shop: MyShop | null | undef
           <span className="pprompt-ic"><Icon name="plus" size={22} strokeWidth={2.5} /></span>
           <b>Post your first item</b>
           <span>A short video of the item sells best. Show it from every side, and any marks.</span>
-          <button className="btn green" onClick={() => nav("/sell/new")}>Post an item</button>
+          <button className="btn green" onClick={() => nav("/post?mode=create")}>Post an item</button>
         </div>
       ) : (
         <div className="grid3">

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import {
   canUse, DELIVERY_OPTIONS, LISTING_LABELS, rand, TIER_INFO, tierFor, TRUST_POINTS, validateListing,
@@ -28,7 +28,8 @@ export function CertUpload({ status, onDone }: { status: string; onDone: () => v
 
 const CONDITIONS: Condition[] = ["new", "like_new", "good", "fair"];
 
-export function NewListing() {
+/** The listing form. Used as the Create tab of the post screen; a photo or video taken with Camera arrives as `media`. */
+export function NewListing({ media = null, onCamera }: { media?: File | null; onCamera?: () => void }) {
   const [shop] = useLoad(() => api.myShop(), []);
   const food = shop?.category === "food";
   const [title, setTitle] = useState("");
@@ -41,7 +42,10 @@ export function NewListing() {
   const [leadDays, setLeadDays] = useState("2");
   const [allergens, setAllergens] = useState("");
   const [caption, setCaption] = useState("");
-  const [video, setVideo] = useState<File | null>(null);
+  const [video, setVideo] = useState<File | null>(media);
+  useEffect(() => { if (media) setVideo(media); }, [media]);
+  const preview = useMemo(() => (video ? URL.createObjectURL(video) : null), [video]);
+  useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
   const [proof, setProof] = useState<File | null>(null);
   const [progress, setProgress] = useState(0);
   const { busy, error, run, setError } = useAction();
@@ -63,20 +67,28 @@ export function NewListing() {
         leadDays: food ? Number(leadDays) || 2 : null, allergens: food ? allergens || null : null, caption: caption.trim() || title.trim(),
       }, video, proof, setProgress);
       toast(res.live ? "Your item is live" : res.message ?? "Saved as a draft");
-      nav("/me?tab=selling");
+      nav("/me");
     });
   };
 
   if (shop === undefined) return <div className="screen"><Loading /></div>;
   if (!shop || shop.status === "onboarding") return <Navigate to="/sell/start" replace />;
   return (
-    <form className="screen" onSubmit={submit}>
-      <BackButton />
-      <h1 style={{ marginTop: 6 }}>List an item</h1>
+    <form className="screen create-form" onSubmit={submit}>
+      <h1 style={{ marginTop: 6 }}>Create a listing</h1>
       <ErrorNote error={error} />
-      <Field label="Video" hint="Short and honest. Show the whole item and every flaw. Up to 60 seconds works best.">
-        <input type="file" accept="video/*" capture="environment" onChange={(e) => setVideo(e.target.files?.[0] ?? null)} />
-      </Field>
+      <div className="media-pick">
+        <div className="media-thumb">
+          {video && preview ? (video.type.startsWith("image/") ? <img src={preview} alt="Your photo" /> : <video src={preview} muted playsInline loop autoPlay />)
+            : <Icon name="plus" size={22} />}
+        </div>
+        <div className="grow">
+          <Field label="Photo or video" hint="Short and honest. Show the whole item and every flaw.">
+            <input type="file" accept="video/*,image/*" onChange={(e) => setVideo(e.target.files?.[0] ?? null)} />
+          </Field>
+          {onCamera && <button type="button" className="link" onClick={onCamera}>Use the camera instead</button>}
+        </div>
+      </div>
       <Field label="Title"><input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={80} placeholder={food ? "Celebration cake, 20 cm" : "Vintage denim jacket, size M"} required /></Field>
       <Field label="Price (rand)" hint={priceCents ? `You get ${R(priceCents - (founding ? 0 : fee))} after the ${founding ? "0% founding" : "6%"} fee, plus delivery.` : undefined}>
         <input value={price} onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, ""))} inputMode="decimal" placeholder="450" required />
@@ -111,8 +123,8 @@ export function NewListing() {
         </>
       )}
       <Field label="Description"><textarea value={description} onChange={(e) => setDescription(e.target.value)} /></Field>
-      <Field label="Video caption"><input value={caption} onChange={(e) => setCaption(e.target.value)} maxLength={300} placeholder="3 ways to style it" /></Field>
-      {busy && video && <div className="note" style={{ marginBottom: 12 }}>Uploading video… {progress}%</div>}
+      <Field label="Caption"><input value={caption} onChange={(e) => setCaption(e.target.value)} maxLength={300} placeholder="3 ways to style it" /></Field>
+      {busy && video && <div className="note" style={{ marginBottom: 12 }}>Uploading… {progress}%</div>}
       <button className="btn green block big" disabled={busy}>{busy ? "Posting…" : "Post listing"}</button>
     </form>
   );

@@ -461,7 +461,7 @@ export function createDemoApi(): Api {
       });
       if (video && sh.status === "open") {
         s.posts.unshift({ id: id(), shopId: sh.id, productId: pid, caption: input.caption, createdAt: now().toISOString(),
-          video: { url: URL.createObjectURL(video), demo: { bg: "#3f3f46", label: "Your video (this browser only)" } } });
+          video: { url: URL.createObjectURL(video), kind: video.type.startsWith("image/") ? "image" : "video", demo: { bg: "#3f3f46", label: "Your post (this browser only)" } } });
       }
       save();
       return { live, message };

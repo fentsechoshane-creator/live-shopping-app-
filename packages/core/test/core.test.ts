@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   rand, formatRand, protectionFee, orderTotals, sellerFee, releasableAt, payoutDate, nextFriday, addWorkingDays,
   reserveFor, scoreFrom, tierFor, canUse, validateListing, canTransition, returnReasonsFor, shipBy,
+  liveStock, goLiveBlockers, MIN_LIVE_STOCK,
 } from "../src/index.ts";
 
 describe("money", () => {
@@ -149,5 +150,26 @@ describe("orders", () => {
   it("only Buy now allows change of mind", () => {
     expect(returnReasonsFor("buy_now")).toContain("changed_mind");
     expect(returnReasonsFor("order_now")).not.toContain("changed_mind");
+  });
+});
+
+describe("going live", () => {
+  const ok = { verified: true, goodOrders: 5, trustScore: 72, category: "clothes" as const };
+  it("counts stock of live Buy now listings only", () => {
+    expect(liveStock([
+      { status: "live", mode: "buy_now", stock: 3 },
+      { status: "live", mode: "buy_now", stock: 2 },
+      { status: "draft", mode: "buy_now", stock: 10 },
+      { status: "live", mode: "order_now", stock: 99 },
+    ])).toBe(5);
+  });
+  it("needs at least 5 in stock: 5 items or 5 of one item", () => {
+    expect(MIN_LIVE_STOCK).toBe(5);
+    expect(goLiveBlockers(ok, 4)[0]).toMatch(/can't go live without stock/);
+    expect(goLiveBlockers(ok, 5)).toEqual([]);
+  });
+  it("still needs 5 good orders", () => {
+    expect(goLiveBlockers({ ...ok, goodOrders: 2 }, 8)).toHaveLength(1);
+    expect(goLiveBlockers({ ...ok, goodOrders: 2 }, 1)).toHaveLength(2);
   });
 });

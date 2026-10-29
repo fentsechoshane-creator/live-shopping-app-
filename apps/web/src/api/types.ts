@@ -16,6 +16,8 @@ export interface User {
 export interface VideoSource {
   muxPlaybackId?: string | null;
   url?: string | null;
+  /** A photo post instead of a video. */
+  kind?: "video" | "image";
   /** Demo only: a coloured placeholder with a label. */
   demo?: { bg: string; label: string; scene?: string };
 }

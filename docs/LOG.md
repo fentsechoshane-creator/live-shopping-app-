@@ -66,6 +66,15 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 
 ## Log
 
+### 2026-10-29: Posting: Camera, Create and Live
+- The + tab opens a new post screen (`/post`, `apps/web/src/screens/seller/Post.tsx`) with Camera, Create and Live at the bottom, like TikTok. The app's tab bar hides there; X closes it.
+- **Camera** opens the phone camera: gallery on the left, shutter in the middle, flip on the right. Tap for a photo, press and hold for a video until you let go. Length limit picker: 15 seconds, 1 minute or 3 minutes (recording stops at the limit, with a red ring). Then Retake or Next, which carries the photo or video into Create.
+- **Create** is the listing form (title "Create a listing"), now taking a photo or a video. Photos are stored as image media (no Mux) and show as photo posts in the feed.
+- **Live** has a Go live button. It checks stock first: at least 5 items in stock, or 5 of one item (live Buy now listings only; made to order food does not count). Without it: "You can't go live without stock" and a Create a listing button. It also still applies the existing rule of 5 good orders before going live. Live streaming itself is coming next.
+- New core rule: `MIN_LIVE_STOCK`, `liveStock()`, `goLiveBlockers()` in packages/core with tests.
+- Camera note: the phone preview inside Claude may not be allowed to open the camera; it then offers the gallery. In the real app or a hosted link, Safari asks for camera access.
+- Open: keep the 5 good orders rule for going live, or go live on stock alone? [CONFIRM]
+
 ### 2026-10-29: Lower tab bar
 - The floating tab bar sits much lower with only a little float (5px from the bottom, or just above the iPhone home bar) and is a bit slimmer, so more of the video shows. Feed buttons, toasts and screen padding follow it through `--tab-bottom` and `--tab-space` in styles.css. Asked for in a comment on the phone preview.
 

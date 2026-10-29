@@ -10,7 +10,8 @@ import { MockPay, OrderDetail, Orders } from "./screens/buyer/Orders";
 import { Activity, ShopPage, SignIn } from "./screens/buyer/Account";
 import { Profile } from "./screens/buyer/Profile";
 import { Onboarding } from "./screens/seller/Onboarding";
-import { NewListing, Payouts, SellerOrderDetail, SellerOrders } from "./screens/seller/Selling";
+import { Payouts, SellerOrderDetail, SellerOrders } from "./screens/seller/Selling";
+import { Post } from "./screens/seller/Post";
 import { Admin } from "./screens/admin/Admin";
 
 function RequireUser({ children }: { children: ReactNode }) {
@@ -35,7 +36,7 @@ function Tabs() {
     <nav className={`tabs glass ${onVideo ? "on-video" : ""}`} aria-label="Main">
       <NavLink to="/" end aria-label="Home"><Icon name="home" /></NavLink>
       <NavLink to="/explore" aria-label="Explore"><Icon name="explore" /></NavLink>
-      <NavLink to="/sell/new" className="create" aria-label="Create or start selling"><Icon name="plus" strokeWidth={2.5} /></NavLink>
+      <NavLink to="/post" className="create" aria-label="Post: camera, create a listing or go live"><Icon name="plus" strokeWidth={2.5} /></NavLink>
       <NavLink to="/activity" aria-label={`Activity${unread ? `, ${unread} new` : ""}`}>
         <Icon name="bell" />{unread > 0 && <span className="badge">{unread}</span>}
       </NavLink>
@@ -120,6 +121,7 @@ function Help() {
 const guard = (el: ReactNode) => <RequireUser>{el}</RequireUser>;
 
 export function App() {
+  const loc = useLocation();
   return (
     <div className="phone">
       <div className="content">
@@ -136,14 +138,15 @@ export function App() {
           <Route path="/me" element={guard(<Profile />)} />
           <Route path="/sell" element={<Navigate to="/me?tab=selling" replace />} />
           <Route path="/sell/start" element={guard(<Onboarding />)} />
-          <Route path="/sell/new" element={guard(<NewListing />)} />
+          <Route path="/post" element={guard(<Post />)} />
+          <Route path="/sell/new" element={<Navigate to="/post?mode=create" replace />} />
           <Route path="/sell/orders" element={guard(<SellerOrders />)} />
           <Route path="/sell/orders/:id" element={guard(<SellerOrderDetail />)} />
           <Route path="/sell/payouts" element={guard(<Payouts />)} />
           <Route path="/admin" element={guard(<Admin />)} />
           <Route path="*" element={<div className="screen"><div className="empty">Page not found.</div></div>} />
         </Routes>
-        <Tabs />
+        {!loc.pathname.startsWith("/post") && <Tabs />}
         <SideMenu />
       </div>
     </div>

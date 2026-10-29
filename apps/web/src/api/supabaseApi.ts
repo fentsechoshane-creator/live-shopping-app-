@@ -37,6 +37,7 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
     return data as T;
   }
 
+  const isImage = (path: string | null) => !!path && /\.(jpe?g|png|webp|heic|heif|gif)$/i.test(path);
   const videoUrl = (path: string | null) => (path ? sb.storage.from("videos").getPublicUrl(path).data.publicUrl : null);
 
   const toProduct = (p: any): ProductPublic => ({
@@ -88,7 +89,7 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
     postId: r.post_id, caption: r.caption,
     product: toProduct({ ...r, id: r.product_id, status: "live" }),
     shop: { id: r.shop_id, name: r.shop_name, handle: r.shop_handle, category: r.category, trustScore: r.trust_score, tier: r.tier },
-    video: { muxPlaybackId: r.playback_id, url: videoUrl(r.storage_path) },
+    video: { muxPlaybackId: r.playback_id, url: videoUrl(r.storage_path), kind: isImage(r.storage_path) ? "image" : "video" },
   });
 
   const api: Api = {
@@ -137,7 +138,7 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
         shop,
         items: posts.filter((p) => p.media?.status === "ready").map((p) => ({
           postId: p.id, caption: p.caption, product: toProduct(p.products), shop,
-          video: { muxPlaybackId: p.media.mux_playback_id, url: videoUrl(p.media.storage_path) },
+          video: { muxPlaybackId: p.media.mux_playback_id, url: videoUrl(p.media.storage_path), kind: isImage(p.media.storage_path) ? "image" : "video" },
         })),
       };
     },
@@ -327,11 +328,14 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
       }
       if (video) {
         let mediaId: string;
-        const up = await call<{ useStorage?: boolean; mediaId?: string; uploadUrl?: string }>("mux-upload", {});
+        const photo = video.type.startsWith("image/");
+        // Photos go straight to storage. Videos go to Mux when it is set up.
+        const up = photo ? { useStorage: true } as { useStorage?: boolean; mediaId?: string; uploadUrl?: string }
+          : await call<{ useStorage?: boolean; mediaId?: string; uploadUrl?: string }>("mux-upload", {});
         if (up.useStorage) {
           const path = await upload("videos", video, "clip");
           onProgress?.(100);
-          mediaId = (check(await sb.from("media").insert({ owner_id: await uid(), kind: "video", storage_path: path, status: "ready" }).select("id").single()) as any).id;
+          mediaId = (check(await sb.from("media").insert({ owner_id: await uid(), kind: photo ? "image" : "video", storage_path: path, status: "ready" }).select("id").single()) as any).id;
         } else {
           await putWithProgress(up.uploadUrl!, video, onProgress);
           mediaId = up.mediaId!;

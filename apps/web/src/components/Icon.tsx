@@ -9,6 +9,7 @@ const PATHS: Record<string, string> = {
   search: "M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3",
   menu: "M4 7h16M4 12h16M4 17h16",
   edit: "M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4",
+  flip: "M4 9a8 8 0 0 1 14-3l2 2M20 4v4h-4M20 15a8 8 0 0 1-14 3l-2-2M4 20v-4h4",
   heart: "M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z",
   repost: "M17 3l3 3-3 3M4 11V9a3 3 0 0 1 3-3h13M7 21l-3-3 3-3M20 13v2a3 3 0 0 1-3 3H4",
   close: "M6 6l12 12M18 6 6 18",

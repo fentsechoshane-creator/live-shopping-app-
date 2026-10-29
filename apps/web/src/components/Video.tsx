@@ -45,5 +45,6 @@ export function Video({ src, label }: { src: VideoSource; label: string }) {
       </div>
     );
   }
+  if (src.kind === "image" && src.url) return <img src={src.url} alt={label} className="photo-post" />;
   return <video ref={ref} src={hlsUrl ? undefined : src.url ?? undefined} poster={poster} muted loop playsInline aria-label={label} />;
 }

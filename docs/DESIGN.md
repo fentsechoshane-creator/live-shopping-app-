@@ -32,6 +32,6 @@
 | Profile | `/me` (Profile.tsx) | Built, TikTok style: photo with Posts, Sales, Following beside it; name, rating bubble (out of 5, red to green, black when none), standing pill, bio. This header never changes. Posts, Likes and Reposts tabs below; Posts shows seller buttons and prompts to open a shop or post when empty. Shop pages use the same layout. Trust and Following open as sheets. |
 | Side menu and settings | Menu button on Me | Built. |
 | Seller sign up (5 steps) | `/sell/start` | Built. |
-| List an item | `/sell/new` | Built. |
+| Post (+ tab): Camera, Create, Live | `/post` (Post.tsx) | Built. Camera: gallery left, shutter middle (tap photo, hold video), flip right, length limit. Create: the listing form. Live: stock check (5 minimum), streaming coming next. |
 | Shop checklist | Me, Selling | Built. |
 | Auctions, live selling, chat | | Not built yet. |

@@ -37,3 +37,21 @@ export function canUse(feature: Feature, s: SellerState): { ok: boolean; reason?
       return s.trustScore >= 70 ? { ok: true } : { ok: false, reason: "Unlocks at a trust score of 70." };
   }
 }
+
+/** You need at least this much stock to go live: 5 items, or 5 of one item. */
+export const MIN_LIVE_STOCK = 5;
+
+/** Units a seller can sell on a live: the stock of their live Buy now listings. Made to order items do not count. */
+export function liveStock(products: { status: string; mode: string; stock: number }[]): number {
+  return products.filter((p) => p.status === "live" && p.mode === "buy_now").reduce((n, p) => n + Math.max(0, p.stock), 0);
+}
+
+/** Everything that stops a seller going live, stock first. Empty means they can go live. */
+export function goLiveBlockers(s: SellerState, stock: number): string[] {
+  const out: string[] = [];
+  if (stock < MIN_LIVE_STOCK)
+    out.push(`You can't go live without stock. Have at least ${MIN_LIVE_STOCK} items in stock, or ${MIN_LIVE_STOCK} of one item (you have ${stock}).`);
+  const rule = canUse("go_live", s);
+  if (!rule.ok && rule.reason) out.push(rule.reason);
+  return out;
+}
