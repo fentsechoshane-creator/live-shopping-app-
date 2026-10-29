@@ -78,3 +78,13 @@ Without Mux, seller videos upload to Supabase Storage and play as plain files. T
 ## Hosting the web app
 
 `npm run build` makes `apps/web/dist`, a static site. Any static host works (Vercel, Netlify, Cloudflare Pages). Set the three `VITE_` variables there and send all routes to `index.html`.
+
+## Photo suggestions (optional)
+
+When a seller adds a photo, the app can suggest a title, type, condition and price. This uses Claude through the `suggest-listing` server function.
+
+1. Create an API key at console.anthropic.com.
+2. Put it in `supabase/.env` as `ANTHROPIC_API_KEY=...` (never in the web app, chat or git).
+3. `supabase secrets set --env-file supabase/.env` and `supabase functions deploy suggest-listing`.
+
+Without the key, the app simply skips suggestions.

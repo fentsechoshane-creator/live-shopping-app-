@@ -17,7 +17,13 @@ export function Post() {
   const [params, setParams] = useSearchParams();
   const mode: Mode = (["camera", "create", "live"] as const).find((m) => m === params.get("mode")) ?? "camera";
   const setMode = (m: Mode) => { setSub(false); setParams(m === "camera" ? {} : { mode: m }, { replace: true }); };
-  const [media, setMedia] = useState<File | null>(null);
+  // Cover first (a video or a photo), then extra photos. Only the cover can be a video.
+  const [media, setMedia] = useState<File[]>([]);
+  const [fromCamera, setFromCamera] = useState(false);
+  const addShot = (f: File) => setMedia((cur) => {
+    if (f.type.startsWith("video/")) return [f, ...cur.filter((x) => !x.type.startsWith("video/"))];
+    return [...cur, f].slice(0, 10);
+  });
   // On a later page (a camera review or a later Create step) the Camera, Create, Live switch hides.
   const [sub, setSub] = useState(false);
   const [shop] = useLoad(() => api.myShop(), []);
@@ -31,9 +37,10 @@ export function Post() {
 
   return (
     <div className={`post ${dark ? "dark" : ""}`}>
-      {mode === "camera" && <Camera onReview={setSub} onDone={(f) => { setMedia(f); setMode("create"); }} />}
+      {mode === "camera" && <Camera onReview={setSub} onDone={(f) => { addShot(f); setFromCamera(true); setMode("create"); }} />}
       {mode === "create" && (
-        <CreateListing shop={shop} media={media} onMedia={setMedia} onCamera={() => setMode("camera")} onStep={(n) => setSub(n > 0)} />
+        <CreateListing shop={shop} media={media} onMedia={setMedia} startAtDetails={fromCamera}
+          onCamera={() => { setFromCamera(false); setMode("camera"); }} onStep={(n) => { setSub(n > 0); if (n === 0) setFromCamera(false); }} />
       )}
       {mode === "live" && <GoLive onCreate={() => setMode("create")} />}
 

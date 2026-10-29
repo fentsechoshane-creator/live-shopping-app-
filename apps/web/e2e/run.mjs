@@ -193,8 +193,16 @@ try {
   await page.goto(`${BASE}/post?mode=create`);
   await page.getByRole("heading", { name: "Create a listing" }).waitFor();
   await shot("create-start");
-  await page.getByLabel("Photo or video", { exact: true }).setInputFiles(fakeFile("clip.mp4", "video/mp4"));
+  // Two photos from the gallery: the first is the cover.
+  await page.getByLabel("Photo or video", { exact: true }).setInputFiles([here + "fixtures/denim.jpg", here + "fixtures/denim-back.jpg"]);
+  await page.getByRole("button", { name: "Make photo 2 the cover" }).waitFor();
+  await shot("create-photos");
   await page.getByRole("button", { name: "Next" }).click();
+  // Suggestions from the photo (an example in demo mode), applied with one tap.
+  await page.getByText("Example suggestion (demo)").waitFor();
+  await shot("create-suggest");
+  await page.getByRole("button", { name: "Use these" }).click();
+  await check(page.getByLabel("Title").inputValue().then((v) => v === "Denim jacket, light wash, size M"), "suggested title filled in");
   await check(page.getByRole("tablist", { name: "Post" }).count().then((n) => n === 0), "Camera, Create, Live hides after the first page");
   // Replicas are stopped on the step where you type the title.
   await page.getByLabel("Title").fill("Jordan 4 reps 1:1");
@@ -210,6 +218,13 @@ try {
   await page.getByText(/You get R450 after the 0% founding fee/).waitFor(); // founding sellers pay no fee
   await page.getByRole("button", { name: "M", exact: true }).click();
   await shot("create-price");
+  // Drafts: leave halfway, come back, carry on where you were.
+  await page.waitForTimeout(600);
+  await page.goto(`${BASE}/post?mode=create`);
+  await page.getByText("Continue your draft?").waitFor();
+  await shot("create-draft");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await check(page.getByLabel("Price (rand)").inputValue().then((v) => v === "450"), "draft brought the price back");
   await page.getByRole("button", { name: "Next" }).click();
   await page.getByLabel("Caption", { exact: true }).fill("Real denim, every mark on camera");
   // Back goes one step back and keeps what you typed.
@@ -242,6 +257,8 @@ try {
 
   await page.goto(BASE);
   await page.getByRole("region", { name: /Vintage denim jacket, size M/ }).waitFor();
+  await page.getByRole("region", { name: /Vintage denim jacket, size M/ }).getByRole("button", { name: /See details/ }).click();
+  await page.getByRole("img", { name: /Vintage denim jacket, size M, photo 2/ }).waitFor(); // the extra photo shows in the item sheet
 
   // ===== Team =====
   await signOut();

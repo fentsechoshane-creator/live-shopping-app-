@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { LISTING_LABELS, rand, validateListing, type Condition, type ListingLabel } from "@app/core";
-import { api, type MyShop } from "../../api";
+import { api, type ListingSuggestion, type MyShop } from "../../api";
+import { clearDraft, loadDraft, loadDraftMedia, saveDraft, saveDraftMedia, snapshot, type DraftFields } from "../../lib/draft";
 import { useSession } from "../../session";
 import { Icon } from "../../components/Icon";
 import { ErrorNote, R, useAction } from "../../components/ui";
@@ -17,12 +18,12 @@ const STEPS = ["Media", "What is it", "Price", "More", "Review"] as const;
  * 0 photo or video, 1 what it is, 2 price and stock, 3 extra details (optional), 4 review and post.
  * Step 0 is the first page (the Camera, Create, Live switch shows); later steps hide it and Back goes one step back.
  */
-export function CreateListing({ shop, media, onMedia, onCamera, onStep }: {
-  shop: MyShop; media: File | null; onMedia: (f: File | null) => void; onCamera: () => void; onStep: (step: number) => void;
+export function CreateListing({ shop, media, onMedia, onCamera, onStep, startAtDetails }: {
+  shop: MyShop; media: File[]; onMedia: (files: File[]) => void; onCamera: () => void; onStep: (step: number) => void; startAtDetails?: boolean;
 }) {
   const food = shop.category === "food";
   const founding = !!shop.foundingUntil && new Date(shop.foundingUntil) > new Date();
-  const [step, setStepState] = useState(media ? 1 : 0);
+  const [step, setStepState] = useState(startAtDetails && media.length ? 1 : 0);
   const [title, setTitle] = useState("");
   const [label, setLabel] = useState<ListingLabel>("new");
   const [condition, setCondition] = useState<Condition | null>(null);
@@ -36,7 +37,7 @@ export function CreateListing({ shop, media, onMedia, onCamera, onStep }: {
   const [caption, setCaption] = useState("");
   const [progress, setProgress] = useState(0);
   const { busy, error, run, setError } = useAction();
-  const { toast } = useSession();
+  const { toast, user } = useSession();
   const nav = useNavigate();
   const bodyRef = useRef<HTMLDivElement>(null);
 
@@ -46,12 +47,53 @@ export function CreateListing({ shop, media, onMedia, onCamera, onStep }: {
   const priceCents = rand(Number(price) || 0);
   const fee = founding ? 0 : Math.round(priceCents * 0.06);
   const mode = food ? "order_now" : "buy_now";
-  const preview = useMemo(() => (media ? URL.createObjectURL(media) : null), [media]);
-  useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
+  const cover = media[0] ?? null;
+  const urls = useMemo(() => media.map((m) => URL.createObjectURL(m)), [media]);
+  useEffect(() => () => urls.forEach((u) => URL.revokeObjectURL(u)), [urls]);
+  const preview = urls[0] ?? null;
+
+  // ----- Drafts: saved on this phone as you go -----
+  const uid = user?.id ?? "anon";
+  const [draft, setDraft] = useState<DraftFields | null>(() => (media.length ? null : loadDraft(uid)));
+  const touched = !!(title || price || description || caption || media.length);
+  useEffect(() => {
+    if (!touched || draft) return;
+    const t = window.setTimeout(() => saveDraft(uid, { title, label, condition, price, stock, sizes, leadDays, allergens, description, caption, step, savedAt: new Date().toISOString() }), 400);
+    return () => window.clearTimeout(t);
+  }, [touched, draft, uid, title, label, condition, price, stock, sizes, leadDays, allergens, description, caption, step]);
+  useEffect(() => { if (!draft && media.length) saveDraftMedia(uid, media); }, [media, draft, uid]);
+  const resumeDraft = async () => {
+    if (!draft) return;
+    setTitle(draft.title); setLabel(draft.label as ListingLabel); setCondition(draft.condition as Condition | null); setPrice(draft.price);
+    setStock(draft.stock); setSizes(draft.sizes); setLeadDays(draft.leadDays); setAllergens(draft.allergens);
+    setDescription(draft.description); setCaption(draft.caption);
+    const files = await loadDraftMedia(uid);
+    if (files.length) onMedia(files);
+    setDraft(null);
+    setStep(files.length ? Math.max(1, Math.min(4, draft.step)) : 0);
+  };
+  const discardDraft = () => { clearDraft(uid); setDraft(null); };
+
+  // ----- Suggestions from the cover photo, once per cover -----
+  const [sugg, setSugg] = useState<ListingSuggestion | "loading" | null>(null);
+  const askedFor = useRef<File | null>(null);
+  useEffect(() => {
+    if (step !== 1 || !cover || title || askedFor.current === cover) return;
+    askedFor.current = cover;
+    setSugg("loading");
+    snapshot(cover).then((img) => (img ? api.suggestListing(img) : null)).then((r) => setSugg(r)).catch(() => setSugg(null));
+  }, [step, cover, title]);
+  const applySuggestion = (x: ListingSuggestion) => {
+    setTitle(x.title);
+    if (!food) { setLabel(x.label); setCondition(x.condition); }
+    setPrice(String(Math.round(x.priceCents / 100)));
+    if (!description) setDescription(x.description);
+    setSugg(null);
+  };
 
   // Check each step as you leave it, so problems show where they happen.
   const stepErrors = (n: number): string[] => {
-    if (n === 0) return media ? [] : ["Add a photo or video first."];
+    if (n === 0) return media.length ? [] : ["Add a photo or video first."];
     if (n === 1) {
       if (title.trim().length < 3) return ["Give it a short title, like “Vintage denim jacket, size M”."];
       return validateListing({ title, description: "", price: 100, label, condition: condition ?? undefined, hasProof: !!proof, mode })
@@ -73,13 +115,28 @@ export function CreateListing({ shop, media, onMedia, onCamera, onStep }: {
       title: title.trim(), description: description.trim(), priceCents, mode, label: food ? "new" : label, condition,
       sizes, stock: food ? 99 : stock, leadDays: food ? leadDays : null, allergens: food ? allergens.trim() || null : null,
       caption: caption.trim() || title.trim(),
-    }, media, proof, setProgress);
+    }, cover, proof, setProgress, media.slice(1));
+    clearDraft(uid);
     toast(res.live ? "Your item is live" : res.message ?? "Saved as a draft");
     nav("/me");
   });
 
   const pickRef = useRef<HTMLInputElement>(null);
-  const isImage = media?.type.startsWith("image/");
+  const isImage = !!cover?.type.startsWith("image/");
+  const addFiles = (files: File[]) => {
+    let next = [...media];
+    for (const f of files) {
+      if (f.type.startsWith("video/")) {
+        if (next[0]?.type.startsWith("video/")) { toast("Only the cover can be a video. Your new video is now the cover."); next[0] = f; }
+        else next = [f, ...next];
+      } else next.push(f);
+    }
+    if (next.length > 10) toast("Up to 10 photos and videos.");
+    onMedia(next.slice(0, 10));
+    setError(null);
+  };
+  const makeCover = (i: number) => onMedia([media[i], ...media.filter((_, j) => j !== i)]);
+  const remove = (i: number) => onMedia(media.filter((_, j) => j !== i));
 
   return (
     <div className="wizard">
@@ -100,25 +157,64 @@ export function CreateListing({ shop, media, onMedia, onCamera, onStep }: {
           <div className="wz-media">
             <h1>Create a listing</h1>
             <p className="muted">Start with a short video or a photo. Show the whole item and every mark.</p>
-            {media && preview ? (
-              <div className="wz-preview">
-                {isImage ? <img src={preview} alt="Your photo" /> : <video src={preview} muted playsInline loop autoPlay />}
-                <button className="btn vglass wz-change" onClick={() => onMedia(null)}>Change</button>
+            {draft && !media.length && (
+              <div className="wz-draft">
+                <span className="grow"><b>Continue your draft?</b><small>{draft.title || "Untitled item"} · saved {new Date(draft.savedAt).toLocaleString("en-ZA", { weekday: "short", hour: "2-digit", minute: "2-digit" })}</small></span>
+                <button className="btn" onClick={discardDraft}>Start over</button>
+                <button className="btn green" onClick={resumeDraft}>Continue</button>
               </div>
+            )}
+            {cover && preview ? (
+              <>
+                <div className="wz-preview">
+                  {isImage ? <img src={preview} alt="Cover" /> : <video src={preview} muted playsInline loop autoPlay />}
+                  <span className="wz-cover-tag">Cover</span>
+                </div>
+                <div className="wz-strip" aria-label="Photos and video">
+                  {media.map((m, i) => (
+                    <div key={urls[i]} className={`wz-tile ${i === 0 ? "on" : ""}`}>
+                      <button className="wz-tile-img" onClick={() => makeCover(i)} aria-label={i === 0 ? "Cover" : `Make photo ${i + 1} the cover`}>
+                        {m.type.startsWith("image/") ? <img src={urls[i]} alt="" /> : <video src={urls[i]} muted playsInline />}
+                      </button>
+                      <button className="wz-x" onClick={() => remove(i)} aria-label={`Remove ${i === 0 ? "cover" : `photo ${i + 1}`}`}><Icon name="close" size={12} strokeWidth={3} /></button>
+                    </div>
+                  ))}
+                  {media.length < 10 && (
+                    <>
+                      <button className="wz-add" onClick={() => pickRef.current?.click()} aria-label="Add photos"><Icon name="plus" size={20} /><span>Add</span></button>
+                      <button className="wz-add" onClick={onCamera} aria-label="Take another"><Icon name="live" size={20} /><span>Camera</span></button>
+                    </>
+                  )}
+                </div>
+                <div className="wz-hint muted-hint">{media.length} of 10 · tap a photo to make it the cover</div>
+              </>
             ) : (
               <div className="wz-pick">
                 <button className="wz-big" onClick={onCamera}><Icon name="live" size={26} /><b>Use the camera</b><span>Tap for a photo, hold for a video</span></button>
-                <button className="wz-big" onClick={() => pickRef.current?.click()}><Icon name="grid" size={26} /><b>Choose from gallery</b><span>A photo or video you already have</span></button>
+                <button className="wz-big" onClick={() => pickRef.current?.click()}><Icon name="grid" size={26} /><b>Choose from gallery</b><span>Up to 10 photos, or a video and photos</span></button>
               </div>
             )}
-            <input ref={pickRef} type="file" accept="image/*,video/*" hidden aria-label="Photo or video"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) { onMedia(f); setError(null); } }} />
+            <input ref={pickRef} type="file" accept="image/*,video/*" multiple hidden aria-label="Photo or video"
+              onChange={(e) => { addFiles([...(e.target.files ?? [])]); e.target.value = ""; }} />
           </div>
         )}
 
         {step === 1 && (
           <>
             <h1>What are you selling?</h1>
+            {sugg === "loading" && <div className="wz-sugg loading"><Icon name="spark" size={18} /><span>Reading your photo for suggestions…</span></div>}
+            {sugg && sugg !== "loading" && (
+              <div className="wz-sugg">
+                <div className="row between"><b><Icon name="spark" size={16} /> {sugg.demo ? "Example suggestion (demo)" : "Suggested from your photo"}</b>
+                  <button className="link" onClick={() => setSugg(null)}>No thanks</button></div>
+                <div className="wz-sugg-body">
+                  <span>{sugg.title}</span>
+                  <span className="muted">{food ? "" : `${LISTING_LABELS[sugg.label].label}${sugg.condition ? `, ${sugg.condition.replace("_", " ")}` : ""} · `}{R(sugg.priceCents)}</span>
+                </div>
+                <button className="btn green block" onClick={() => applySuggestion(sugg)}>Use these</button>
+                <small className="muted">Check them. You can change anything.</small>
+              </div>
+            )}
             <label className="wz-label" htmlFor="wz-title">Title</label>
             <input id="wz-title" className="wz-input" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={80} autoFocus
               placeholder={food ? "Celebration cake, 20 cm" : "Vintage denim jacket, size M"} />
@@ -204,7 +300,8 @@ export function CreateListing({ shop, media, onMedia, onCamera, onStep }: {
           <>
             <h1>Check and post</h1>
             <div className="wz-review">
-              <div className="wz-thumb">{media && preview && (isImage ? <img src={preview} alt="" /> : <video src={preview} muted playsInline />)}</div>
+              <div className="wz-thumb">{cover && preview && (isImage ? <img src={preview} alt="" /> : <video src={preview} muted playsInline />)}
+                {media.length > 1 && <span className="wz-more">+{media.length - 1}</span>}</div>
               <div className="group grow">
                 <ReviewRow t="Title" v={title} onEdit={() => setStep(1)} />
                 {!food && <ReviewRow t="Type" v={`${LISTING_LABELS[label].label}${condition && label === "pre_loved" ? `, ${CONDITIONS.find((c) => c.value === condition)?.label.toLowerCase()}` : ""}`} onEdit={() => setStep(1)} />}
@@ -215,7 +312,7 @@ export function CreateListing({ shop, media, onMedia, onCamera, onStep }: {
               </div>
             </div>
             <div className="note" style={{ marginTop: 12 }}>The buyer's money is held safely and paid to you after the return window closes.</div>
-            {busy && media && <div className="note" style={{ marginTop: 10 }}>Uploading… {progress}%</div>}
+            {busy && cover && <div className="note" style={{ marginTop: 10 }}>Uploading… {progress}%</div>}
           </>
         )}
       </div>
@@ -227,7 +324,7 @@ export function CreateListing({ shop, media, onMedia, onCamera, onStep }: {
             : <button className="btn green block big" onClick={post} disabled={busy}>{busy ? "Posting…" : "Post listing"}</button>}
         </div>
       )}
-      {step === 0 && media && (
+      {step === 0 && media.length > 0 && (
         <div className="wz-foot above-modes"><button className="btn green block big" onClick={next}>Next</button></div>
       )}
     </div>

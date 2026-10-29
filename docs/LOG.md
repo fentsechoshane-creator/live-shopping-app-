@@ -57,7 +57,8 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 
 ## Next up
 
-- Apply migration 0009 (public likes and reposts) to the live Supabase project.
+- Apply migrations 0009 (public likes and reposts) and 0010 (listing photos) to the live Supabase project, and deploy the `suggest-listing` function.
+- Add the `ANTHROPIC_API_KEY` secret in Supabase (Edge Functions, Secrets) so photo suggestions work. Never paste it in chat or git. [Lehloma]
 
 - Real seller video clips for the demo (Ofentse to send short clips, or allow Pexels in Claude settings).
 - Supabase dashboard: set Site URL and add `{{ .Token }}` to the magic link email so the 6 digit sign in code works. [Ofentse]
@@ -65,6 +66,12 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 - Messages tab and live streams with auctions are shown as "coming next".
 
 ## Log
+
+### 2026-10-29: Several photos, suggestions from the photo, drafts
+- **Several photos:** Create's first page takes up to 10 items: a cover (video or photo) plus photos. Tap a photo to make it the cover, X to remove, Add or Camera for more. Only the cover can be a video. Extra photos show in the item sheet on the feed. Migration 0010 adds `listing_photos` (public for live items, sellers add only to their own items and folder, max 10). Tested locally.
+- **Suggestions from the photo:** on "What are you selling?" the app reads the cover and suggests a title, type, condition, price and description. "Use these" fills them in; everything stays editable. Server function `suggest-listing` calls Claude (`claude-haiku-5-5`, change with `SUGGEST_MODEL`). It needs the `ANTHROPIC_API_KEY` secret in Supabase; without it the app quietly skips suggestions. No brand names in suggested titles. Demo mode shows a labelled example, not a real reading.
+- **Drafts:** Create saves as you go on this phone (text in localStorage, photos and video in IndexedDB). Opening Create again offers "Continue your draft?" with Continue or Start over. Posting clears it.
+- **Not yet on the live project** (Ofentse cancelled the approval this time): migration 0009 (public likes and reposts), migration 0010 (listing photos) and the `suggest-listing` function. [Open]
 
 ### 2026-10-29: Sellers only, and Create in steps
 - Only sellers can post. Tapping + without an open shop asks "Open a shop?" with "Yes, open my shop" and "No, not now". No closes the question and changes nothing. Opening `/post` directly asks the same.

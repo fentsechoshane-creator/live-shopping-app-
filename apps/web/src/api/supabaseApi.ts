@@ -2,6 +2,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { validateListing } from "@app/core";
 import type {
+  ListingSuggestion,
   MyProfile, ShopPublic,
   Api, BankInput, Category, CheckoutInput, FeedItem, ListingInput, MyShop, Notification, Order, Payout, PendingReview,
   ProductPublic, User,
@@ -300,7 +301,7 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
     async openShop() {
       check(await sb.rpc("open_shop"));
     },
-    async createListing(input: ListingInput, video, proof, onProgress) {
+    async createListing(input: ListingInput, video, proof, onProgress, photos = []) {
       const errors = validateListing({ title: input.title, description: input.description, price: input.priceCents, label: input.label,
         condition: input.condition ?? undefined, hasProof: !!proof, mode: input.mode });
       if (errors.length) throw new Error(errors[0]);
@@ -343,7 +344,23 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
         const posted = await sb.from("posts").insert({ shop_id: shopId, product_id: productId, media_id: mediaId, caption: input.caption });
         if (posted.error && live) message = "Saved. Your video posts once your shop is open.";
       }
+      for (const [i, photo] of photos.slice(0, 9).entries()) {
+        const path = await upload("videos", photo, "photo");
+        check(await sb.from("listing_photos").insert({ product_id: productId, storage_path: path, position: i + 1 }));
+      }
       return { live, message };
+    },
+    async productPhotos(productId) {
+      const rows = check(await sb.from("listing_photos").select("storage_path").eq("product_id", productId).order("position")) as any[];
+      return rows.map((r) => videoUrl(r.storage_path)!).filter(Boolean);
+    },
+    async suggestListing(photo) {
+      try {
+        const image = await new Promise<string>((ok, no) => { const r = new FileReader(); r.onload = () => ok(String(r.result)); r.onerror = no; r.readAsDataURL(photo); });
+        return await call<ListingSuggestion>("suggest-listing", { image });
+      } catch {
+        return null; // not set up, or the AI could not read it: the seller just types as normal
+      }
     },
     async sellerOrders() {
       const shopId = await myShopId();

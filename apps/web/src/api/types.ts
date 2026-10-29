@@ -34,6 +34,16 @@ export interface FeedItem {
 
 export type Reaction = "like" | "repost";
 
+export interface ListingSuggestion {
+  title: string;
+  label: ListingLabel;
+  condition: Condition | null;
+  priceCents: Cents;
+  description: string;
+  /** Demo mode: a made up example, not a real reading of the photo. */
+  demo?: boolean;
+}
+
 export interface MyProfile {
   id: string;
   displayName: string;
@@ -230,7 +240,12 @@ export interface Api {
   submitFoodCert(file: File): Promise<void>;
   acceptRules(): Promise<void>;
   openShop(): Promise<void>;
-  createListing(input: ListingInput, video: File | null, proof: File | null, onProgress?: (pct: number) => void): Promise<{ live: boolean; message?: string }>;
+  /** `video` is the cover (a video or a photo). `photos` are up to 9 extra photos shown in the item sheet. */
+  createListing(input: ListingInput, video: File | null, proof: File | null, onProgress?: (pct: number) => void, photos?: File[]): Promise<{ live: boolean; message?: string }>;
+  /** Extra photos of a listing, in order. */
+  productPhotos(productId: string): Promise<string[]>;
+  /** Suggested title, type, condition and price from a photo. Null when suggestions are not available. */
+  suggestListing(photo: Blob): Promise<ListingSuggestion | null>;
   sellerOrders(): Promise<Order[]>;
   shipOrder(id: string, trackingRef: string, packingVideo: File | null): Promise<void>;
   acceptReturn(id: string): Promise<void>;

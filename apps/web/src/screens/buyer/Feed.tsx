@@ -217,8 +217,14 @@ function VideoCard({ item, counts, onBrowse, onBuy }: { item: FeedItem; counts?:
 
 function ProductDetails({ item }: { item: FeedItem }) {
   const p = item.product;
+  const [photos] = useLoad(() => api.productPhotos(p.id), [p.id]);
   return (
     <div className="stack">
+      {photos && photos.length > 0 && (
+        <div className="photo-row" aria-label="More photos">
+          {photos.map((u, i) => <img key={u} src={u} alt={`${p.title}, photo ${i + 2}`} loading="lazy" />)}
+        </div>
+      )}
       <div className="row between"><span className="pill">{LISTING_LABELS[p.label].label}</span><b style={{ fontSize: 22 }}>{R(p.priceCents)}</b></div>
       {p.condition && <div className="small">Condition: <b>{p.condition.replace("_", " ")}</b></div>}
       {p.description && <p style={{ margin: 0, lineHeight: 1.5 }}>{p.description}</p>}

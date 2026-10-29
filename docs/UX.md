@@ -21,7 +21,5 @@ Use these with docs/DESIGN.md on every new screen. They come from common practic
 
 ## Ideas for later
 
-- Save drafts automatically so a seller can stop halfway and come back.
-- Suggest a title and price from the photo (AI), and let the seller accept with one tap.
-- Several photos per listing, with the first as the cover.
+- Done: drafts save automatically; suggestions from the photo; several photos with a cover.
 - Haptic feedback on key taps on iPhone.

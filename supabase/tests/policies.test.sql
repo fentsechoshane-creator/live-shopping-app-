@@ -244,3 +244,22 @@ delete from post_reactions where user_id = '00000000-0000-0000-0000-00000000000b
 reset role;
 do $$ begin assert (select count(*) from post_reactions) = 2, 'others cannot remove your likes'; end $$;
 select 'like and repost tests passed' as result;
+-- Extra listing photos: only the seller adds them, inside their own folder, and anyone sees them on live items.
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000a');
+insert into listing_photos (product_id, storage_path, position)
+  select id, '00000000-0000-0000-0000-00000000000a/tee-2.jpg', 1 from products where title = 'Oversized tee, sand';
+select pg_temp.expect_error($$insert into listing_photos (product_id, storage_path) select id, 'someone-else/x.jpg' from products where title = 'Oversized tee, sand'$$, 'row-level security');
+reset role;
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000c');
+select pg_temp.expect_error($$insert into listing_photos (product_id, storage_path) select id, '00000000-0000-0000-0000-00000000000c/x.jpg' from products where title = 'Oversized tee, sand'$$, 'row-level security');
+reset role;
+select pg_temp.act_as_anon();
+do $$ begin assert (select count(*) from listing_photos) = 0, 'the tee is sold out by now, so its photos are hidden'; end $$;
+reset role;
+set session_replication_role = replica; -- skip the guard triggers just for this test setup
+update products set status = 'live', stock = 1 where title = 'Oversized tee, sand';
+set session_replication_role = default;
+select pg_temp.act_as_anon();
+do $$ begin assert (select count(*) from listing_photos) = 1, 'photos of live items are public'; end $$;
+reset role;
+select 'listing photo tests passed' as result;

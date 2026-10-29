@@ -15,7 +15,7 @@ interface DShop {
   checks: MyShop["checks"];
 }
 interface DProduct extends ProductPublic { shopId: string; proofStatus: ReviewStatus }
-interface DPost { id: string; shopId: string; productId: string; caption: string; video: FeedItem["video"]; createdAt: string }
+interface DPost { id: string; shopId: string; productId: string; caption: string; video: FeedItem["video"]; createdAt: string; photos?: string[] }
 interface DOrder extends Order { shopOwnerId: string }
 interface DUser extends User { trust: number; welcomeUsed: boolean; admin: boolean; createdAt?: string; bio?: string }
 type DPayout = Payout & { shopId: string; topUpCents: number; topUpPaid: boolean };
@@ -346,6 +346,15 @@ export function createDemoApi(): Api {
         .filter((x): x is { r: typeof x.r; po: DPost } => !!x.po && visible(x.po))
         .map(({ r, po }) => ({ ...toFeed(po), repostedBy: owners.get(r.userId) }));
     },
+    async productPhotos(productId) {
+      return s.posts.find((p) => p.productId === productId)?.photos ?? [];
+    },
+    async suggestListing() {
+      // Demo mode can't read the photo: it returns a clearly labelled example so you can see how suggestions work.
+      await wait(900);
+      return { title: "Denim jacket, light wash, size M", label: "pre_loved", condition: "good", priceCents: 42000,
+        description: "Classic light wash denim jacket with button front and chest pockets.", demo: true };
+    },
     async following() {
       const u = me();
       return s.follows.filter((f) => f.userId === u.id).map((f) => s.shops.find((x) => x.id === f.shopId)).filter(Boolean).map((sh) => publicShop(sh!));
@@ -442,7 +451,7 @@ export function createDemoApi(): Api {
       }
       save();
     },
-    async createListing(input: ListingInput, video, proof, onProgress) {
+    async createListing(input: ListingInput, video, proof, onProgress, photos = []) {
       const sh = myShopRow();
       if (!sh) throw new Error("Start your shop first.");
       const errors = validateListing({ title: input.title, description: input.description, price: input.priceCents, label: input.label,
@@ -461,6 +470,7 @@ export function createDemoApi(): Api {
       });
       if (video && sh.status === "open") {
         s.posts.unshift({ id: id(), shopId: sh.id, productId: pid, caption: input.caption, createdAt: now().toISOString(),
+          photos: photos.slice(0, 9).map((p) => URL.createObjectURL(p)),
           video: { url: URL.createObjectURL(video), kind: video.type.startsWith("image/") ? "image" : "video", demo: { bg: "#3f3f46", label: "Your post (this browser only)" } } });
       }
       save();
