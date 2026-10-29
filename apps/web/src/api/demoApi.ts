@@ -27,6 +27,11 @@ interface State {
 }
 
 const KEY = "lsa-demo-v3";
+// Made up seller videos (drawn product scenes with captions and music) so the player can be tested.
+import teeClip from "../assets/demo/tee.mp4";
+import cakeClip from "../assets/demo/cake.mp4";
+import runnerClip from "../assets/demo/runner.mp4";
+const DEMO_CLIPS: Record<string, string> = { "po-1": teeClip, "po-3": cakeClip, "po-5": runnerClip };
 const CODE = "123456";
 const id = () => crypto.randomUUID();
 const approvedChecks = (): MyShop["checks"] => ({
@@ -196,7 +201,7 @@ export function createDemoApi(): Api {
 
   const toFeed = (po: DPost): FeedItem => {
     const p = s.products.find((x) => x.id === po.productId)!;
-    return { postId: po.id, caption: po.caption, product: p, shop: publicShop(shopOf(po.shopId)), video: { ...po.video, url: mediaUrl(po.video.url) } };
+    return { postId: po.id, caption: po.caption, product: p, shop: publicShop(shopOf(po.shopId)), video: DEMO_CLIPS[po.id] ? { ...po.video, url: DEMO_CLIPS[po.id], kind: "video" } : { ...po.video, url: mediaUrl(po.video.url) } };
   };
   const visible = (po: DPost) => {
     const p = s.products.find((x) => x.id === po.productId);

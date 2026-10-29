@@ -70,6 +70,12 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 
 ## Log
 
+### 2026-10-29: Sleeker player, gestures, demo videos, benchmark
+- Progress bar is a thin 2px line; the dot only appears while you drag (then it grows a little so you can see where you are). No big dot while playing.
+- Gestures: hold anywhere for 2x speed (a "2x" chip shows), double tap the left side to go back 10 seconds, the right side to go forward 10 seconds.
+- Three made up demo videos with music and captions (`apps/web/src/assets/demo/`: tee, cake, runner), made from our drawn scenes, so the player can be tested in the demo. About 250 KB each.
+- New `docs/BENCHMARK.md`: feature comparison with TikTok, Instagram, Whatnot, Vinted and Depop, and how close we are to a full closed loop.
+
 ### 2026-10-29: Video player, slideshow, store readiness
 - Fix: the "Open a shop?" question now closes when you tap Yes (it stayed on screen over the shop set up).
 - Video player like TikTok (`apps/web/src/components/Video.tsx`): plays when on screen, tap to pause or play (big play button with time), sound button (top right, remembered on the phone; phones only allow sound after a tap), a bar at the bottom you can drag to rewind or skip, and the time left. Video tiles on profiles and shops show the length ("0:45").

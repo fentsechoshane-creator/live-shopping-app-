@@ -78,6 +78,50 @@ function Player({ hlsUrl, url, poster, label }: { hlsUrl: string | null; url: st
     });
   }, [onScreen, soundOn]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Gestures: tap to pause, double tap left to go back 10 seconds (right: forward 10), hold for 2x speed.
+  const [flash, setFlash] = useState<string | null>(null);
+  const [fast, setFast] = useState(false);
+  const tapTimer = useRef<number>();
+  const holdTimer = useRef<number>();
+  const held = useRef(false);
+  const lastTap = useRef(0);
+  const showFlash = (t: string) => { setFlash(t); window.setTimeout(() => setFlash((f) => (f === t ? null : f)), 650); };
+  const onLayerDown = (e: React.PointerEvent) => {
+    held.current = false;
+    holdTimer.current = window.setTimeout(() => {
+      const v = ref.current;
+      if (!v) return;
+      held.current = true;
+      v.playbackRate = 2;
+      if (v.paused) { userPaused.current = false; v.play().catch(() => {}); }
+      setFast(true);
+    }, 450);
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+  };
+  const endHold = () => {
+    window.clearTimeout(holdTimer.current);
+    if (held.current && ref.current) { ref.current.playbackRate = 1; setFast(false); }
+  };
+  const onLayerUp = (e: React.PointerEvent) => {
+    endHold();
+    if (held.current) return; // that was a hold, not a tap
+    const now = Date.now();
+    const v = ref.current;
+    if (now - lastTap.current < 300 && v) {
+      window.clearTimeout(tapTimer.current);
+      lastTap.current = 0;
+      const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      const back = e.clientX - r.left < r.width / 2;
+      v.currentTime = Math.max(0, Math.min(length || v.duration || 0, v.currentTime + (back ? -10 : 10)));
+      setTime(v.currentTime);
+      showFlash(back ? "back" : "fwd");
+      return;
+    }
+    lastTap.current = now;
+    tapTimer.current = window.setTimeout(toggle, 280); // wait a moment in case it's a double tap
+  };
+  useEffect(() => () => { window.clearTimeout(tapTimer.current); window.clearTimeout(holdTimer.current); }, []);
+
   const toggle = () => {
     const v = ref.current;
     if (!v) return;
@@ -114,14 +158,18 @@ function Player({ hlsUrl, url, poster, label }: { hlsUrl: string | null; url: st
         onPlay={() => setPaused(false)} onPause={() => setPaused(true)}
         onTimeUpdate={(e) => !scrubbing && setTime(e.currentTarget.currentTime)}
         onLoadedMetadata={(e) => setLength(e.currentTarget.duration)} onDurationChange={(e) => setLength(e.currentTarget.duration)} />
-      <button className="tap-layer" onClick={toggle} aria-label={paused ? "Play" : "Pause"}>
+      <button className="tap-layer" onPointerDown={onLayerDown} onPointerUp={onLayerUp} onPointerCancel={endHold}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } }}
+        onContextMenu={(e) => e.preventDefault()} aria-label={paused ? "Play" : "Pause"}>
+        {flash && <span className={`seek-flash ${flash}`}><Icon name={flash === "back" ? "rewind" : "forward"} size={22} />{flash === "back" ? "10s" : "10s"}</span>}
+        {fast && <span className="speed-chip vglass">2x <Icon name="forward" size={14} /></span>}
         {paused && onScreen && userPaused.current && <span className="big-play vglass"><Icon name="play" size={30} /></span>}
         {(scrubbing || (paused && userPaused.current)) && <span className="vtime">{clock(time)} / {clock(length)}</span>}
       </button>
       <button className="sound-btn vglass" onClick={toggleSound} aria-label={soundOn ? "Sound off" : "Sound on"} aria-pressed={soundOn}>
         <Icon name={soundOn ? "sound" : "mute"} size={18} />
       </button>
-      <div className={`vbar ${scrubbing || paused ? "big" : ""}`}>
+      <div className={`vbar ${scrubbing ? "drag" : ""}`}>
         {!scrubbing && !paused && length > 0 && <span className="vlen">{clock(length - time)}</span>}
         <div className="vtrack" ref={barRef} role="slider" aria-label="Video position" aria-valuemin={0} aria-valuemax={Math.round(length)} aria-valuenow={Math.round(time)}
           aria-valuetext={`${clock(time)} of ${clock(length)}`} tabIndex={0}

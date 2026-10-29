@@ -288,6 +288,16 @@ try {
   await clipCard.getByRole("button", { name: "Sound on" }).click();
   await check(clipCard.getByRole("button", { name: "Sound off" }).isVisible(), "sound turned on");
   await shot("video-paused");
+  // Hold for 2x speed, double tap the left side to go back 10 seconds.
+  const box = await clipCard.boundingBox();
+  await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.35);
+  await page.mouse.down();
+  await clipCard.getByText("2x").waitFor();
+  await shot("video-2x");
+  await page.mouse.up();
+  await page.mouse.click(box.x + box.width * 0.2, box.y + box.height * 0.35);
+  await page.mouse.click(box.x + box.width * 0.2, box.y + box.height * 0.35);
+  await clipCard.locator(".seek-flash.back").waitFor();
 
   // ===== Team =====
   await signOut();
