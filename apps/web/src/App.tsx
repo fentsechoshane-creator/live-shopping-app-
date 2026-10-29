@@ -11,7 +11,7 @@ import { Activity, ShopPage, SignIn } from "./screens/buyer/Account";
 import { Profile } from "./screens/buyer/Profile";
 import { Onboarding } from "./screens/seller/Onboarding";
 import { Payouts, SellerOrderDetail, SellerOrders } from "./screens/seller/Selling";
-import { Post } from "./screens/seller/Post";
+import { Post, SellerGate } from "./screens/seller/Post";
 import { Admin } from "./screens/admin/Admin";
 
 function RequireUser({ children }: { children: ReactNode }) {
@@ -32,16 +32,27 @@ function Tabs() {
     api.notifications().then((n) => setUnread(n.filter((x) => !x.readAt).length)).catch(() => {});
   }, [user, loc.pathname]);
   const onVideo = loc.pathname === "/";
+  const nav = useNavigate();
+  const [shop] = useLoad(() => (user ? api.myShop() : Promise.resolve(null)), [user?.id, loc.pathname]);
+  const [ask, setAsk] = useState(false);
+  // Only sellers can post: without an open shop, + asks first instead of opening the post screen.
+  const plus = (e: React.MouseEvent) => {
+    if (!user) { e.preventDefault(); return nav("/signin?next=%2Fpost"); }
+    if (!shop || shop.status !== "open") { e.preventDefault(); setAsk(true); }
+  };
   return (
+    <>
     <nav className={`tabs glass ${onVideo ? "on-video" : ""}`} aria-label="Main">
       <NavLink to="/" end aria-label="Home"><Icon name="home" /></NavLink>
       <NavLink to="/explore" aria-label="Explore"><Icon name="explore" /></NavLink>
-      <NavLink to="/post" className="create" aria-label="Post: camera, create a listing or go live"><Icon name="plus" strokeWidth={2.5} /></NavLink>
+      <NavLink to="/post" className="create" onClick={plus} aria-label="Post: camera, create a listing or go live"><Icon name="plus" strokeWidth={2.5} /></NavLink>
       <NavLink to="/activity" aria-label={`Activity${unread ? `, ${unread} new` : ""}`}>
         <Icon name="bell" />{unread > 0 && <span className="badge">{unread}</span>}
       </NavLink>
       <NavLink to="/me" aria-label="My profile"><Icon name="user" /></NavLink>
     </nav>
+    <SellerGate open={ask} onClose={() => setAsk(false)} unfinished={!!shop} />
+    </>
   );
 }
 

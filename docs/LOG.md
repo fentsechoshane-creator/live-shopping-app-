@@ -66,6 +66,13 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 
 ## Log
 
+### 2026-10-29: Sellers only, and Create in steps
+- Only sellers can post. Tapping + without an open shop asks "Open a shop?" with "Yes, open my shop" and "No, not now". No closes the question and changes nothing. Opening `/post` directly asks the same.
+- Create is now one step at a time (`apps/web/src/screens/seller/Create.tsx`): first page is the photo or video (camera or gallery), then 1 What are you selling (title, type, condition or proof), 2 Price and stock (price with "You get R…", stock stepper, size chips; food: allergens), 3 Tell buyers more (caption and description, optional, can skip), 4 Check and post (edit any row).
+- After the first page the Camera, Create, Live switch and the X hide. Back (top left) goes one step back and keeps what you typed; on the first page the switch comes back. A photo from Camera starts Create at step 1.
+- Replica and brand checks now run on the title step.
+- New `docs/UX.md`: rules for how screens should feel, from research on multi step forms and selling apps. AGENTS.md points to it.
+
 ### 2026-10-29: Posting: Camera, Create and Live
 - The + tab opens a new post screen (`/post`, `apps/web/src/screens/seller/Post.tsx`) with Camera, Create and Live at the bottom, like TikTok. The app's tab bar hides there; X closes it.
 - **Camera** opens the phone camera: gallery on the left, shutter in the middle, flip on the right. Tap for a photo, press and hold for a video until you let go. Length limit picker: 15 seconds, 1 minute or 3 minutes (recording stops at the limit, with a red ring). Then Retake or Next, which carries the photo or video into Create.

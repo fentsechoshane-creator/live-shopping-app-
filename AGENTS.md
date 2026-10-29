@@ -4,6 +4,7 @@ Read docs/LOG.md (shared project memory), README.md, docs/ARCHITECTURE.md and do
 
 - **After each piece of work, add a short dated entry to docs/LOG.md** and update its Current state and Next up. Commit it with the work.
 
+- **UX rules:** follow docs/UX.md (one job per screen, steps with progress and Back, main button at the bottom, ask before dead ends).
 - **Design rule for every new version:** screens must match the prototype references in `docs/design/prototype/` and use the Liquid Glass system in docs/DESIGN.md (tokens and classes in `apps/web/src/styles.css` only). Check the e2e screenshots against the references before shipping.
 
 - Money is in **cents** (integers) everywhere. Use `formatRand` to show it.

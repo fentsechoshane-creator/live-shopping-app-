@@ -5,7 +5,7 @@ import { api } from "../../api";
 import { useLoad } from "../../session";
 import { Icon } from "../../components/Icon";
 import { Loading } from "../../components/ui";
-import { NewListing } from "./Selling";
+import { CreateListing } from "./Create";
 
 type Mode = "camera" | "create" | "live";
 
@@ -16,24 +16,60 @@ type Mode = "camera" | "create" | "live";
 export function Post() {
   const [params, setParams] = useSearchParams();
   const mode: Mode = (["camera", "create", "live"] as const).find((m) => m === params.get("mode")) ?? "camera";
-  const setMode = (m: Mode) => setParams(m === "camera" ? {} : { mode: m }, { replace: true });
+  const setMode = (m: Mode) => { setSub(false); setParams(m === "camera" ? {} : { mode: m }, { replace: true }); };
   const [media, setMedia] = useState<File | null>(null);
+  // On a later page (a camera review or a later Create step) the Camera, Create, Live switch hides.
+  const [sub, setSub] = useState(false);
+  const [shop] = useLoad(() => api.myShop(), []);
   const nav = useNavigate();
+  const close = () => (window.history.length > 1 ? nav(-1) : nav("/"));
   const dark = mode !== "create";
+
+  if (shop === undefined) return <div className="post dark"><div className="cam"><div className="cam-msg"><Loading /></div></div></div>;
+  // Only sellers can post. Without an open shop, ask first; "No" leaves you where you were.
+  if (!shop || shop.status !== "open") return <div className="post dark"><SellerGate open onClose={close} /></div>;
 
   return (
     <div className={`post ${dark ? "dark" : ""}`}>
-      {mode === "camera" && <Camera onDone={(f) => { setMedia(f); setMode("create"); }} />}
-      {mode === "create" && <NewListing media={media} onCamera={() => setMode("camera")} />}
+      {mode === "camera" && <Camera onReview={setSub} onDone={(f) => { setMedia(f); setMode("create"); }} />}
+      {mode === "create" && (
+        <CreateListing shop={shop} media={media} onMedia={setMedia} onCamera={() => setMode("camera")} onStep={(n) => setSub(n > 0)} />
+      )}
       {mode === "live" && <GoLive onCreate={() => setMode("create")} />}
 
-      <button className={`post-close ${dark ? "vglass" : "glass"}`} onClick={() => nav(-1)} aria-label="Close"><Icon name="close" size={20} /></button>
-      <div className={`post-modes ${dark ? "vglass" : "glass"}`} role="tablist" aria-label="Post">
-        {(["camera", "create", "live"] as const).map((m) => (
-          <button key={m} role="tab" aria-selected={mode === m} onClick={() => setMode(m)}>
-            {m === "live" && <span className="dot-live" />}{m === "camera" ? "Camera" : m === "create" ? "Create" : "Live"}
-          </button>
-        ))}
+      {!sub && (
+        <>
+          <button className={`post-close ${dark ? "vglass" : "glass"}`} onClick={close} aria-label="Close"><Icon name="close" size={20} /></button>
+          <div className={`post-modes ${dark ? "vglass" : "glass"}`} role="tablist" aria-label="Post">
+            {(["camera", "create", "live"] as const).map((m) => (
+              <button key={m} role="tab" aria-selected={mode === m} onClick={() => setMode(m)}>
+                {m === "live" && <span className="dot-live" />}{m === "camera" ? "Camera" : m === "create" ? "Create" : "Live"}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** "Only sellers can post." Yes opens the shop sign up; No closes and changes nothing. */
+export function SellerGate({ open, onClose, unfinished }: { open: boolean; onClose: () => void; unfinished?: boolean }) {
+  const nav = useNavigate();
+  if (!open) return null;
+  return (
+    <div className="sheet-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="sheet glass" role="dialog" aria-modal="true" aria-label="Open a shop?" style={{ color: "var(--ink)" }}>
+        <div className="grabber" />
+        <div className="gate">
+          <span className="pprompt-ic"><Icon name="store" size={22} /></span>
+          <h2>{unfinished ? "Finish opening your shop?" : "Open a shop?"}</h2>
+          <p>Only sellers can post items or go live. Opening a shop takes a few minutes, and the first 50 shops pay 0% for 3 months.</p>
+        </div>
+        <div className="sheet-foot stack" style={{ gap: 8 }}>
+          <button className="btn green block big" onClick={() => nav("/sell/start")}>Yes, open my shop</button>
+          <button className="btn block" onClick={onClose}>No, not now</button>
+        </div>
       </div>
     </div>
   );
@@ -43,7 +79,7 @@ const LIMITS = [15, 60, 180] as const;
 const HOLD_MS = 250;
 
 /** Phone style camera: gallery on the left, shutter in the middle, flip on the right. Tap for a photo, hold to record. */
-function Camera({ onDone }: { onDone: (file: File) => void }) {
+function Camera({ onDone, onReview }: { onDone: (file: File) => void; onReview: (on: boolean) => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recRef = useRef<MediaRecorder | null>(null);
@@ -136,6 +172,7 @@ function Camera({ onDone }: { onDone: (file: File) => void }) {
   };
 
   const pick = (f: File | undefined) => f && setShot(f);
+  useEffect(() => onReview(!!shot), [shot]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (shot) return <Review file={shot} onRetake={() => setShot(null)} onUse={() => onDone(shot)} />;
 
@@ -189,8 +226,8 @@ function Review({ file, onRetake, onUse }: { file: File; onRetake: () => void; o
     <div className="cam">
       {file.type.startsWith("image/") ? <img className="cam-feed" src={url} alt="Your photo" /> : <video className="cam-feed" src={url} autoPlay loop playsInline controls={false} />}
       <div className="cam-bottom">
-        <div className="row" style={{ gap: 10, justifyContent: "center", marginBottom: 54 }}>
-          <button className="btn vglass" onClick={onRetake}>Retake</button>
+        <div className="row" style={{ gap: 10, justifyContent: "center", marginBottom: 4 }}>
+          <button className="btn vglass" onClick={onRetake}><Icon name="back" size={18} />Retake</button>
           <button className="btn green" onClick={onUse}>Next<Icon name="chevron" size={18} /></button>
         </div>
       </div>

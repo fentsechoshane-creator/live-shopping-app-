@@ -119,6 +119,14 @@ try {
   await page.goto(`${BASE}/explore`);
   await page.getByRole("heading", { name: "Shops to follow" }).waitFor();
   await shot("explore");
+  // Only sellers can post: + asks first, and No leaves you where you were.
+  await page.goto(`${BASE}/explore`);
+  await page.getByRole("link", { name: /^Post/ }).click();
+  await page.getByRole("dialog", { name: "Open a shop?" }).waitFor();
+  await page.waitForTimeout(400);
+  await shot("seller-gate");
+  await page.getByRole("button", { name: "No, not now" }).click();
+  await check(Promise.resolve(new URL(page.url()).pathname === "/explore"), "No keeps you on the same screen");
   await page.goto(`${BASE}/me`);
   await page.getByRole("tab", { name: "Posts", selected: true }).waitFor();
   await page.getByText("Open your shop to post").waitFor(); // no shop yet, so Posts asks you to open one
@@ -180,42 +188,57 @@ try {
   await check(page.locator(".screen").evaluate((el) => getComputedStyle(el).overflowY === "auto"), "profile scrolls inside the app frame");
   await check(page.getByRole("tab", { name: "Posts", selected: true }).isVisible(), "posts tab chosen");
 
-  // Replica listing is blocked.
+  // Create a listing, one step at a time. Start with a photo or video from the gallery.
   await page.waitForTimeout(3500); // demo ID approval
-  await page.goto(`${BASE}/sell/new`);
+  await page.goto(`${BASE}/post?mode=create`);
+  await page.getByRole("heading", { name: "Create a listing" }).waitFor();
+  await shot("create-start");
+  await page.getByLabel("Photo or video", { exact: true }).setInputFiles(fakeFile("clip.mp4", "video/mp4"));
+  await page.getByRole("button", { name: "Next" }).click();
+  await check(page.getByRole("tablist", { name: "Post" }).count().then((n) => n === 0), "Camera, Create, Live hides after the first page");
+  // Replicas are stopped on the step where you type the title.
   await page.getByLabel("Title").fill("Jordan 4 reps 1:1");
-  await page.getByLabel("Price (rand)").fill("900");
-  await page.getByRole("button", { name: "Post listing" }).click();
+  await page.getByRole("button", { name: "Next" }).click();
   await page.getByText(/Counterfeit Goods Act/).first().waitFor();
   await shot("listing-blocked");
-
   await page.getByLabel("Title").fill("Vintage denim jacket, size M");
+  await page.getByRole("radio", { name: /Pre loved/ }).click();
+  await page.getByRole("button", { name: "Good", exact: true }).click();
+  await shot("create-what");
+  await page.getByRole("button", { name: "Next" }).click();
   await page.getByLabel("Price (rand)").fill("450");
   await page.getByText(/You get R450 after the 0% founding fee/).waitFor(); // founding sellers pay no fee
-  await page.getByRole("button", { name: /Pre loved/ }).click();
-  await page.getByRole("button", { name: "good", exact: true }).click();
-  await page.getByLabel("Photo or video", { exact: true }).setInputFiles(fakeFile("clip.mp4", "video/mp4"));
+  await page.getByRole("button", { name: "M", exact: true }).click();
+  await shot("create-price");
+  await page.getByRole("button", { name: "Next" }).click();
   await page.getByLabel("Caption", { exact: true }).fill("Real denim, every mark on camera");
+  // Back goes one step back and keeps what you typed.
+  await page.getByRole("button", { name: "Back" }).click();
+  await check(page.getByLabel("Price (rand)").inputValue().then((v) => v === "450"), "price kept after going back");
+  await page.getByRole("button", { name: "Next" }).click();
+  await page.getByRole("button", { name: "Next" }).click();
+  await page.getByRole("heading", { name: "Check and post" }).waitFor();
+  await shot("create-review");
   await page.getByRole("button", { name: "Post listing" }).click();
   await page.waitForURL((u) => u.pathname === "/me");
   await page.getByRole("link", { name: /Vintage denim jacket, size M/ }).waitFor();
   await shot("seller-listed");
-  // The + tab: Camera first. Tap the shutter for a photo, then Next takes it to Create.
+
+  // Camera: tap the shutter for a photo, then Next takes it to Create.
   await page.goto(`${BASE}/post`);
   const shutter = page.getByRole("button", { name: /Tap for a photo/ });
   await page.waitForFunction(() => document.querySelector(".cam-feed")?.videoWidth > 0, null, { timeout: 15000 });
   await shot("camera");
   await shutter.click();
   await page.getByRole("button", { name: "Next" }).click();
-  await page.getByRole("heading", { name: "Create a listing" }).waitFor();
-  await page.locator(".media-thumb img").waitFor(); // the photo carried over
-  // Live: blocked without 5 items in stock.
+  await page.getByRole("heading", { name: "What are you selling?" }).waitFor(); // the photo is already in, so Create starts at step 1
+  await page.getByRole("button", { name: "Back" }).click();
+  await page.locator(".wz-preview img").waitFor(); // back to the first page with the photo, and the switch is back
   await page.getByRole("tab", { name: "Live" }).click();
   await page.getByRole("button", { name: "Go live" }).click();
   await page.getByRole("dialog", { name: "Can't go live yet" }).getByText(/can't go live without stock/).waitFor();
   await page.waitForTimeout(400);
   await shot("live-blocked");
-
 
   await page.goto(BASE);
   await page.getByRole("region", { name: /Vintage denim jacket, size M/ }).waitFor();
