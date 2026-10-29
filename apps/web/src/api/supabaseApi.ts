@@ -175,16 +175,16 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
     async myProfile(): Promise<MyProfile> {
       const { data: u } = await sb.auth.getUser();
       if (!u.user) throw new Error("Please sign in.");
-      const { data: p } = await sb.from("profiles").select("display_name, trust_score, created_at").eq("id", u.user.id).single();
+      const { data: p } = await sb.from("profiles").select("display_name, bio, trust_score, created_at").eq("id", u.user.id).single();
       const { count } = await sb.from("orders").select("id", { count: "exact", head: true }).eq("buyer_id", u.user.id)
         .not("status", "in", "(pending_payment,cancelled)");
       return {
-        id: u.user.id, displayName: p?.display_name || u.user.email?.split("@")[0] || "", email: u.user.email,
+        id: u.user.id, displayName: p?.display_name || u.user.email?.split("@")[0] || "", bio: p?.bio ?? "", email: u.user.email,
         trustScore: p?.trust_score ?? 50, createdAt: p?.created_at ?? u.user.created_at, ordersCount: count ?? 0,
       };
     },
-    async updateProfile(displayName) {
-      check(await sb.from("profiles").update({ display_name: displayName.trim() }).eq("id", await uid()));
+    async updateProfile(displayName, bio) {
+      check(await sb.from("profiles").update({ display_name: displayName.trim(), bio: bio.trim().slice(0, 150) }).eq("id", await uid()));
     },
     async following() {
       const rows = check(await sb.from("follows").select("shops(id, name, handle, category)").eq("user_id", await uid())) as any[];

@@ -17,7 +17,7 @@ interface DShop {
 interface DProduct extends ProductPublic { shopId: string; proofStatus: ReviewStatus }
 interface DPost { id: string; shopId: string; productId: string; caption: string; video: FeedItem["video"]; createdAt: string }
 interface DOrder extends Order { shopOwnerId: string }
-interface DUser extends User { trust: number; welcomeUsed: boolean; admin: boolean; createdAt?: string }
+interface DUser extends User { trust: number; welcomeUsed: boolean; admin: boolean; createdAt?: string; bio?: string }
 type DPayout = Payout & { shopId: string; topUpCents: number; topUpPaid: boolean };
 interface State {
   users: DUser[]; currentUserId: string | null; shops: DShop[]; products: DProduct[]; posts: DPost[]; orders: DOrder[];
@@ -300,12 +300,13 @@ export function createDemoApi(): Api {
     async myProfile() {
       const u = me();
       return {
-        id: u.id, displayName: u.displayName, email: u.email, trustScore: u.trust, createdAt: u.createdAt ?? now().toISOString(),
+        id: u.id, displayName: u.displayName, bio: u.bio ?? "", email: u.email, trustScore: u.trust, createdAt: u.createdAt ?? now().toISOString(),
         ordersCount: s.orders.filter((o) => o.buyerId === u.id && !["pending_payment", "cancelled"].includes(o.status)).length,
       };
     },
-    async updateProfile(displayName) {
+    async updateProfile(displayName, bio) {
       me().displayName = displayName.trim();
+      me().bio = bio.trim().slice(0, 150);
       save();
       listeners.forEach((l) => l(me()));
     },

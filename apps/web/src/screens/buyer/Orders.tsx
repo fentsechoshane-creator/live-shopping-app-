@@ -42,7 +42,8 @@ export function Orders() {
   const [orders, error] = useLoad(() => api.myOrders(), []);
   return (
     <div className="screen">
-      <h1 className="large-title" style={{ margin: "8px 0 16px" }}>My orders</h1>
+      <h1 className="large-title" style={{ margin: "8px 0 0" }}>My orders</h1>
+      {orders && <div className="tiny-count" style={{ marginBottom: 14 }}>{orders.length} {orders.length === 1 ? "order" : "orders"} in total</div>}
       <ErrorNote error={error} />
       <OrderList orders={orders} />
     </div>

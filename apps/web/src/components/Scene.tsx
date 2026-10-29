@@ -12,16 +12,17 @@ export const sceneFor = (productId: string): SceneKind | null => BY_PRODUCT[prod
 const ROOM: Record<SceneKind, { wall: [string, string]; floor: string; light: string }> = {
   tee: { wall: ["#efe4d6", "#c9b49a"], floor: "#b59c7e", light: "#fff6e8" },
   denim: { wall: ["#d9dde2", "#9aa4b0"], floor: "#7d8894", light: "#ffffff" },
-  shirt: { wall: ["#3a4150", "#151922"], floor: "#0f1218", light: "#c9d6ff" },
+  shirt: { wall: ["#6b7590", "#46506a"], floor: "#535d72", light: "#dbe4ff" },
   cake: { wall: ["#f6dfe0", "#d9a9ad"], floor: "#e9d3c4", light: "#fff3ea" },
   runner: { wall: ["#e3e8e2", "#aab6ad"], floor: "#c7d0c8", light: "#ffffff" },
 };
 
-export function Scene({ kind, animated = false, label }: { kind: SceneKind; animated?: boolean; label?: string }) {
+/** `thumb` crops to the product, so small tiles are not mostly floor. */
+export function Scene({ kind, animated = false, label, thumb = false }: { kind: SceneKind; animated?: boolean; label?: string; thumb?: boolean }) {
   const id = useId().replace(/:/g, "");
   const r = ROOM[kind];
   return (
-    <svg className={`scene ${animated ? "live" : ""}`} viewBox="0 0 360 640" preserveAspectRatio="xMidYMid slice"
+    <svg className={`scene ${animated ? "live" : ""}`} viewBox={thumb ? "20 80 320 420" : "0 0 360 640"} preserveAspectRatio="xMidYMid slice"
       role="img" aria-label={label ?? `${kind} product shot`}>
       <defs>
         <linearGradient id={`${id}w`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={r.wall[0]} /><stop offset="1" stopColor={r.wall[1]} /></linearGradient>
@@ -140,5 +141,5 @@ function Hanger({ light }: { light?: boolean }) {
 /** Small product picture for tiles, rows and chips. Falls back to a colour swatch. */
 export function ProductArt({ productId, fallback }: { productId: string; fallback: string }) {
   const kind = sceneFor(productId);
-  return kind ? <Scene kind={kind} /> : <span style={{ position: "absolute", inset: 0, background: `linear-gradient(160deg, ${fallback}, #111)` }} />;
+  return kind ? <Scene kind={kind} thumb /> : <span style={{ position: "absolute", inset: 0, background: `linear-gradient(160deg, ${fallback}, #111)` }} />;
 }

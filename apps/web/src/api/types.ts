@@ -31,6 +31,7 @@ export interface FeedItem {
 export interface MyProfile {
   id: string;
   displayName: string;
+  bio: string;
   email?: string;
   trustScore: number;
   createdAt: string;
@@ -202,7 +203,7 @@ export interface Api {
   markAllRead(): Promise<void>;
   welcomeCreditAvailable(): Promise<boolean>;
   myProfile(): Promise<MyProfile>;
-  updateProfile(displayName: string): Promise<void>;
+  updateProfile(displayName: string, bio: string): Promise<void>;
   following(): Promise<ShopPublic[]>;
   follow(shopId: string): Promise<void>;
   unfollow(shopId: string): Promise<void>;

@@ -49,7 +49,7 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 ## Current state
 
 - Buyer: feed (For you, Following, Live), Explore, product sheet, checkout, orders with returns, activity.
-- Profile: one TikTok style page with Seller and Buyer tabs (`apps/web/src/screens/buyer/Profile.tsx`).
+- Profile: one TikTok style page (`apps/web/src/screens/buyer/Profile.tsx`): photo with Posts, Sales, Following beside it, name with rating bubble, standing pill, bio, then Seller and Buyer tabs.
 - Seller: 5 step onboarding, listing with counterfeit checks, orders to ship, payouts with credit top ups.
 - Team (admin): checks, returns, top ups to pay.
 - Demo media: drawn product shots (`apps/web/src/components/Scene.tsx`) stand in for seller videos, because this workspace cannot download stock media. Real sellers upload video through Mux.
@@ -63,6 +63,16 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 - Messages tab and live streams with auctions are shown as "coming next".
 
 ## Log
+
+### 2026-10-29: Profile numbers, bio, rating, lighter screens
+- Profile numbers sit beside the photo and no longer change between tabs: Posts, Sales, Following (in that order). Orders and Credit removed from the profile (Orders has its own page, the wallet shows credit).
+- Added a bio (up to 150 characters, edit with the pencil). Migration 0007 adds `profiles.bio`, applied to the live project.
+- Added a seller rating bubble out of 5 with one decimal: green when good, red at the bottom, colours in between, black "0.0" when there are no ratings yet. Shown for sellers only.
+- Standing is now a small green pill next to the handle.
+- The Seller | Buyer tabs now sit right under the bio and only change the buttons and the grid.
+- Orders pages show a tiny total order count under the page picker.
+- Explore category buttons no longer squash. The feed's dark fade at the bottom is lighter, and small product pictures crop to the product instead of the dark floor.
+- Open question: reposts and likes. The concept has Browse and Share instead of likes, so neither exists yet. [CONFIRM with Ofentse]
 
 ### 2026-10-29: Handover for any AI and for Lehloma
 - Added "How far we are" and "Run the current version" to this log, and `npm run status`, which prints where we are, what's next, the latest work and the current version.

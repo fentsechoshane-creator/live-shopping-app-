@@ -56,6 +56,10 @@ export function Profile() {
   const standing = profile.trustScore >= 70 ? "Trusted buyer" : profile.trustScore >= 40 ? "Good standing" : "Under review";
   const categoryText = shop ? { clothes: "Clothes and thrift", beauty: "Hair and beauty", food: "Food and bakes", designer: "Designer resale" }[shop.category] : "";
 
+  const ratings = (sales ?? []).map((o) => o.review?.stars).filter((x): x is number => typeof x === "number");
+  const rating = ratings.length ? ratings.reduce((a, b) => a + b, 0) / ratings.length : null;
+  const standingTone = profile.trustScore >= 40 ? "green" : "amber";
+
   return (
     <div className="screen profile">
       <div className="pbar">
@@ -70,60 +74,56 @@ export function Profile() {
         </div>
       </div>
 
-      <div className={`pavatar ${hasShop ? "green" : ""}`}>{name[0]?.toUpperCase()}</div>
+      <div className="phead">
+        <div className={`pavatar ${hasShop ? "green" : ""}`}>{name[0]?.toUpperCase()}</div>
+        <div className="pstats">
+          <button onClick={() => { setSide("seller"); document.getElementById("grid")?.scrollIntoView({ behavior: "smooth" }); }}>
+            <b>{hasShop ? shop!.products.filter((p) => p.status === "live").length : 0}</b><span>Posts</span></button>
+          <button onClick={() => hasShop && nav("/sell/orders")}><b>{sold}</b><span>Sales</span></button>
+          <button onClick={() => setSheet("following")}><b>{following.size}</b><span>Following</span></button>
+        </div>
+      </div>
+
       <div className="pname">
         <b>{name}</b>
-        {hasShop && shop!.checks.idStatus === "approved" && <span className="tick" aria-label="Verified"><Icon name="check" size={14} strokeWidth={3} /></span>}
+        {hasShop && shop!.checks.idStatus === "approved" && <span className="tick" aria-label="Verified"><Icon name="check" size={12} strokeWidth={3} /></span>}
+        {hasShop && <RatingBubble rating={rating} count={ratings.length} />}
       </div>
-      <div className="phandle">@{handle}</div>
-
-      <div className="pstats">
-        {side === "seller" ? (
-          <>
-            <button onClick={() => hasShop && nav("/sell/orders")}><b>{hasShop ? sold : 0}</b><span>Sales</span></button>
-            <button onClick={() => hasShop && document.getElementById("grid")?.scrollIntoView({ behavior: "smooth" })}><b>{hasShop ? shop!.products.filter((p) => p.status === "live").length : 0}</b><span>Live items</span></button>
-            <button onClick={() => hasShop && setSheet("trust")}><b>{hasShop ? shop!.trustScore : 0}</b><span>Trust</span></button>
-          </>
-        ) : (
-          <>
-            <button onClick={() => setSheet("following")}><b>{following.size}</b><span>Following</span></button>
-            <button onClick={() => nav("/orders")}><b>{profile.ordersCount}</b><span>Orders</span></button>
-            <button onClick={() => toast(credit ? `${R(WELCOME_CREDIT)} comes off your first order of R200 or more` : "No credit right now")}><b>{credit ? R(WELCOME_CREDIT) : "R0"}</b><span>Credit</span></button>
-          </>
-        )}
+      <div className="phandle">
+        <span>@{handle}</span>
+        <button className={`standing ${standingTone}`} onClick={() => (hasShop ? setSheet("trust") : nav("/help"))}>
+          <Icon name="shield" size={12} strokeWidth={2.4} />{standing}
+        </button>
       </div>
-
-      <p className="pbio">
-        {side === "seller"
-          ? hasShop
-            ? <><b>{shop!.name}</b> · {founding ? <span className="pos">Founding seller, 0% fee until {dateText(shop!.foundingUntil)}</span> : <>{categoryText} · {TIER_INFO[tierFor(shop!.trustScore)].label}</>}</>
-            : "Sell from video with your money held safely. No monthly fee."
-          : <>{standing} · buyer protection on every order</>}
-      </p>
-
-      <div className="ppills">
-        {side === "seller" ? (
-          hasShop ? (
-            <>
-              <button className="pill-btn green" onClick={() => nav("/sell/new")}><Icon name="plus" size={15} strokeWidth={2.5} />List an item</button>
-              <button className="pill-btn" onClick={() => nav("/sell/orders")}><Icon name="truck" size={15} />Orders{toShip > 0 && <span className="count">{toShip}</span>}</button>
-              <button className="pill-btn" onClick={() => nav("/sell/payouts")}><Icon name="payout" size={15} />Payouts</button>
-            </>
-          ) : (
-            <button className="pill-btn green" onClick={() => nav("/sell/start")}><Icon name="store" size={15} />{shop ? "Continue" : "Open my shop"}</button>
-          )
-        ) : (
-          <>
-            <button className="pill-btn" onClick={() => nav("/explore")}><Icon name="search" size={15} />Find sellers</button>
-            <button className="pill-btn" onClick={() => nav("/help")}><Icon name="shield" size={15} />Returns and help</button>
-          </>
-        )}
-      </div>
+      {profile.bio
+        ? <p className="pbio">{profile.bio}</p>
+        : <button className="pbio add" onClick={() => setSheet("edit")}>Add a bio</button>}
 
       <div className="ptabs" role="tablist" aria-label="Profile">
         <button role="tab" aria-selected={side === "seller"} onClick={() => setSide("seller")}>Seller</button>
         <button role="tab" aria-selected={side === "buyer"} onClick={() => setSide("buyer")}>Buyer</button>
       </div>
+
+      <div className="ppills">
+        {side === "seller" ? (
+          hasShop ? (
+            <>
+              <button className="pill-btn green" onClick={() => nav("/sell/new")}><Icon name="plus" size={14} strokeWidth={2.5} />List an item</button>
+              <button className="pill-btn" onClick={() => nav("/sell/orders")}><Icon name="truck" size={14} />Orders{toShip > 0 && <span className="count">{toShip}</span>}</button>
+              <button className="pill-btn" onClick={() => nav("/sell/payouts")}><Icon name="payout" size={14} />Payouts</button>
+            </>
+          ) : (
+            <button className="pill-btn green" onClick={() => nav("/sell/start")}><Icon name="store" size={14} />{shop ? "Continue" : "Open my shop"}</button>
+          )
+        ) : (
+          <>
+            <button className="pill-btn" onClick={() => nav("/orders")}><Icon name="bag" size={14} />My orders</button>
+            <button className="pill-btn" onClick={() => nav("/help")}><Icon name="shield" size={14} />Returns and help</button>
+          </>
+        )}
+      </div>
+      {side === "seller" && founding && <div className="pnote">{shop!.name} · Founding seller, 0% fee until {dateText(shop!.foundingUntil)}</div>}
+      {side === "seller" && hasShop && !founding && <div className="pnote muted">{shop!.name} · {categoryText}</div>}
 
       <div id="grid">
         {side === "seller" ? (
@@ -133,10 +133,21 @@ export function Profile() {
         )}
       </div>
 
-      {sheet === "edit" && <EditProfile name={name} onClose={() => setSheet(null)} onSaved={reloadProfile} />}
+      {sheet === "edit" && <EditProfile name={name} bio={profile.bio} onClose={() => setSheet(null)} onSaved={reloadProfile} />}
       {sheet === "following" && <FollowingSheet onClose={() => setSheet(null)} />}
       {sheet === "trust" && hasShop && <TrustSheet shop={shop!} onClose={() => setSheet(null)} />}
     </div>
+  );
+}
+
+/** Seller rating out of 5. Red at the bottom, green at the top, black when there are no ratings yet. */
+export function RatingBubble({ rating, count }: { rating: number | null; count: number }) {
+  if (rating === null) return <span className="rating none" aria-label="No ratings yet">★ 0.0</span>;
+  const hue = Math.round(Math.max(0, Math.min(1, (rating - 1) / 3.5)) * 135);
+  return (
+    <span className="rating" style={{ background: `hsl(${hue} 72% 38%)` }} aria-label={`Rated ${rating.toFixed(1)} out of 5 from ${count} reviews`}>
+      ★ {rating.toFixed(1)}
+    </span>
   );
 }
 
@@ -263,14 +274,16 @@ function TrustSheet({ shop, onClose }: { shop: MyShop; onClose: () => void }) {
   );
 }
 
-function EditProfile({ name, onClose, onSaved }: { name: string; onClose: () => void; onSaved: () => void }) {
+function EditProfile({ name, bio, onClose, onSaved }: { name: string; bio: string; onClose: () => void; onSaved: () => void }) {
   const [value, setValue] = useState(name);
+  const [text, setText] = useState(bio);
   const { busy, error, run } = useAction();
   return (
     <Sheet title="Edit profile" onClose={onClose}
-      footer={<button className="btn green block big" disabled={busy || !value.trim()} onClick={() => run(async () => { await api.updateProfile(value); onSaved(); onClose(); })}>Save</button>}>
+      footer={<button className="btn green block big" disabled={busy || !value.trim()} onClick={() => run(async () => { await api.updateProfile(value, text); onSaved(); onClose(); })}>Save</button>}>
       <ErrorNote error={error} />
-      <Field label="Name shown to sellers"><input value={value} onChange={(e) => setValue(e.target.value)} maxLength={40} /></Field>
+      <Field label="Name"><input value={value} onChange={(e) => setValue(e.target.value)} maxLength={40} /></Field>
+      <Field label="Bio" hint={`${text.length} of 150`}><textarea value={text} onChange={(e) => setText(e.target.value)} maxLength={150} rows={3} placeholder="What you sell or love to buy" /></Field>
     </Sheet>
   );
 }

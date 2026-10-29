@@ -116,7 +116,7 @@ try {
   await page.getByRole("tab", { name: "Buyer", selected: true }).waitFor();
   await page.getByRole("link", { name: /Oversized tee, sand/ }).waitFor(); // bought item shows in the grid
   await shot("me-buying");
-  await page.locator(".pstats button").first().click(); // Following count opens the list
+  await page.locator(".pstats button", { hasText: "Following" }).click(); // Following count opens the list
   await page.getByRole("dialog", { name: "Following" }).getByText("@thrift.with.lebo").waitFor();
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Menu and settings" }).click();

@@ -68,7 +68,8 @@ export function Activity() {
         { value: "messages", label: "Messages" },
         { value: "orders", label: "Orders" },
       ]} />
-      <div style={{ marginTop: 16 }}>
+      {tab === "orders" && orders && <div className="tiny-count">{orders.length} {orders.length === 1 ? "order" : "orders"} in total</div>}
+      <div style={{ marginTop: tab === "orders" ? 10 : 16 }}>
         {tab === "notifications" && (
           <>
             <ErrorNote error={error} />
