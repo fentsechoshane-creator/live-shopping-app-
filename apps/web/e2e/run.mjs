@@ -108,6 +108,11 @@ try {
   await page.getByRole("region", { name: /Oversized tee/ }).getByRole("button", { name: "Follow" }).click();
   await page.getByRole("group", { name: "Feed" }).getByRole("button", { name: "Following" }).click();
   await page.getByRole("region", { name: /Oversized tee/ }).waitFor();
+  // Like and repost sit beside the product card.
+  const teeCard = page.getByRole("region", { name: /Oversized tee/ });
+  await teeCard.getByRole("button", { name: /^Like/ }).click();
+  await teeCard.getByRole("button", { name: /^Repost/ }).click();
+  await check(teeCard.getByRole("button", { name: /^Like/ }).getAttribute("aria-pressed").then((v) => v === "true"), "liked");
   await shot("following");
   await page.goto(`${BASE}/explore`);
   await page.getByRole("heading", { name: "Shops to follow" }).waitFor();
@@ -119,6 +124,11 @@ try {
   await page.locator(".pstats button", { hasText: "Following" }).click(); // Following count opens the list
   await page.getByRole("dialog", { name: "Following" }).getByText("@thrift.with.lebo").waitFor();
   await page.keyboard.press("Escape");
+  await page.getByRole("tab", { name: "Liked" }).click();
+  await page.getByRole("link", { name: /Oversized tee, sand, R349/ }).waitFor(); // liked video shows on the profile
+  await page.getByRole("tab", { name: "Reposted" }).click();
+  await page.getByRole("link", { name: /Oversized tee, sand, R349/ }).waitFor();
+  await shot("me-reposted");
   await page.getByRole("button", { name: "Menu and settings" }).click();
   await page.getByRole("dialog", { name: "Menu and settings" }).waitFor();
   await page.waitForTimeout(400);

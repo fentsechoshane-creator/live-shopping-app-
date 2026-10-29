@@ -64,6 +64,13 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 
 ## Log
 
+### 2026-10-29: Likes and reposts
+- Feed: a heart (like) and a repost button now sit beside the product card, with counts (1.2K style). Buy now and Share stay on the row below.
+- Profile, Buyer tab: three small switches, Bought, Liked and Reposted, each with its own grid.
+- Database: migration 0008 adds `post_reactions` (each person sees and changes only their own) and `post_counts()` (counts only, never who). Applied to the live project and covered by `npm run test:db`.
+- For the engine: likes and reposts are new ranking signals. Suggested weight order: Buy now, then Browse and Share, then likes and reposts, then views. [CONFIRM]
+- Demo posts start with sample like and repost counts so the feed looks real.
+
 ### 2026-10-29: Profile numbers, bio, rating, lighter screens
 - Profile numbers sit beside the photo and no longer change between tabs: Posts, Sales, Following (in that order). Orders and Credit removed from the profile (Orders has its own page, the wallet shows credit).
 - Added a bio (up to 150 characters, edit with the pencil). Migration 0007 adds `profiles.bio`, applied to the live project.
@@ -72,7 +79,7 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 - The Seller | Buyer tabs now sit right under the bio and only change the buttons and the grid.
 - Orders pages show a tiny total order count under the page picker.
 - Explore category buttons no longer squash. The feed's dark fade at the bottom is lighter, and small product pictures crop to the product instead of the dark floor.
-- Open question: reposts and likes. The concept has Browse and Share instead of likes, so neither exists yet. [CONFIRM with Ofentse]
+- Reposts and likes: Ofentse asked for both (built in the next entry).
 
 ### 2026-10-29: Handover for any AI and for Lehloma
 - Added "How far we are" and "Run the current version" to this log, and `npm run status`, which prints where we are, what's next, the latest work and the current version.

@@ -241,6 +241,14 @@ a { color: inherit; text-decoration: none; }
 .vchip { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 5px 11px; font-size: 12.5px; font-weight: 600; align-self: flex-start; }
 .vchip .d { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
 .vchip.amber .d { background: var(--amber); }
+.prod-row { display: grid; grid-template-columns: minmax(0, 1fr) 46px 46px; gap: 6px; }
+.prod-row .product-chip { min-width: 0; }
+.product-chip .grow { min-width: 0; }
+.product-chip .t, .product-chip .s { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.react { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; border: 0; border-radius: 16px; color: var(--on-video); }
+.react span { font-size: 10.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.react.on.like svg { fill: #ff4d6d; stroke: #ff4d6d; }
+.react.on.repost { color: #4ade80; }
 .product-chip { display: flex; align-items: center; gap: 10px; border-radius: 16px; padding: 7px 14px 7px 7px; min-height: 50px; }
 .art { position: relative; overflow: hidden; padding: 0 !important; }
 .art svg, .tile .media svg { position: absolute; inset: 0; width: 100%; height: 100%; }
@@ -387,3 +395,6 @@ a { color: inherit; text-decoration: none; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
 .tiny-count { font-size: 12px; color: var(--ink-3); font-weight: 600; margin: 8px 2px 0; }
+.subtabs { display: flex; gap: 4px; margin: 10px 0 8px; }
+.subtabs button { display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 10px; border: 0; border-radius: 999px; background: none; color: var(--ink-3); font-weight: 650; font-size: 13px; }
+.subtabs button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 0 0 0.5px var(--hairline); }

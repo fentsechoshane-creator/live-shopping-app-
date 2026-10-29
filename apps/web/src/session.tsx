@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
-import { api, type User } from "./api";
+import { api, type Reaction, type User } from "./api";
 
 interface Session {
   user: User | null;
@@ -8,6 +8,10 @@ interface Session {
   /** Shops the user follows. */
   following: Set<string>;
   toggleFollow: (shopId: string) => Promise<void>;
+  /** Posts the user liked and reposted. */
+  liked: Set<string>;
+  reposted: Set<string>;
+  toggleReaction: (postId: string, kind: Reaction) => Promise<void>;
   /** Lower video quality on mobile data. Saved on this phone only. */
   dataSaver: boolean;
   setDataSaver: (on: boolean) => void;
@@ -18,6 +22,7 @@ interface Session {
 
 const Ctx = createContext<Session>({
   user: null, ready: false, toast: () => {}, following: new Set(), toggleFollow: async () => {},
+  liked: new Set(), reposted: new Set(), toggleReaction: async () => {},
   dataSaver: false, setDataSaver: () => {}, menuOpen: false, setMenuOpen: () => {},
 });
 
@@ -30,6 +35,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [following, setFollowing] = useState<Set<string>>(new Set());
+  const [liked, setLiked] = useState<Set<string>>(new Set());
+  const [reposted, setReposted] = useState<Set<string>>(new Set());
   const [dataSaver, setDataSaverState] = useState(readPref("lsa-data-saver"));
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -39,8 +46,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!user) return setFollowing(new Set());
+    if (!user) { setLiked(new Set()); setReposted(new Set()); return setFollowing(new Set()); }
     api.following().then((shops) => setFollowing(new Set(shops.map((s) => s.id)))).catch(() => {});
+    api.reactions().then((r) => { setLiked(new Set(r.liked)); setReposted(new Set(r.reposted)); }).catch(() => {});
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toast = useCallback((m: string) => {
@@ -59,13 +67,27 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
   }, [following, toast]);
 
+  const toggleReaction = useCallback(async (postId: string, kind: Reaction) => {
+    const set = kind === "like" ? setLiked : setReposted;
+    const on = !(kind === "like" ? liked : reposted).has(postId);
+    const flip = (add: boolean) => set((prev) => { const n = new Set(prev); add ? n.add(postId) : n.delete(postId); return n; });
+    flip(on);
+    try {
+      await api.react(postId, kind, on);
+      if (kind === "repost" && on) toast("Reposted to your profile");
+    } catch (e: any) {
+      flip(!on);
+      toast(e?.message ?? "Could not update. Try again.");
+    }
+  }, [liked, reposted, toast]);
+
   const setDataSaver = (on: boolean) => {
     setDataSaverState(on);
     try { localStorage.setItem("lsa-data-saver", on ? "1" : "0"); } catch { /* ignore */ }
   };
 
   return (
-    <Ctx.Provider value={{ user, ready, toast, following, toggleFollow, dataSaver, setDataSaver, menuOpen, setMenuOpen }}>
+    <Ctx.Provider value={{ user, ready, toast, following, toggleFollow, liked, reposted, toggleReaction, dataSaver, setDataSaver, menuOpen, setMenuOpen }}>
       {children}
       {msg && <div className="toast" role="status">{msg}</div>}
     </Ctx.Provider>

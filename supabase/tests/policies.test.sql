@@ -228,3 +228,17 @@ do $$ begin
   assert cron_secret_ok((select secret from vault.secrets where name = 'run_due_secret')), 'right secret accepted';
 end $$;
 select 'scheduler secret tests passed' as result;
+-- Likes and reposts: you manage only your own, others see counts only.
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000b');
+insert into post_reactions (user_id, post_id, kind) select '00000000-0000-0000-0000-00000000000b', id, 'like' from posts limit 1;
+insert into post_reactions (user_id, post_id, kind) select '00000000-0000-0000-0000-00000000000b', id, 'repost' from posts limit 1;
+select pg_temp.expect_error($$insert into post_reactions (user_id, post_id, kind) select '00000000-0000-0000-0000-00000000000c', id, 'like' from posts limit 1$$, 'row-level security');
+reset role;
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000c');
+do $$ begin
+  assert (select count(*) from post_reactions) = 0, 'cannot see other people''s likes';
+  assert (select likes from post_counts(array(select id from posts limit 1))) = 1, 'like counted';
+  assert (select reposts from post_counts(array(select id from posts limit 1))) = 1, 'repost counted';
+end $$;
+reset role;
+select 'like and repost tests passed' as result;

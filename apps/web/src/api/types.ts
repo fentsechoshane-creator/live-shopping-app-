@@ -28,6 +28,8 @@ export interface FeedItem {
   video: VideoSource;
 }
 
+export type Reaction = "like" | "repost";
+
 export interface MyProfile {
   id: string;
   displayName: string;
@@ -204,6 +206,13 @@ export interface Api {
   welcomeCreditAvailable(): Promise<boolean>;
   myProfile(): Promise<MyProfile>;
   updateProfile(displayName: string, bio: string): Promise<void>;
+  /** Posts the signed in user liked or reposted (ids). Empty when signed out. */
+  reactions(): Promise<{ liked: string[]; reposted: string[] }>;
+  react(postId: string, kind: Reaction, on: boolean): Promise<void>;
+  /** Like and repost counts per post id. */
+  postCounts(postIds: string[]): Promise<Record<string, { likes: number; reposts: number }>>;
+  /** Live posts the user liked or reposted, newest reaction first. */
+  reactedPosts(kind: Reaction): Promise<FeedItem[]>;
   following(): Promise<ShopPublic[]>;
   follow(shopId: string): Promise<void>;
   unfollow(shopId: string): Promise<void>;

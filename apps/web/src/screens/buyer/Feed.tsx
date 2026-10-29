@@ -80,6 +80,9 @@ export function FeedList({ items }: { items: FeedItem[] }) {
     return () => el.removeEventListener("scroll", onScroll);
   }, []);
 
+  const [counts, setCounts] = useState<Record<string, { likes: number; reposts: number }>>({});
+  useEffect(() => { api.postCounts(items.map((it) => it.postId)).then(setCounts).catch(() => {}); }, [items]);
+
   const go = (d: number) => ref.current?.scrollTo({ top: (index + d) * ref.current.clientHeight, behavior: "smooth" });
   const startBuy = (it: FeedItem) => {
     if (!user) return nav(`/signin?next=${encodeURIComponent("/")}`);
@@ -90,7 +93,7 @@ export function FeedList({ items }: { items: FeedItem[] }) {
   return (
     <>
       <div className="feed" ref={ref} aria-label="Video feed">
-        {items.map((it) => <VideoCard key={it.postId} item={it} onBrowse={() => setBrowse(it)} onBuy={() => startBuy(it)} />)}
+        {items.map((it) => <VideoCard key={it.postId} item={it} counts={counts[it.postId]} onBrowse={() => setBrowse(it)} onBuy={() => startBuy(it)} />)}
       </div>
       {items.length > 1 && (
         <div className="rail">
@@ -131,9 +134,19 @@ function statusChip(it: FeedItem): { text: string; tone: "green" | "amber" } | n
   return null;
 }
 
-function VideoCard({ item, onBrowse, onBuy }: { item: FeedItem; onBrowse: () => void; onBuy: () => void }) {
+/** Short count like TikTok: 1234 shows as 1.2K. */
+const short = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1).replace(/\.0$/, "")}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1).replace(/\.0$/, "")}K` : String(n));
+
+function VideoCard({ item, counts, onBrowse, onBuy }: { item: FeedItem; counts?: { likes: number; reposts: number }; onBrowse: () => void; onBuy: () => void }) {
   const p = item.product;
-  const { following, toggleFollow, user } = useSession();
+  const { following, toggleFollow, user, liked, reposted, toggleReaction } = useSession();
+  const isLiked = liked.has(item.postId);
+  const isReposted = reposted.has(item.postId);
+  // Counts from the server already include the user's own reaction when it was loaded; nudge them on taps since then.
+  const [start] = useState({ liked: isLiked, reposted: isReposted });
+  const likes = (counts?.likes ?? 0) + (isLiked ? 1 : 0) - (start.liked ? 1 : 0);
+  const reposts = (counts?.reposts ?? 0) + (isReposted ? 1 : 0) - (start.reposted ? 1 : 0);
+  const react = (kind: "like" | "repost") => (user ? toggleReaction(item.postId, kind) : nav("/signin"));
   const nav = useNavigate();
   const chip = statusChip(item);
   const isFollowing = following.has(item.shop.id);
@@ -165,11 +178,19 @@ function VideoCard({ item, onBrowse, onBuy }: { item: FeedItem; onBrowse: () => 
           </button>
         </div>
         <div className="caption">{item.caption}</div>
+        <div className="prod-row">
         <button className="product-chip vglass" onClick={onBrowse} style={{ textAlign: "left" }} aria-label={`See details: ${p.title}, ${R(p.priceCents)}`}>
           <span className="sw art"><ProductArt productId={p.id} fallback="#555" /></span>
           <span className="grow"><span className="t" style={{ display: "block" }}>{p.title}</span><span className="s" style={{ display: "block" }}>{sub}</span></span>
           <span className="p">{R(p.priceCents)}</span>
         </button>
+          <button className={`react vglass ${isLiked ? "on like" : ""}`} onClick={() => react("like")} aria-pressed={isLiked} aria-label={`Like, ${likes}`}>
+            <Icon name="heart" size={20} /><span>{short(likes)}</span>
+          </button>
+          <button className={`react vglass ${isReposted ? "on repost" : ""}`} onClick={() => react("repost")} aria-pressed={isReposted} aria-label={`Repost, ${reposts}`}>
+            <Icon name="repost" size={20} /><span>{short(reposts)}</span>
+          </button>
+        </div>
         <div className="actions">
           <BuyButton item={item} onClick={onBuy} />
           <button className="vround vglass" onClick={share} aria-label="Share"><Icon name="share" /></button>

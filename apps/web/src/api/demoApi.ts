@@ -23,6 +23,7 @@ interface State {
   users: DUser[]; currentUserId: string | null; shops: DShop[]; products: DProduct[]; posts: DPost[]; orders: DOrder[];
   notifications: (Notification & { userId: string })[]; payouts: DPayout[]; clockOffsetMs: number;
   follows: { userId: string; shopId: string }[];
+  reactions?: { userId: string; postId: string; kind: "like" | "repost"; at: string }[];
 }
 
 const KEY = "lsa-demo-v2";
@@ -309,6 +310,31 @@ export function createDemoApi(): Api {
       me().bio = bio.trim().slice(0, 150);
       save();
       listeners.forEach((l) => l(me()));
+    },
+    async reactions() {
+      const u = s.users.find((x) => x.id === s.currentUserId);
+      const mine = (s.reactions ?? []).filter((r) => u && r.userId === u.id);
+      return { liked: mine.filter((r) => r.kind === "like").map((r) => r.postId), reposted: mine.filter((r) => r.kind === "repost").map((r) => r.postId) };
+    },
+    async react(postId, kind, on) {
+      const u = me();
+      s.reactions = (s.reactions ?? []).filter((r) => !(r.userId === u.id && r.postId === postId && r.kind === kind));
+      if (on) s.reactions.unshift({ userId: u.id, postId, kind, at: now().toISOString() });
+      save();
+    },
+    async postCounts(ids) {
+      // A little starting activity on the sample posts so the counts look real.
+      const base: Record<string, [number, number]> = { "po-1": [214, 12], "po-2": [96, 7], "po-3": [341, 28], "po-4": [58, 3], "po-5": [133, 9] };
+      return Object.fromEntries(ids.map((pid) => {
+        const rs = (s.reactions ?? []).filter((r) => r.postId === pid);
+        const [l, r] = base[pid] ?? [0, 0];
+        return [pid, { likes: l + rs.filter((x) => x.kind === "like").length, reposts: r + rs.filter((x) => x.kind === "repost").length }];
+      }));
+    },
+    async reactedPosts(kind) {
+      const u = me();
+      return (s.reactions ?? []).filter((r) => r.userId === u.id && r.kind === kind)
+        .map((r) => s.posts.find((po) => po.id === r.postId)).filter((po): po is DPost => !!po && visible(po)).map(toFeed);
     },
     async following() {
       const u = me();

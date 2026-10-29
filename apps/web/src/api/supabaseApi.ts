@@ -84,6 +84,13 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
     return (data as string | null) ?? null;
   }
 
+  const feedItem = (r: any): FeedItem => ({
+    postId: r.post_id, caption: r.caption,
+    product: toProduct({ ...r, id: r.product_id, status: "live" }),
+    shop: { id: r.shop_id, name: r.shop_name, handle: r.shop_handle, category: r.category, trustScore: r.trust_score, tier: r.tier },
+    video: { muxPlaybackId: r.playback_id, url: videoUrl(r.storage_path) },
+  });
+
   const api: Api = {
     mode: "live",
 
@@ -114,12 +121,7 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
 
     async feed(offset = 0) {
       const rows = check(await sb.rpc("feed", { p_limit: 20, p_offset: offset })) as any[];
-      return rows.map((r): FeedItem => ({
-        postId: r.post_id, caption: r.caption,
-        product: toProduct({ ...r, id: r.product_id, status: "live" }),
-        shop: { id: r.shop_id, name: r.shop_name, handle: r.shop_handle, category: r.category, trustScore: r.trust_score, tier: r.tier },
-        video: { muxPlaybackId: r.playback_id, url: videoUrl(r.storage_path) },
-      }));
+      return rows.map(feedItem);
     },
     async shop(handle) {
       const rows = check(await sb.rpc("shop_public", { p_handle: handle })) as any[];
@@ -185,6 +187,34 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
     },
     async updateProfile(displayName, bio) {
       check(await sb.from("profiles").update({ display_name: displayName.trim(), bio: bio.trim().slice(0, 150) }).eq("id", await uid()));
+    },
+    async reactions() {
+      const { data: u } = await sb.auth.getUser();
+      if (!u.user) return { liked: [], reposted: [] };
+      const rows = check(await sb.from("post_reactions").select("post_id, kind").eq("user_id", u.user.id)) as any[];
+      return { liked: rows.filter((r) => r.kind === "like").map((r) => r.post_id), reposted: rows.filter((r) => r.kind === "repost").map((r) => r.post_id) };
+    },
+    async react(postId, kind, on) {
+      const me = await uid();
+      if (on) {
+        const res = await sb.from("post_reactions").insert({ user_id: me, post_id: postId, kind });
+        if (res.error && !res.error.message.includes("duplicate")) throw new Error(res.error.message);
+      } else {
+        check(await sb.from("post_reactions").delete().eq("user_id", me).eq("post_id", postId).eq("kind", kind));
+      }
+    },
+    async postCounts(ids) {
+      if (!ids.length) return {};
+      const rows = check(await sb.rpc("post_counts", { p_ids: ids })) as any[];
+      return Object.fromEntries(rows.map((r) => [r.post_id, { likes: r.likes, reposts: r.reposts }]));
+    },
+    async reactedPosts(kind) {
+      const rows = check(await sb.from("post_reactions").select("post_id").eq("user_id", await uid()).eq("kind", kind)
+        .order("created_at", { ascending: false })) as any[];
+      const order = rows.map((r) => r.post_id as string);
+      // Version 1: match against the live feed, which is fine while the catalogue is small. Move to a server function at scale.
+      const live = (check(await sb.rpc("feed", { p_limit: 50, p_offset: 0 })) as any[]).map(feedItem);
+      return order.map((id) => live.find((it) => it.postId === id)).filter((x): x is FeedItem => !!x);
     },
     async following() {
       const rows = check(await sb.from("follows").select("shops(id, name, handle, category)").eq("user_id", await uid())) as any[];

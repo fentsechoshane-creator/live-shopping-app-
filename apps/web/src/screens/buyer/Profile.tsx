@@ -209,7 +209,39 @@ function SellerGrid({ shop, error, sold, reload }: { shop: MyShop | null | undef
   );
 }
 
+type BuyerView = "bought" | "liked" | "reposted";
+
+/** Buyer tab: what you bought, liked and reposted, switched with three small icons like TikTok. */
 function BuyerGrid({ orders }: { orders: Order[] | undefined }) {
+  const [view, setView] = useState<BuyerView>("bought");
+  const { liked, reposted } = useSession();
+  const [posts] = useLoad(() => (view === "bought" ? Promise.resolve([]) : api.reactedPosts(view === "liked" ? "like" : "repost")),
+    [view, liked.size, reposted.size]);
+  const tabs: [BuyerView, string, string][] = [["bought", "bag", "Bought"], ["liked", "heart", "Liked"], ["reposted", "repost", "Reposted"]];
+  return (
+    <>
+      <div className="subtabs" role="tablist" aria-label="Buyer">
+        {tabs.map(([v, icon, label]) => (
+          <button key={v} role="tab" aria-selected={view === v} onClick={() => setView(v)}><Icon name={icon} size={15} />{label}</button>
+        ))}
+      </div>
+      {view === "bought" ? <BoughtGrid orders={orders} /> : !posts ? <Loading /> : posts.length === 0 ? (
+        <div className="pempty">{view === "liked" ? "Videos you like show here. Tap the heart on any video." : "Videos you repost show here, so people who visit your profile can see them."}</div>
+      ) : (
+        <div className="grid3">
+          {posts.map((it) => (
+            <Link key={it.postId} to={`/s/${it.shop.handle}`} className="g3" aria-label={`${it.product.title}, ${R(it.product.priceCents)}`}>
+              <ProductArt productId={it.product.id} fallback={it.video.demo?.bg ?? swatch(it.product.id)} />
+              <span className="g3foot">{R(it.product.priceCents)}</span>
+            </Link>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+function BoughtGrid({ orders }: { orders: Order[] | undefined }) {
   if (!orders) return <Loading />;
   if (orders.length === 0) return <div className="pempty">Things you buy show here. Your money is held safely until the return window closes.</div>;
   return (
