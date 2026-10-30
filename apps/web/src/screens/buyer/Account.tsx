@@ -6,6 +6,7 @@ import { useLoad, useSession } from "../../session";
 import { Icon } from "../../components/Icon";
 import { useGoBack, BackButton, ErrorNote, Field, Loading, R, Segmented, Sheet, TierPill, timeAgo, useAction } from "../../components/ui";
 import { PostGrid } from "../../components/PostGrid";
+import { shareOrCopy } from "../../native";
 import { useTabSwipe } from "../../components/gestures";
 import { ConversationList, replyText, useMessageShop } from "./Messages";
 import { MoreSheet } from "../../components/Safety";
@@ -15,6 +16,8 @@ export function SignIn() {
   const [contact, setContact] = useState("");
   const [code, setCode] = useState("");
   const [sent, setSent] = useState(false);
+  const [usePassword, setUsePassword] = useState(false); // for the app store reviewers' test account
+  const [password, setPassword] = useState("");
   const { busy, error, run } = useAction();
   const [params] = useSearchParams();
   const nav = useNavigate();
@@ -28,13 +31,21 @@ export function SignIn() {
       <p className="muted" style={{ marginTop: 0 }}>One account for buying and selling. We send you a 6 digit code.</p>
       {api.mode === "demo" && <div className="note amber" style={{ marginBottom: 14 }}>Demo: use any email and the code <b>123456</b>. An email starting with “admin” signs in as our team. To try the seller side of chats, use <b>lebo@shop.demo</b>.</div>}
       <ErrorNote error={error} />
-      {!sent ? (
+      {usePassword ? (
+        <form onSubmit={(e) => { e.preventDefault(); run(async () => { await api.signInWithPassword(contact, password); nav(next, { replace: true }); }); }}>
+          <Field label="Email"><input value={contact} onChange={(e) => setContact(e.target.value)} type="email" inputMode="email" autoComplete="email" required /></Field>
+          <Field label="Password"><input value={password} onChange={(e) => setPassword(e.target.value)} type="password" autoComplete="current-password" required /></Field>
+          <button className="btn green block big" disabled={busy}>{busy ? "Signing in…" : "Sign in"}</button>
+          <button type="button" className="link" style={{ marginTop: 14 }} onClick={() => setUsePassword(false)}>Get a code instead</button>
+        </form>
+      ) : !sent ? (
         <form onSubmit={(e) => { e.preventDefault(); run(async () => { await api.sendCode(contact); setSent(true); }); }}>
           <Field label={phone ? "Cell number" : "Email"}>
             <input value={contact} onChange={(e) => setContact(e.target.value)} type={phone ? "tel" : "email"} inputMode={phone ? "tel" : "email"}
               autoComplete={phone ? "tel" : "email"} placeholder={phone ? "082 123 4567" : "you@example.com"} required />
           </Field>
           <button className="btn green block big" disabled={busy}>{busy ? "Sending…" : "Send code"}</button>
+          <button type="button" className="link" style={{ marginTop: 14 }} onClick={() => setUsePassword(true)}>Sign in with a password</button>
         </form>
       ) : (
         <form onSubmit={(e) => { e.preventDefault(); run(async () => { await api.verifyCode(contact, code); nav(next, { replace: true }); }); }}>
@@ -118,10 +129,7 @@ export function ShopPage() {
   if (!data) return <div className="screen"><BackButton /><div className="empty">Shop not found.</div></div>;
   const { shop, items } = data;
   const isFollowing = following.has(shop.id);
-  const share = async () => {
-    const url = `${location.origin}/s/${shop.handle}`;
-    try { if (navigator.share) await navigator.share({ url }); else { await navigator.clipboard.writeText(url); toast("Link copied"); } } catch { /* cancelled */ }
-  };
+  const share = async () => { if ((await shareOrCopy(`/s/${shop.handle}`)) === "copied") toast("Link copied"); };
   return (
     <div className="screen profile">
       <div className="pbar">

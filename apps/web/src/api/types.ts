@@ -257,6 +257,10 @@ export interface Api {
   unblock(userId: string): Promise<void>;
   blocked(): Promise<BlockedPerson[]>;
   deleteAccount(): Promise<void>;
+  /** Phone app: remember this device so we can send push notifications. */
+  savePushToken(token: string, platform: string): Promise<void>;
+  /** Email and password sign in (used for the app store reviewers' test account). */
+  signInWithPassword(email: string, password: string): Promise<User>;
   openReports(): Promise<OpenReport[]>;
   handleReport(id: string, action: "remove" | "dismiss"): Promise<void>;
 

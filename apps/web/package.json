@@ -10,10 +10,23 @@
     "typecheck": "tsc --noEmit",
     "dev:live": "vite --mode live",
     "build:live": "tsc --noEmit && vite build --mode live",
-    "build:artifact": "vite build --config vite.artifact.config.ts"
+    "build:artifact": "vite build --config vite.artifact.config.ts",
+    "build:native": "tsc --noEmit && vite build --mode live && cap sync",
+    "open:ios": "cap open ios",
+    "open:android": "cap open android"
   },
   "dependencies": {
     "@app/core": "0.1.0",
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/core": "^8.6.0",
+    "@capacitor/haptics": "^8.0.2",
+    "@capacitor/ios": "^8.6.0",
+    "@capacitor/keyboard": "^8.0.6",
+    "@capacitor/push-notifications": "^8.1.3",
+    "@capacitor/share": "^8.0.3",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.4",
     "@supabase/supabase-js": "2.45.4",
     "hls.js": "1.5.17",
     "react": "18.3.1",
@@ -21,6 +34,8 @@
     "react-router-dom": "6.28.0"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.6.0",
     "@types/react": "18.3.12",
     "@types/react-dom": "18.3.1",
     "@vitejs/plugin-react": "4.3.4",

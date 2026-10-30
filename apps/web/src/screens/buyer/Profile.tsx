@@ -8,6 +8,7 @@ import { ProductArt } from "../../components/Scene";
 import { ErrorNote, Field, Loading, R, Sheet, dateText, swatch, useAction } from "../../components/ui";
 import { CertUpload } from "../seller/Selling";
 import { PostGrid } from "../../components/PostGrid";
+import { shareOrCopy } from "../../native";
 import { useTabSwipe } from "../../components/gestures";
 
 type Tab = "posts" | "likes" | "reposts";
@@ -45,13 +46,7 @@ export function Profile() {
   if (!profile) return <div className="screen"><Loading /></div>;
   const name = profile.displayName || user.email?.split("@")[0] || "You";
   const handle = name.toLowerCase().replace(/[^a-z0-9.]+/g, ".");
-  const share = async () => {
-    const url = hasShop ? `${location.origin}/s/${shop!.handle}` : `${location.origin}/`;
-    try {
-      if (navigator.share) await navigator.share({ url });
-      else { await navigator.clipboard.writeText(url); toast("Link copied"); }
-    } catch { /* cancelled */ }
-  };
+  const share = async () => { if ((await shareOrCopy(hasShop ? `/s/${shop!.handle}` : "/")) === "copied") toast("Link copied"); };
 
   const sold = (sales ?? []).filter((o) => !["cancelled", "refunded"].includes(o.status)).length;
   const toShip = (sales ?? []).filter((o) => o.status === "paid").length;

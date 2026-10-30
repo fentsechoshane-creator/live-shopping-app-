@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">myHaul</string>
+    <string name="title_activity_main">myHaul</string>
+    <string name="package_name">za.co.myhaul.app</string>
+    <string name="custom_url_scheme">za.co.myhaul.app</string>
+</resources>

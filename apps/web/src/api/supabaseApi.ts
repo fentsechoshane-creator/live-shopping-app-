@@ -259,6 +259,15 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
       const rows = check(await sb.rpc("my_blocks")) as any[];
       return rows.map((r) => ({ userId: r.user_id, name: r.name, shopId: r.shop_id, shopHandle: r.shop_handle }));
     },
+    async savePushToken(token, platform) {
+      const res = await sb.from("device_tokens").upsert({ token, user_id: await uid(), platform, last_seen_at: new Date().toISOString() }, { onConflict: "token" });
+      if (res.error) throw new Error(res.error.message);
+    },
+    async signInWithPassword(email, password) {
+      const { data, error } = await sb.auth.signInWithPassword({ email: email.trim(), password });
+      if (error || !data.user) throw new Error("Wrong email or password.");
+      return (await api.currentUser())!;
+    },
     async deleteAccount() {
       await call("delete-account", { confirm: "DELETE" });
       await sb.auth.signOut();

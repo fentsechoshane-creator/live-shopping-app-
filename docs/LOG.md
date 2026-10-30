@@ -92,6 +92,18 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-10-30: myHaul phone apps (Capacitor) and store readiness
+- Decisions (Ofentse): wrap the current app with **Capacitor** for iPhone and Android; app name **myHaul**; **personal** developer accounts for now. Lehloma is focused on the ranking algorithm.
+- `apps/web/ios` and `apps/web/android` added (Capacitor 8). App ID `za.co.myhaul.app` [CONFIRM before first upload]. iPhone only, portrait only, Android API 36.
+- Phone features (`src/native.ts`): splash, status bar, Android back button (closes sheets first), native share sheet with public links, light haptics on like and repost, push notification registration (tokens saved in `device_tokens`, migration 0013; sending needs Apple and Firebase keys).
+- Permission texts for camera, microphone, photos and notifications; export compliance flag set.
+- Placeholder **icon and splash** (green shopping bag with a play button) in all sizes; store images in `apps/web/store/` (icons, Google feature graphic, iPhone 6.7" and Android screenshots via `node e2e/store-shots.mjs`).
+- **Public pages** for the stores in the web build: `/privacy.html`, `/support.html`, `/delete-account.html`. Support email set to help@myhaul.co.za [CONFIRM].
+- **Reviewer sign in:** "Sign in with a password" on the sign in screen, for the test account the stores need.
+- Privacy page now says 18 and over [CONFIRM].
+- `.github/workflows/android.yml` builds an Android test APK on every push.
+- New `docs/STORE.md`: listing text, age rating and privacy answers, permissions, the rules we meet, reviewer notes, build and submit steps, and the to do list.
+
 ### 2026-10-30: Live database update still pending
 - Checked the live project: it has migrations up to 0008 (likes and reposts). 0009 to 0012 are not applied.
 - Applying from Claude was cancelled twice by the approval step. Fallback: run the combined file (migrations 0009 to 0012 in one transaction, in order) in Supabase SQL Editor, or `supabase db push` from Lehloma's machine.

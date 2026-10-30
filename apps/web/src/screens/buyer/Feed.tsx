@@ -12,6 +12,7 @@ import { CheckoutSheet } from "./Checkout";
 import { CommentsSheet } from "../../components/Comments";
 import { MoreSheet } from "../../components/Safety";
 import { useSwipe } from "../../components/gestures";
+import { shareOrCopy, tap } from "../../native";
 import { useMessageShop } from "./Messages";
 
 type Tab = "for_you" | "following" | "live";
@@ -169,7 +170,7 @@ function VideoCard({ item, counts, comments, onBrowse, onBuy, onComments, onMore
   item: FeedItem; counts?: { likes: number; reposts: number }; comments: number; onBrowse: () => void; onBuy: () => void; onComments: () => void; onMore: () => void;
 }) {
   const p = item.product;
-  const { following, toggleFollow, user, liked, reposted, toggleReaction } = useSession();
+  const { following, toggleFollow, user, liked, reposted, toggleReaction, toast } = useSession();
   const isLiked = liked.has(item.postId);
   const isReposted = reposted.has(item.postId);
   // Counts from the server already include the user's own reaction when it was loaded; nudge them on taps since then.
@@ -178,17 +179,11 @@ function VideoCard({ item, counts, comments, onBrowse, onBuy, onComments, onMore
   const reposts = (counts?.reposts ?? 0) + (isReposted ? 1 : 0) - (start.reposted ? 1 : 0);
   // Swipe left on a video to open the shop, like TikTok.
   const swipe = useSwipe({ onLeft: () => nav(`/s/${item.shop.handle}`) });
-  const react = (kind: "like" | "repost") => (user ? toggleReaction(item.postId, kind) : nav("/signin"));
+  const react = (kind: "like" | "repost") => { if (!user) return nav("/signin"); tap(); toggleReaction(item.postId, kind); };
   const nav = useNavigate();
   const chip = statusChip(item);
   const isFollowing = following.has(item.shop.id);
-  const share = async () => {
-    const url = `${location.origin}/s/${item.shop.handle}`;
-    try {
-      if (navigator.share) await navigator.share({ title: p.title, url });
-      else await navigator.clipboard.writeText(url);
-    } catch { /* cancelled */ }
-  };
+  const share = async () => { if ((await shareOrCopy(`/s/${item.shop.handle}?item=${p.id}`, p.title)) === "copied") toast("Link copied"); };
   const sub = [
     p.sizes.length ? (p.sizes.length > 1 ? `Sizes ${p.sizes[0]} to ${p.sizes[p.sizes.length - 1]}` : `Size ${p.sizes[0]}`) : LISTING_LABELS[p.label].label,
     p.mode === "buy_now" && p.stock > 1 ? `${p.stock} left` : null,

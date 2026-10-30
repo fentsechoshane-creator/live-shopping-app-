@@ -1,4 +1,4 @@
-# [Venture name]: live shopping for small South African sellers
+# myHaul: live shopping for small South African sellers
 
 The first real build of the app. It covers the **seller side** (sign up, ID and bank checks, rules, shop, listings with video, shipping, returns, payouts) and a **basic buyer side** (video feed, Browse, Buy now and Order now checkout with money held in escrow, order tracking, returns, ratings).
 

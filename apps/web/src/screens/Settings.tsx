@@ -52,7 +52,7 @@ export function DeleteAccountSheet({ onClose }: { onClose: () => void }) {
   );
 }
 
-const CONTACT = "help@[app domain]"; // [CONFIRM] real support email and company details before publishing
+const CONTACT = "help@myhaul.co.za"; // [CONFIRM] create this mailbox and add company details before publishing
 
 /** Privacy policy and terms in plain words, with contact details (store rules ask for both). */
 export function Privacy() {
@@ -102,6 +102,9 @@ export function Privacy() {
         <li>Keep payments in the app. Paying outside removes buyer protection.</li>
         <li>Report anything that breaks these rules. Our team checks reports within 24 hours and may remove content or close accounts.</li>
       </ul>
+
+      <h2>Children</h2>
+      <p>myHaul is for people aged 18 and over. [CONFIRM age policy]</p>
 
       <h2>Buying and selling</h2>
       <ul>

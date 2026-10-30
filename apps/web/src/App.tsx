@@ -1,6 +1,7 @@
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useSwipe } from "./components/gestures";
+import { isNative, registerPush, startNative, statusBarFor } from "./native";
 import { api } from "./api";
 import { useLoad, useSession } from "./session";
 import { Icon } from "./components/Icon";
@@ -67,6 +68,12 @@ function SideMenu() {
   const [admin] = useLoad(() => (user && menuOpen ? api.isAdmin() : Promise.resolve(false)), [user?.id, menuOpen]);
   const [deleting, setDeleting] = useState(false);
   const swipeClose = useSwipe({ onRight: () => setMenuOpen(false) }); // swipe the menu away
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setMenuOpen(false); // Escape and Android back close the menu
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [menuOpen, setMenuOpen]);
   if (!menuOpen || !user) return null;
   // Deleting: show only the confirm sheet, not the menu behind it.
   if (deleting) return <DeleteAccountSheet onClose={() => { setDeleting(false); setMenuOpen(false); }} />;
@@ -152,7 +159,11 @@ export function App() {
   const edgeStart = useRef<{ x: number; y: number } | null>(null);
   const isTabRoot = ["/", "/explore", "/activity", "/me", "/post"].includes(loc.pathname);
   // Only in the installed app: Safari and Chrome already swipe back from the edge, and doing it too would go back two screens.
-  const standalone = typeof window !== "undefined" && (window.matchMedia?.("(display-mode: standalone)").matches || (navigator as any).standalone === true);
+  const standalone = isNative || (typeof window !== "undefined" && (window.matchMedia?.("(display-mode: standalone)").matches || (navigator as any).standalone === true));
+  const { user } = useSession();
+  useEffect(() => { startNative(() => (window.history.length > 1 ? nav(-1) : nav("/"))); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { statusBarFor(loc.pathname === "/" || loc.pathname.startsWith("/post")); }, [loc.pathname]);
+  useEffect(() => { if (user) registerPush((token, platform) => api.savePushToken(token, platform)); }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const edgeBack = {
     onTouchStart: (e: React.TouchEvent) => { const t = e.touches[0]; edgeStart.current = standalone && t.clientX < 24 && !isTabRoot ? { x: t.clientX, y: t.clientY } : null; },
     onTouchEnd: (e: React.TouchEvent) => {

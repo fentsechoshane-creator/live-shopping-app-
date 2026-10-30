@@ -476,6 +476,11 @@ export function createDemoApi(): Api {
         return { userId: b.blockedId, name: person?.displayName || "User", shopId: sh?.id ?? null, shopHandle: sh?.handle ?? null };
       });
     },
+    async savePushToken() { /* demo: nothing to send to */ },
+    async signInWithPassword(email, password) {
+      if (password !== CODE) throw new Error("Wrong email or password. In the demo, the password is 123456.");
+      return this.verifyCode(email, CODE);
+    },
     async deleteAccount() {
       const u = me();
       const open = s.orders.filter((o) => (o.buyerId === u.id || o.shopOwnerId === u.id) && !["completed", "cancelled", "refunded"].includes(o.status)).length;

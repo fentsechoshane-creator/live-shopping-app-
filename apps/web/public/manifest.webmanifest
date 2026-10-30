@@ -1,0 +1,11 @@
+{
+  "name": "myHaul",
+  "short_name": "myHaul",
+  "description": "Shop South African sellers from short videos, with your money held safely.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b0b0d",
+  "theme_color": "#0b0b0d",
+  "icons": [{ "src": "/icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }]
+}

@@ -352,3 +352,11 @@ do $$ begin
 end $$;
 reset role;
 select 'offer, hold and reply time tests passed' as result;
+-- Device tokens: your own only; removed when the account is deleted.
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000d');
+insert into device_tokens (token, user_id, platform) values ('tok-d', '00000000-0000-0000-0000-00000000000d', 'ios');
+select pg_temp.expect_error($$insert into device_tokens (token, user_id, platform) values ('tok-x', '00000000-0000-0000-0000-00000000000e', 'ios')$$, 'row-level security');
+reset role;
+select forget_user('00000000-0000-0000-0000-00000000000d');
+do $$ begin assert (select count(*) from device_tokens where user_id = '00000000-0000-0000-0000-00000000000d') = 0, 'devices forgotten'; end $$;
+select 'device token tests passed' as result;
