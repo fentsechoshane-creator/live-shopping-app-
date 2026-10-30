@@ -9,13 +9,16 @@ import { Icon } from "../../components/Icon";
 import { Loading, R, Segmented, Sheet, TierPill } from "../../components/ui";
 
 import { CheckoutSheet } from "./Checkout";
+import { CommentsSheet } from "../../components/Comments";
+import { MoreSheet } from "../../components/Safety";
+import { useMessageShop } from "./Messages";
 
 type Tab = "for_you" | "following" | "live";
 
 export function Feed() {
   const [tab, setTab] = useState<Tab>("for_you");
   const [items, error] = useLoad(() => api.feed(), []);
-  const { following, user } = useSession();
+  const { following, user, blockedShops } = useSession();
   const [credit] = useLoad(() => (user ? api.welcomeCreditAvailable() : Promise.resolve(false)), [user?.id]);
   const nav = useNavigate();
   const [reposts] = useLoad(() => (user && tab === "following" ? api.followingReposts() : Promise.resolve([] as FeedItem[])), [user?.id, tab, following.size]);
@@ -24,6 +27,7 @@ export function Feed() {
     ? [...(items ?? []).filter((it) => following.has(it.shop.id)), ...(reposts ?? [])]
         .filter((it, i, all) => all.findIndex((x) => x.postId === it.postId) === i)
     : items ?? [];
+  const visibleItems = shown.filter((it) => !blockedShops.has(it.shop.id)); // blocked shops never show
 
   return (
     <div className="fill">
@@ -32,11 +36,11 @@ export function Feed() {
       {items && tab === "live" && (
         <FeedEmpty title="No one is live right now" body="Lives with pop up Buy now cards and quick auctions are coming next. Follow sellers to hear when they go live." />
       )}
-      {items && tab === "following" && shown.length === 0 && (
+      {items && tab === "following" && visibleItems.length === 0 && (
         <FeedEmpty title="Follow sellers to see their drops here" body="Tap Follow on any video, or find shops in Explore."
           action={<button className="btn vglass" onClick={() => nav("/explore")}>Find sellers</button>} />
       )}
-      {items && tab !== "live" && shown.length > 0 && <FeedList items={shown} key={tab} />}
+      {items && tab !== "live" && visibleItems.length > 0 && <FeedList items={visibleItems} key={tab} />}
 
       <div className="top-bar">
         <Segmented<Tab> label="Feed" onVideo value={tab} onChange={setTab} options={[
@@ -92,6 +96,11 @@ export function FeedList({ items, start = 0 }: { items: FeedItem[]; start?: numb
 
   const [counts, setCounts] = useState<Record<string, { likes: number; reposts: number }>>({});
   useEffect(() => { api.postCounts(items.map((it) => it.postId)).then(setCounts).catch(() => {}); }, [items]);
+  const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
+  useEffect(() => { api.commentCounts(items.map((it) => it.postId)).then(setCommentCounts).catch(() => {}); }, [items]);
+  const [commenting, setCommenting] = useState<FeedItem | null>(null);
+  const [more, setMore] = useState<FeedItem | null>(null);
+  const messageShop = useMessageShop();
 
   const go = (d: number) => ref.current?.scrollTo({ top: (index + d) * ref.current.clientHeight, behavior: "smooth" });
   const startBuy = (it: FeedItem) => {
@@ -103,7 +112,8 @@ export function FeedList({ items, start = 0 }: { items: FeedItem[]; start?: numb
   return (
     <>
       <div className="feed" ref={ref} aria-label="Video feed">
-        {items.map((it) => <VideoCard key={it.postId} item={it} counts={counts[it.postId]} onBrowse={() => setBrowse(it)} onBuy={() => startBuy(it)} />)}
+        {items.map((it) => <VideoCard key={it.postId} item={it} counts={counts[it.postId]} comments={commentCounts[it.postId] ?? 0}
+          onBrowse={() => setBrowse(it)} onBuy={() => startBuy(it)} onComments={() => setCommenting(it)} onMore={() => setMore(it)} />)}
       </div>
       {items.length > 1 && (
         <div className="rail">
@@ -120,6 +130,10 @@ export function FeedList({ items, start = 0 }: { items: FeedItem[]; start?: numb
         </Sheet>
       )}
       {buy && <CheckoutSheet item={buy} onClose={() => setBuy(null)} />}
+      {commenting && <CommentsSheet postId={commenting.postId} postOwnerShopHandle={commenting.shop.handle} onClose={() => setCommenting(null)}
+        onCount={(n) => setCommentCounts((c) => ({ ...c, [commenting.postId]: n }))} />}
+      {more && <MoreSheet kind="post" targetId={more.postId} shopId={more.shop.id} shopHandle={more.shop.handle} onClose={() => setMore(null)}
+        onMessage={() => { setMore(null); messageShop(more.shop.id); }} />}
     </>
   );
 }
@@ -147,7 +161,9 @@ function statusChip(it: FeedItem): { text: string; tone: "green" | "amber" } | n
 /** Short count like TikTok: 1234 shows as 1.2K. */
 const short = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1).replace(/\.0$/, "")}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1).replace(/\.0$/, "")}K` : String(n));
 
-function VideoCard({ item, counts, onBrowse, onBuy }: { item: FeedItem; counts?: { likes: number; reposts: number }; onBrowse: () => void; onBuy: () => void }) {
+function VideoCard({ item, counts, comments, onBrowse, onBuy, onComments, onMore }: {
+  item: FeedItem; counts?: { likes: number; reposts: number }; comments: number; onBrowse: () => void; onBuy: () => void; onComments: () => void; onMore: () => void;
+}) {
   const p = item.product;
   const { following, toggleFollow, user, liked, reposted, toggleReaction } = useSession();
   const isLiked = liked.has(item.postId);
@@ -191,6 +207,7 @@ function VideoCard({ item, counts, onBrowse, onBuy }: { item: FeedItem; counts?:
           <button className="follow-btn vglass" onClick={() => (user ? toggleFollow(item.shop.id) : nav("/signin"))} aria-pressed={isFollowing}>
             {isFollowing ? "Following" : "Follow"}
           </button>
+          <button className="more-btn" onClick={onMore} aria-label="More options"><Icon name="more" size={20} strokeWidth={3} /></button>
         </div>
         <div className="caption">{item.caption}</div>
         <div className="prod-row">
@@ -210,6 +227,7 @@ function VideoCard({ item, counts, onBrowse, onBuy }: { item: FeedItem; counts?:
         </div>
         <div className="actions">
           <BuyButton item={item} onClick={onBuy} />
+          <button className="vround vglass with-count" onClick={onComments} aria-label={`Comments, ${comments}`}><Icon name="comment" size={20} /><span>{short(comments)}</span></button>
           <button className="vround vglass" onClick={share} aria-label="Share"><Icon name="share" /></button>
         </div>
       </div>
@@ -219,6 +237,7 @@ function VideoCard({ item, counts, onBrowse, onBuy }: { item: FeedItem; counts?:
 
 function ProductDetails({ item }: { item: FeedItem }) {
   const p = item.product;
+  const messageShop = useMessageShop();
   const [photos] = useLoad(() => api.productPhotos(p.id), [p.id]);
   return (
     <div className="stack">
@@ -243,6 +262,7 @@ function ProductDetails({ item }: { item: FeedItem }) {
           <TierPill tier={item.shop.tier} />
         </div>
       </Link>
+      <button className="btn block" onClick={() => messageShop(item.shop.id)}><Icon name="chat" size={18} />Message seller</button>
     </div>
   );
 }

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   rand, formatRand, protectionFee, orderTotals, sellerFee, releasableAt, payoutDate, nextFriday, addWorkingDays,
   reserveFor, scoreFrom, tierFor, canUse, validateListing, canTransition, returnReasonsFor, shipBy,
-  liveStock, goLiveBlockers, MIN_LIVE_STOCK,
+  liveStock, goLiveBlockers, MIN_LIVE_STOCK, isRude, looksOffApp,
 } from "../src/index.ts";
 
 describe("money", () => {
@@ -171,5 +171,18 @@ describe("going live", () => {
   it("still needs 5 good orders", () => {
     expect(goLiveBlockers({ ...ok, goodOrders: 2 }, 8)).toHaveLength(1);
     expect(goLiveBlockers({ ...ok, goodOrders: 2 }, 1)).toHaveLength(2);
+  });
+});
+
+describe("safety", () => {
+  it("catches rude words but not normal words", () => {
+    expect(isRude("you bitch")).toBe(true);
+    expect(isRude("Is this still available?")).toBe(false);
+    expect(isRude("Scunthorpe")).toBe(false);
+  });
+  it("spots requests to pay outside the app", () => {
+    expect(looksOffApp("WhatsApp me on 082 123 4567")).toBe(true);
+    expect(looksOffApp("I can do EFT if you want")).toBe(true);
+    expect(looksOffApp("Does it come in M?")).toBe(false);
   });
 });

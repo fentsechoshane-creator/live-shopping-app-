@@ -13,6 +13,8 @@ import { Onboarding } from "./screens/seller/Onboarding";
 import { Payouts, SellerOrderDetail, SellerOrders } from "./screens/seller/Selling";
 import { Post, SellerGate } from "./screens/seller/Post";
 import { Admin } from "./screens/admin/Admin";
+import { Thread } from "./screens/buyer/Messages";
+import { BlockedAccounts, DeleteAccountSheet, Privacy } from "./screens/Settings";
 
 function RequireUser({ children }: { children: ReactNode }) {
   const { user, ready } = useSession();
@@ -62,7 +64,10 @@ function SideMenu() {
   const nav = useNavigate();
   const [shop] = useLoad(() => (user && menuOpen ? api.myShop() : Promise.resolve(null)), [user?.id, menuOpen]);
   const [admin] = useLoad(() => (user && menuOpen ? api.isAdmin() : Promise.resolve(false)), [user?.id, menuOpen]);
+  const [deleting, setDeleting] = useState(false);
   if (!menuOpen || !user) return null;
+  // Deleting: show only the confirm sheet, not the menu behind it.
+  if (deleting) return <DeleteAccountSheet onClose={() => { setDeleting(false); setMenuOpen(false); }} />;
   const go = (to: string) => { setMenuOpen(false); nav(to); };
   const name = user.displayName || user.email?.split("@")[0] || "You";
   return (
@@ -87,7 +92,12 @@ function SideMenu() {
           {shop && shop.status !== "onboarding" && <MenuRow icon="payout" t="Payouts" s="Paid once the return window closes" onClick={() => go("/sell/payouts")} />}
           <MenuRow icon="bell" t="Notifications" s="Orders, returns and shop updates" onClick={() => go("/activity")} />
           <MenuRow icon="help" t="Returns and help" s="7 day returns on Buy now, buyer protection" onClick={() => go("/help")} />
-          {admin && <MenuRow icon="team" t="Team" s="Checks, returns and top ups" onClick={() => go("/admin")} />}
+          {admin && <MenuRow icon="team" t="Team" s="Reports, checks, returns and top ups" onClick={() => go("/admin")} />}
+        </div>
+        <div className="group" style={{ marginTop: 14 }}>
+          <MenuRow icon="chat" t="Messages" s="Chats with buyers and sellers" onClick={() => go("/activity?tab=messages")} />
+          <MenuRow icon="block" t="Blocked accounts" s="People you blocked" onClick={() => go("/settings/blocked")} />
+          <MenuRow icon="lock" t="Privacy and terms" s="How we use your data, community rules" onClick={() => go("/privacy")} />
         </div>
         <div className="group" style={{ marginTop: 14 }}>
           <div className="cell">
@@ -99,6 +109,7 @@ function SideMenu() {
         <button className="btn danger block" style={{ marginTop: 18 }} onClick={() => { setMenuOpen(false); api.signOut().then(() => nav("/")); }}>
           <Icon name="logout" size={18} />Log out
         </button>
+        <button className="link" style={{ marginTop: 14, color: "var(--red-text)", alignSelf: "center" }} onClick={() => setDeleting(true)}>Delete my account</button>
         {api.demo && <button className="btn line block" style={{ marginTop: 8 }} onClick={() => { setMenuOpen(false); api.demo!.reset().then(() => nav("/")); }}>Reset demo data</button>}
       </aside>
     </div>
@@ -155,6 +166,9 @@ export function App() {
           <Route path="/sell/orders/:id" element={guard(<SellerOrderDetail />)} />
           <Route path="/sell/payouts" element={guard(<Payouts />)} />
           <Route path="/admin" element={guard(<Admin />)} />
+          <Route path="/messages/:id" element={guard(<Thread />)} />
+          <Route path="/settings/blocked" element={guard(<BlockedAccounts />)} />
+          <Route path="/privacy" element={<Privacy />} />
           <Route path="*" element={<div className="screen"><div className="empty">Page not found.</div></div>} />
         </Routes>
         {!loc.pathname.startsWith("/post") && <Tabs />}

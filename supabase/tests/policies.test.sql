@@ -263,3 +263,65 @@ select pg_temp.act_as_anon();
 do $$ begin assert (select count(*) from listing_photos) = 1, 'photos of live items are public'; end $$;
 reset role;
 select 'listing photo tests passed' as result;
+-- ===== Comments, messages, blocks, reports, delete account =====
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000b');
+insert into comments (post_id, user_id, body) select id, '00000000-0000-0000-0000-00000000000b', 'Is it still available?' from posts limit 1;
+select pg_temp.expect_error($$insert into comments (post_id, user_id, body) select id, '00000000-0000-0000-0000-00000000000b', 'you bitch' from posts limit 1$$, 'friendly');
+select pg_temp.expect_error($$insert into comments (post_id, user_id, body) select id, '00000000-0000-0000-0000-00000000000d', 'pretending' from posts limit 1$$, 'row-level security');
+reset role;
+do $$ begin assert (select count(*) from notifications where user_id = '00000000-0000-0000-0000-00000000000a' and kind = 'comment') = 1, 'seller told about the comment'; end $$;
+select pg_temp.act_as_anon();
+do $$ begin assert (select count(*) from post_comments((select id from posts limit 1))) = 1, 'comments are public'; end $$;
+reset role;
+
+-- Messages: buyer b and Other shop (owner e). Nobody else can read them.
+update shops set status = 'open' where handle = 'other.shop'; -- test setup: the shop is open
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000b');
+insert into conversations (buyer_id, shop_id) select '00000000-0000-0000-0000-00000000000b', id from shops where handle = 'other.shop';
+insert into messages (conversation_id, sender_id, body) select id, '00000000-0000-0000-0000-00000000000b', 'Hi, what sizes do you have?' from conversations;
+reset role;
+do $$ begin assert (select count(*) from notifications where user_id = '00000000-0000-0000-0000-00000000000e' and kind = 'message') = 1, 'shop told about the message'; end $$;
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000a');
+do $$ begin assert (select count(*) from messages) = 0, 'others cannot read the chat'; end $$;
+reset role;
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000e');
+insert into messages (conversation_id, sender_id, body) select id, '00000000-0000-0000-0000-00000000000e', 'S to XL' from conversations;
+update messages set read_at = now() where sender_id = '00000000-0000-0000-0000-00000000000b';
+do $$ begin assert (select unread from my_conversations() limit 1) = 0, 'read'; end $$;
+reset role;
+
+-- Block: b blocks e, then nobody can message, and the chat disappears.
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000b');
+insert into blocks (blocker_id, blocked_id) values ('00000000-0000-0000-0000-00000000000b', '00000000-0000-0000-0000-00000000000e');
+select pg_temp.expect_error($$insert into messages (conversation_id, sender_id, body) select id, '00000000-0000-0000-0000-00000000000b', 'hello?' from conversations$$, 'row-level security');
+do $$ begin
+  assert (select count(*) from my_conversations()) = 0, 'blocked chats are hidden';
+  assert (select count(*) from my_blocks()) = 1, 'blocked list';
+end $$;
+reset role;
+
+-- Reports: only the reporter and our team see them; the team can remove the post.
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000b');
+insert into reports (reporter_id, target_kind, target_id, reason) select '00000000-0000-0000-0000-00000000000b', 'post', id, 'counterfeit' from posts limit 1;
+select pg_temp.expect_error($$select admin_handle_report((select id from reports limit 1), 'remove')$$, 'Only our team');
+reset role;
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000d');
+do $$ begin assert (select count(*) from reports) = 0, 'reports are private'; end $$;
+reset role;
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000c');
+select admin_handle_report((select id from reports limit 1), 'remove');
+reset role;
+do $$ begin assert (select status from posts limit 1) = 'removed', 'reported post removed'; end $$;
+
+-- Delete my account: the person is removed, records the law needs stay.
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000b');
+select pg_temp.expect_error($$select forget_user('00000000-0000-0000-0000-00000000000b')$$, 'permission denied');
+reset role;
+select forget_user('00000000-0000-0000-0000-00000000000b');
+do $$ begin
+  assert (select display_name from profiles where id = '00000000-0000-0000-0000-00000000000b') = 'Deleted user', 'name removed';
+  assert (select count(*) from comments where user_id = '00000000-0000-0000-0000-00000000000b') = 0, 'comments removed';
+  assert (select count(*) from conversations) = 0, 'chats removed';
+  assert (select count(*) from orders where buyer_id = '00000000-0000-0000-0000-00000000000b') > 0, 'orders kept for the records';
+end $$;
+select 'safety, comment and message tests passed' as result;

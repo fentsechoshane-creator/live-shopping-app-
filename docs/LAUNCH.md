@@ -7,8 +7,8 @@ Researched 29 Oct 2026. Check the official rules again before submitting. Unconf
 | What we do | Apple | Google | What we must have |
 | --- | --- | --- | --- |
 | Selling physical items (clothes, cakes) | Allowed. Physical goods must be paid **outside** Apple's in app purchase (guideline 3.1.3(e)), so no 30% Apple cut. | Same: physical goods are outside Google Play billing. | Our checkout with TradeSafe and PayFast style payments is fine. |
-| Videos, photos, likes, reposts, lives by users | Allowed with user generated content rules (1.2). | Same, under the user generated content policy. | **Report** a post or user, **block** a user, a filter for bad content, quick responses, and published contact details. **Not built yet.** |
-| Accounts | Must offer **delete my account inside the app** (5.1.1(v)). | Also requires account deletion in the app and on the web. | **Not built yet.** |
+| Videos, photos, likes, reposts, lives by users | Allowed with user generated content rules (1.2). | Same, under the user generated content policy. | **Report** a post or user, **block** a user, a filter for bad content, quick responses, and published contact details. **Built (30 Oct).** Team must answer reports within 24 hours. |
+| Accounts | Must offer **delete my account inside the app** (5.1.1(v)). | Also requires account deletion in the app and on the web. | **Built in the app (30 Oct).** Google also wants a web link for deletion requests. [CONFIRM] |
 | Camera and microphone | Allowed with a clear reason in the permission prompt. | Same. | Permission text in the native app. |
 | Being a "wrapped website" | Rejected if it is just a repackaged website (4.2). | Similar quality bar. | A real native shell (Capacitor or React Native) with camera, notifications and share. Lehloma's call. |
 | Privacy | Privacy policy link and privacy labels. | Data safety form and privacy policy. | Write a POPIA compliant privacy policy. |
@@ -24,7 +24,7 @@ Researched 29 Oct 2026. Check the official rules again before submitting. Unconf
 ## December plan (realistic)
 
 1. **Now:** create the Apple and Google developer accounts (get the D-U-N-S number first if registering the company). Write the privacy policy.
-2. **Next 2 weeks:** build Report, Block and Delete account. Lehloma wraps the app as a native app.
+2. **Next 2 weeks:** Report, Block and Delete account are built; finish the privacy policy details. Lehloma wraps the app as a native app.
 3. **Mid November:** start Google's closed test with 12 or more founding sellers and friends; TestFlight for iPhone testers.
 4. **Early December:** submit to Apple; Google production access after the 14 day test.
 5. **Mid December:** public launch, if reviews pass first time. TradeSafe live payments must be signed off by then.

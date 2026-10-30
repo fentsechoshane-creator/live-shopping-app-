@@ -12,6 +12,9 @@ interface Session {
   liked: Set<string>;
   reposted: Set<string>;
   toggleReaction: (postId: string, kind: Reaction) => Promise<void>;
+  /** Shops whose owner you blocked: hidden from your feed. */
+  blockedShops: Set<string>;
+  refreshBlocks: () => void;
   /** Lower video quality on mobile data. Saved on this phone only. */
   dataSaver: boolean;
   setDataSaver: (on: boolean) => void;
@@ -25,7 +28,7 @@ interface Session {
 
 const Ctx = createContext<Session>({
   user: null, ready: false, toast: () => {}, following: new Set(), toggleFollow: async () => {},
-  liked: new Set(), reposted: new Set(), toggleReaction: async () => {},
+  liked: new Set(), reposted: new Set(), toggleReaction: async () => {}, blockedShops: new Set(), refreshBlocks: () => {},
   dataSaver: false, setDataSaver: () => {}, soundOn: false, setSoundOn: () => {}, menuOpen: false, setMenuOpen: () => {},
 });
 
@@ -40,6 +43,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [following, setFollowing] = useState<Set<string>>(new Set());
   const [liked, setLiked] = useState<Set<string>>(new Set());
   const [reposted, setReposted] = useState<Set<string>>(new Set());
+  const [blockedShops, setBlockedShops] = useState<Set<string>>(new Set());
+  const refreshBlocks = useCallback(() => {
+    api.blocked().then((b) => setBlockedShops(new Set(b.map((x) => x.shopId).filter((x): x is string => !!x)))).catch(() => {});
+  }, []);
   const [dataSaver, setDataSaverState] = useState(readPref("lsa-data-saver"));
   const [menuOpen, setMenuOpen] = useState(false);
   const [soundOn, setSoundOnState] = useState(readPref("lsa-sound"));
@@ -54,9 +61,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!user) { setLiked(new Set()); setReposted(new Set()); return setFollowing(new Set()); }
+    if (!user) { setLiked(new Set()); setReposted(new Set()); setBlockedShops(new Set()); return setFollowing(new Set()); }
     api.following().then((shops) => setFollowing(new Set(shops.map((s) => s.id)))).catch(() => {});
     api.reactions().then((r) => { setLiked(new Set(r.liked)); setReposted(new Set(r.reposted)); }).catch(() => {});
+    refreshBlocks();
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toast = useCallback((m: string) => {
@@ -95,7 +103,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <Ctx.Provider value={{ user, ready, toast, following, toggleFollow, liked, reposted, toggleReaction, dataSaver, setDataSaver, soundOn, setSoundOn, menuOpen, setMenuOpen }}>
+    <Ctx.Provider value={{ user, ready, toast, following, toggleFollow, liked, reposted, toggleReaction, blockedShops, refreshBlocks, dataSaver, setDataSaver, soundOn, setSoundOn, menuOpen, setMenuOpen }}>
       {children}
       {msg && <div className="toast" role="status">{msg}</div>}
     </Ctx.Provider>

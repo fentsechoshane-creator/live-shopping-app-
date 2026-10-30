@@ -8,8 +8,8 @@
 | Tap to pause, sound, drag to rewind, 2x hold, double tap seek | ✅ | 🟡 | 🟡 | ❌ | ✅ |
 | Photo slideshow posts | ✅ | ✅ | ❌ | ✅ (listing photos) | ✅ |
 | Likes, reposts, share | ✅ | ✅ | 🟡 | 🟡 favourites | ✅ |
-| Comments | ✅ | ✅ | ✅ chat | ❌ | ❌ |
-| Direct messages | ✅ | ✅ | ✅ | ✅ | ❌ (coming next) |
+| Comments | ✅ | ✅ | ✅ chat | ❌ | ✅ |
+| Direct messages | ✅ | ✅ | ✅ | ✅ | ✅ buyer and shop chats |
 | Buy inside the video | ✅ | 🟡 tags | ✅ | ❌ | ✅ |
 | Money held until the item is fine (escrow) | 🟡 | ❌ | 🟡 | ✅ buyer protection | ✅ |
 | Returns flow with clear rules | ✅ | ❌ | 🟡 | ✅ | ✅ |
@@ -25,12 +25,12 @@
 | Search and filters | ✅ | ✅ | ✅ | ✅ | 🟡 basic |
 | Ranking engine that rewards sales | ✅ | ✅ | 🟡 | 🟡 | 🟡 basic, engine v1 next |
 | Courier labels and tracking built in | ✅ | ❌ | ✅ | ✅ | 🟡 manual tracking number |
-| Report, block, delete account (store rules) | ✅ | ✅ | ✅ | ✅ | ❌ must build |
+| Report, block, delete account (store rules) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Seller stats (views, conversion) | ✅ | ✅ | ✅ | 🟡 | ❌ |
 
 **Where we are ahead for South Africa:** escrow on every order, clear returns, trust tiers, counterfeit blocking, founding seller 0% fee, R50 welcome credit, food "order now" with allergens.
 
-**Biggest gaps vs the greats:** comments and messages, live selling, push notifications, report and block, editing tools, offers, courier integration.
+**Biggest gaps vs the greats:** live selling, push notifications, editing tools, offers, courier integration.
 
 # Are we a closed loop yet?
 
@@ -47,6 +47,6 @@ The loop: seller signs up and is checked → lists → buyer finds it → pays i
 | Payout and top ups | ✅ | 🟡 | Real payouts through TradeSafe |
 | Reviews and trust | ✅ | ✅ | |
 | Notifications | ✅ in app | ✅ in app | Push notifications (native app) |
-| Store must haves | ❌ | ❌ | Report, block, delete account, privacy policy |
+| Store must haves | ✅ | 🟡 | Apply migration 0011, deploy delete-account, final privacy policy details |
 
 **Short answer:** the full loop works end to end in the demo today. For real money, the gap is mostly keys and sign offs (TradeSafe, Mux, the email template, applying two migrations) plus four store must haves. That is roughly 2 to 3 weeks of focused work for Lehloma and you, with TradeSafe's live sign off as the biggest unknown. [CONFIRM with TradeSafe how long live onboarding takes]

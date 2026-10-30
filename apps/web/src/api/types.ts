@@ -33,6 +33,19 @@ export interface FeedItem {
 }
 
 export type Reaction = "like" | "repost";
+export type ReportReason = "counterfeit" | "not_as_shown" | "offensive" | "scam" | "spam" | "other";
+export type ReportTarget = "post" | "shop" | "comment" | "message" | "user";
+
+export interface Comment {
+  id: string; body: string; createdAt: string; userId: string; name: string; shopHandle: string | null; isSeller: boolean; mine: boolean;
+}
+export interface Conversation {
+  id: string; shopId: string; shopName: string; shopHandle: string; otherName: string; iAmSeller: boolean;
+  lastBody: string | null; lastAt: string; unread: number;
+}
+export interface Message { id: string; body: string; createdAt: string; mine: boolean; readAt: string | null }
+export interface BlockedPerson { userId: string; name: string; shopId: string | null; shopHandle: string | null }
+export interface OpenReport { id: string; targetKind: ReportTarget; targetId: string; reason: ReportReason; details: string; createdAt: string; summary: string }
 
 export interface ListingSuggestion {
   title: string;
@@ -227,6 +240,29 @@ export interface Api {
   postCounts(postIds: string[]): Promise<Record<string, { likes: number; reposts: number }>>;
   /** Live posts liked or reposted, newest first. By the signed in user, or by a shop's owner when shopId is given. Public. */
   reactedPosts(kind: Reaction, shopId?: string): Promise<FeedItem[]>;
+
+  // Safety (store rules): report, block, delete account
+  report(kind: ReportTarget, targetId: string, reason: ReportReason, details: string): Promise<void>;
+  /** Block a person, or the owner of a shop. */
+  block(target: { userId?: string; shopId?: string }): Promise<void>;
+  unblock(userId: string): Promise<void>;
+  blocked(): Promise<BlockedPerson[]>;
+  deleteAccount(): Promise<void>;
+  openReports(): Promise<OpenReport[]>;
+  handleReport(id: string, action: "remove" | "dismiss"): Promise<void>;
+
+  // Comments
+  comments(postId: string): Promise<Comment[]>;
+  addComment(postId: string, body: string): Promise<void>;
+  deleteComment(id: string): Promise<void>;
+  commentCounts(postIds: string[]): Promise<Record<string, number>>;
+
+  // Messages between a buyer and a shop
+  conversations(): Promise<Conversation[]>;
+  /** Gets or starts the chat with a shop and returns its id. */
+  openConversation(shopId: string): Promise<string>;
+  thread(conversationId: string): Promise<{ conversation: Conversation; messages: Message[] }>;
+  sendMessage(conversationId: string, body: string): Promise<void>;
   /** Posts reposted by the owners of shops the user follows, for the Following feed. */
   followingReposts(): Promise<FeedItem[]>;
   following(): Promise<ShopPublic[]>;

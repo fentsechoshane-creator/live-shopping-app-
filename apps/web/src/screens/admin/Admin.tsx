@@ -1,3 +1,4 @@
+import { REPORT_REASONS } from "@app/core";
 import { Navigate } from "react-router-dom";
 import { api } from "../../api";
 import { useLoad, useSession } from "../../session";
@@ -9,16 +10,33 @@ export function Admin() {
   const [reviews, err1, reload1] = useLoad(() => api.pendingReviews(), []);
   const [disputes, err2, reload2] = useLoad(() => api.disputedOrders(), []);
   const [topups, , reload3] = useLoad(() => api.topUpsDue(), []);
+  const [reports, , reload4] = useLoad(() => api.openReports(), []);
   const { busy, error, run } = useAction();
   const { toast } = useSession();
   if (isAdmin === undefined) return <div className="screen"><Loading /></div>;
   if (!isAdmin) return <Navigate to="/" replace />;
-  const act = (fn: () => Promise<void>, msg: string) => run(async () => { await fn(); toast(msg); reload1(); reload2(); reload3(); });
+  const act = (fn: () => Promise<void>, msg: string) => run(async () => { await fn(); toast(msg); reload1(); reload2(); reload3(); reload4(); });
 
   return (
     <div className="screen">
       <h1>Team</h1>
       <ErrorNote error={error ?? err1 ?? err2} />
+      <h2>Reports to check{reports && reports.length > 0 ? ` (${reports.length})` : ""}</h2>
+      <p className="small muted" style={{ marginTop: -4 }}>Answer within 24 hours. App store rules require it.</p>
+      {reports?.length === 0 && <div className="empty">No open reports.</div>}
+      {reports?.map((r) => (
+        <div key={r.id} className="card" style={{ marginBottom: 10 }}>
+          <div className="row between"><b>{REPORT_REASONS[r.reason]}</b><span className="pill">{r.targetKind}</span></div>
+          {r.summary && <div className="small" style={{ margin: "6px 0" }}>“{r.summary}”</div>}
+          {r.details && <div className="small muted" style={{ marginBottom: 6 }}>{r.details}</div>}
+          <div className="row">
+            <button className="btn danger grow" disabled={busy || r.targetKind === "user" || r.targetKind === "message"}
+              onClick={() => act(() => api.handleReport(r.id, "remove"), r.targetKind === "shop" ? "Shop closed" : "Removed")}>
+              {r.targetKind === "shop" ? "Close shop" : "Remove"}</button>
+            <button className="btn grow" disabled={busy} onClick={() => act(() => api.handleReport(r.id, "dismiss"), "Dismissed")}>Dismiss</button>
+          </div>
+        </div>
+      ))}
       <h2>Checks waiting</h2>
       {reviews?.length === 0 && <div className="empty">Nothing to check.</div>}
       {reviews?.map((r) => (

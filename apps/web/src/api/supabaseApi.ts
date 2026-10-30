@@ -2,7 +2,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { validateListing } from "@app/core";
 import type {
-  ListingSuggestion,
+  ListingSuggestion, Conversation, OpenReport,
   MyProfile, ShopPublic,
   Api, BankInput, Category, CheckoutInput, FeedItem, ListingInput, MyShop, Notification, Order, Payout, PendingReview,
   ProductPublic, User,
@@ -86,6 +86,10 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
     return (data as string | null) ?? null;
   }
 
+  const toConversation = (r: any): Conversation => ({
+    id: r.id, shopId: r.shop_id, shopName: r.shop_name, shopHandle: r.shop_handle, otherName: r.other_name, iAmSeller: r.i_am_seller,
+    lastBody: r.last_body, lastAt: r.last_at, unread: r.unread,
+  });
   const feedItem = (r: any): FeedItem => ({
     postId: r.post_id, caption: r.caption,
     product: toProduct({ ...r, id: r.product_id, status: "live" }),
@@ -238,6 +242,84 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
       }
       return out;
     },
+    async report(kind, targetId, reason, details) {
+      check(await sb.from("reports").insert({ reporter_id: await uid(), target_kind: kind, target_id: targetId, reason, details: details.slice(0, 500) }));
+    },
+    async block(target) {
+      let who = target.userId;
+      if (!who && target.shopId) who = ((check(await sb.from("shops").select("owner_id").eq("id", target.shopId).single()) as any).owner_id);
+      if (!who) throw new Error("Couldn't find that account.");
+      const res = await sb.from("blocks").insert({ blocker_id: await uid(), blocked_id: who });
+      if (res.error && !res.error.message.includes("duplicate")) throw new Error(res.error.message);
+    },
+    async unblock(userId) {
+      check(await sb.from("blocks").delete().eq("blocker_id", await uid()).eq("blocked_id", userId));
+    },
+    async blocked() {
+      const rows = check(await sb.rpc("my_blocks")) as any[];
+      return rows.map((r) => ({ userId: r.user_id, name: r.name, shopId: r.shop_id, shopHandle: r.shop_handle }));
+    },
+    async deleteAccount() {
+      await call("delete-account", { confirm: "DELETE" });
+      await sb.auth.signOut();
+    },
+    async openReports() {
+      const rows = check(await sb.from("reports").select("id, target_kind, target_id, reason, details, created_at").eq("status", "open").order("created_at")) as any[];
+      const out: OpenReport[] = [];
+      for (const r of rows) {
+        let summary = "";
+        if (r.target_kind === "post") summary = ((await sb.from("posts").select("caption").eq("id", r.target_id).maybeSingle()).data as any)?.caption ?? "";
+        if (r.target_kind === "comment") summary = ((await sb.from("comments").select("body").eq("id", r.target_id).maybeSingle()).data as any)?.body ?? "";
+        if (r.target_kind === "shop") summary = ((await sb.from("shops").select("name").eq("id", r.target_id).maybeSingle()).data as any)?.name ?? "";
+        out.push({ id: r.id, targetKind: r.target_kind, targetId: r.target_id, reason: r.reason, details: r.details, createdAt: r.created_at, summary });
+      }
+      return out;
+    },
+    async handleReport(id, action) {
+      check(await sb.rpc("admin_handle_report", { p_report: id, p_action: action }));
+    },
+
+    async comments(postId) {
+      const { data: u } = await sb.auth.getUser();
+      const rows = check(await sb.rpc("post_comments", { p_post: postId })) as any[];
+      return rows.map((r) => ({ id: r.id, body: r.body, createdAt: r.created_at, userId: r.user_id, name: r.name, shopHandle: r.shop_handle,
+        isSeller: r.is_seller, mine: r.user_id === u.user?.id }));
+    },
+    async addComment(postId, body) {
+      check(await sb.from("comments").insert({ post_id: postId, user_id: await uid(), body: body.trim() }));
+    },
+    async deleteComment(id) {
+      check(await sb.from("comments").delete().eq("id", id));
+    },
+    async commentCounts(ids) {
+      if (!ids.length) return {};
+      const rows = check(await sb.rpc("comment_counts", { p_ids: ids })) as any[];
+      return Object.fromEntries(rows.map((r) => [r.post_id, r.comments]));
+    },
+
+    async conversations() {
+      const rows = check(await sb.rpc("my_conversations")) as any[];
+      return rows.map(toConversation);
+    },
+    async openConversation(shopId) {
+      const me = await uid();
+      const found = (await sb.from("conversations").select("id").eq("buyer_id", me).eq("shop_id", shopId).maybeSingle()).data as any;
+      if (found) return found.id;
+      return ((check(await sb.from("conversations").insert({ buyer_id: me, shop_id: shopId }).select("id").single()) as any).id);
+    },
+    async thread(conversationId) {
+      const me = await uid();
+      const convs = (check(await sb.rpc("my_conversations")) as any[]).map(toConversation);
+      const conversation = convs.find((c) => c.id === conversationId);
+      if (!conversation) throw new Error("This chat isn't available.");
+      const rows = check(await sb.from("messages").select("id, body, created_at, sender_id, read_at").eq("conversation_id", conversationId).order("created_at")) as any[];
+      await sb.from("messages").update({ read_at: new Date().toISOString() }).eq("conversation_id", conversationId).neq("sender_id", me).is("read_at", null);
+      return { conversation, messages: rows.map((r) => ({ id: r.id, body: r.body, createdAt: r.created_at, mine: r.sender_id === me, readAt: r.read_at })) };
+    },
+    async sendMessage(conversationId, body) {
+      check(await sb.from("messages").insert({ conversation_id: conversationId, sender_id: await uid(), body: body.trim() }));
+    },
+
     async following() {
       const rows = check(await sb.from("follows").select("shops(id, name, handle, category)").eq("user_id", await uid())) as any[];
       return rows.filter((r) => r.shops).map((r): ShopPublic => ({

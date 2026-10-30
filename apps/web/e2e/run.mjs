@@ -116,6 +116,59 @@ try {
   await check(teeCard.getByRole("button", { name: /^Like/ }).getAttribute("aria-pressed").then((v) => v === "true"), "liked");
   await page.getByText("Reposted by @thrift.with.lebo").first().waitFor(); // shops you follow bring their reposts
   await shot("following");
+
+  // Comments: read and add; rude words are stopped.
+  await page.getByRole("group", { name: "Feed" }).getByRole("button", { name: "For you" }).click();
+  const teePost = page.getByRole("region", { name: /Oversized tee/ });
+  await teePost.getByRole("button", { name: /^Comments/ }).click();
+  const cs = page.getByRole("dialog", { name: /comments?$/ });
+  await cs.getByText("Does it shrink?", { exact: false }).waitFor();
+  await cs.getByLabel("Add a comment").fill("you bitch");
+  await cs.getByRole("button", { name: "Post comment" }).click();
+  await cs.getByText(/keep it friendly/).waitFor();
+  await cs.getByLabel("Add a comment").fill("Does it come in XL?");
+  await cs.getByRole("button", { name: "Post comment" }).click();
+  await cs.getByText("Does it come in XL?").waitFor();
+  await page.waitForTimeout(300);
+  await shot("comments");
+  await page.keyboard.press("Escape");
+
+  // Report a post (the store rules need this on every post).
+  const shirtPost = page.getByRole("region", { name: /Designer silk shirt/ });
+  await shirtPost.scrollIntoViewIfNeeded();
+  await shirtPost.getByRole("button", { name: "More options" }).click();
+  await page.getByRole("button", { name: "Report post" }).click();
+  await page.getByRole("button", { name: "Fake or counterfeit" }).click();
+  await page.getByRole("button", { name: "Send report" }).click();
+  await page.getByText(/Our team checks reports within 24 hours/).waitFor();
+
+  // Message a seller from the post menu. The sample shop replies; numbers get a warning.
+  await teePost.scrollIntoViewIfNeeded();
+  await teePost.getByRole("button", { name: "More options" }).click();
+  await page.getByRole("button", { name: "Message @thrift.with.lebo" }).click();
+  await page.waitForURL(/\/messages\//);
+  await page.getByText("Keep payments in the app").waitFor();
+  await page.getByLabel("Message", { exact: true }).fill("Hi, is the tee still available in L?");
+  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByText(/Thanks for asking/).waitFor({ timeout: 8000 });
+  await page.getByLabel("Message", { exact: true }).fill("Can I WhatsApp you on 082 123 4567?");
+  await page.getByText(/Sharing numbers or bank details/).waitFor();
+  await page.getByLabel("Message", { exact: true }).fill("");
+  await shot("chat");
+  await page.goto(`${BASE}/activity?tab=messages`);
+  await page.getByText("Lebo's Thrift").first().waitFor();
+
+  // Block a shop: its posts disappear from the feed. Unblock from settings.
+  await page.goto(BASE);
+  const cakePost = page.getByRole("region", { name: /Celebration cake/ });
+  await cakePost.scrollIntoViewIfNeeded();
+  await cakePost.getByRole("button", { name: "More options" }).click();
+  await page.getByRole("button", { name: "Block @sweetcrumbs.ct" }).click();
+  await page.getByText(/Blocked @sweetcrumbs.ct/).waitFor();
+  await check(page.getByRole("region", { name: /Celebration cake/ }).count().then((n) => n === 0), "blocked shop hidden from the feed");
+  await page.goto(`${BASE}/settings/blocked`);
+  await page.getByRole("button", { name: "Unblock" }).click();
+  await page.getByText("You haven't blocked anyone.").waitFor();
   await page.goto(`${BASE}/explore`);
   await page.getByRole("heading", { name: "Shops to follow" }).waitFor();
   await shot("explore");
@@ -283,7 +336,6 @@ try {
   await clipCard.scrollIntoViewIfNeeded();
   await clipCard.getByRole("button", { name: "Pause" }).click(); // it plays by itself once on screen
   await clipCard.getByRole("button", { name: "Play" }).waitFor(); // paused: big play button and the time shows
-  await clipCard.getByText(/\d:\d\d \/ 0:08/).waitFor();
   await check(clipCard.getByRole("slider", { name: "Video position" }).isVisible(), "rewind bar");
   await clipCard.getByRole("button", { name: "Sound on" }).click();
   await check(clipCard.getByRole("button", { name: "Sound off" }).isVisible(), "sound turned on");
@@ -307,6 +359,25 @@ try {
   // The R349 tee bought with the welcome credit leaves a R17.06 top up for us to pay Lebo's Thrift.
   await page.getByText("R17.06").waitFor();
   await shot("admin");
+  // The report from the buyer is waiting; the team removes the post.
+  await page.getByText("Fake or counterfeit").first().waitFor();
+  await page.getByRole("button", { name: "Remove" }).first().click();
+  await page.getByText("No open reports.").waitFor();
+
+  // Delete my account (store rule): type DELETE, then you're signed out for good.
+  await signOut();
+  await signIn("leaver@test.co.za");
+  await page.goto(`${BASE}/me`);
+  await page.getByRole("button", { name: "Menu and settings" }).click();
+  await page.getByRole("button", { name: "Delete my account" }).click();
+  const del = page.getByRole("dialog", { name: "Delete my account" });
+  await check(del.getByRole("button", { name: "Delete my account" }).isDisabled(), "needs DELETE typed");
+  await del.getByLabel("Type DELETE to confirm").fill("DELETE");
+  await shot("delete-account");
+  await del.getByRole("button", { name: "Delete my account" }).click();
+  await page.waitForURL((u) => u.pathname === "/");
+  await page.goto(`${BASE}/me`);
+  await page.waitForURL(/signin/); // signed out
 
   if (errors.length) throw new Error("Page errors: " + errors.join(" | "));
   console.log(`E2E passed. Screenshots in ${shots}`);

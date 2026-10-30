@@ -164,13 +164,12 @@ function Player({ hlsUrl, url, poster, label }: { hlsUrl: string | null; url: st
         {flash && <span className={`seek-flash ${flash}`}><Icon name={flash === "back" ? "rewind" : "forward"} size={22} />{flash === "back" ? "10s" : "10s"}</span>}
         {fast && <span className="speed-chip vglass">2x <Icon name="forward" size={14} /></span>}
         {paused && onScreen && userPaused.current && <span className="big-play vglass"><Icon name="play" size={30} /></span>}
-        {(scrubbing || (paused && userPaused.current)) && <span className="vtime">{clock(time)} / {clock(length)}</span>}
+        {scrubbing && <span className="vtime">{clock(time)} / {clock(length)}</span>}
       </button>
       <button className="sound-btn vglass" onClick={toggleSound} aria-label={soundOn ? "Sound off" : "Sound on"} aria-pressed={soundOn}>
         <Icon name={soundOn ? "sound" : "mute"} size={18} />
       </button>
       <div className={`vbar ${scrubbing ? "drag" : ""}`}>
-        {!scrubbing && !paused && length > 0 && <span className="vlen">{clock(length - time)}</span>}
         <div className="vtrack" ref={barRef} role="slider" aria-label="Video position" aria-valuemin={0} aria-valuemax={Math.round(length)} aria-valuenow={Math.round(time)}
           aria-valuetext={`${clock(time)} of ${clock(length)}`} tabIndex={0}
           onPointerDown={onBarDown} onPointerMove={(e) => scrubbing && seekTo(e.clientX)}

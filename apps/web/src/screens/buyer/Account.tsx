@@ -6,6 +6,8 @@ import { useLoad, useSession } from "../../session";
 import { Icon } from "../../components/Icon";
 import { BackButton, ErrorNote, Field, Loading, R, Segmented, Sheet, TierPill, timeAgo, useAction } from "../../components/ui";
 import { PostGrid } from "../../components/PostGrid";
+import { ConversationList, useMessageShop } from "./Messages";
+import { MoreSheet } from "../../components/Safety";
 import { OrderList } from "./Orders";
 
 export function SignIn() {
@@ -88,12 +90,7 @@ export function Activity() {
             )}
           </>
         )}
-        {tab === "messages" && (
-          <div className="empty-card">
-            <span className="icon-btn"><Icon name="chat" /></span>
-            <span className="grow"><b>Chat with sellers is coming next</b><div className="small muted">For now, ask questions on the item and the seller sees them in their orders.</div></span>
-          </div>
-        )}
+        {tab === "messages" && <ConversationList />}
         {tab === "orders" && <OrderList orders={orders} />}
       </div>
     </div>
@@ -106,6 +103,8 @@ export function ShopPage() {
   const [data, error] = useLoad(() => api.shop(handle), [handle]);
   const { following, toggleFollow, user, toast } = useSession();
   const [tab, setTab] = useState<"posts" | "likes" | "reposts">("posts");
+  const [more, setMore] = useState(false);
+  const messageShop = useMessageShop();
   const [reacted] = useLoad(() => (data && tab !== "posts" ? api.reactedPosts(tab === "likes" ? "like" : "repost", data.shop.id) : Promise.resolve([])), [data?.shop.id, tab]);
   const nav = useNavigate();
   if (error) return <div className="screen"><ErrorNote error={error} /></div>;
@@ -121,7 +120,10 @@ export function ShopPage() {
     <div className="screen profile">
       <div className="pbar">
         <button className="bare" onClick={() => nav(-1)} aria-label="Back"><Icon name="back" /></button>
-        <button className="bare" onClick={share} aria-label="Share shop"><Icon name="share" /></button>
+        <div className="row" style={{ gap: 2 }}>
+          <button className="bare" onClick={share} aria-label="Share shop"><Icon name="share" /></button>
+          <button className="bare" onClick={() => setMore(true)} aria-label="More options"><Icon name="more" size={20} strokeWidth={3} /></button>
+        </div>
       </div>
       <div className="phead">
         <div className="pavatar green">{shop.name[0]}</div>
@@ -137,8 +139,12 @@ export function ShopPage() {
         {shop.founding && <span className="standing green"><Icon name="check" size={12} strokeWidth={2.6} />Founding seller</span>}
       </div>
       {shop.bio && <p className="pbio">{shop.bio}</p>}
-      <button className={`btn block ${isFollowing ? "" : "dark"}`} style={{ marginTop: 12, minHeight: 40 }}
-        onClick={() => (user ? toggleFollow(shop.id) : nav("/signin"))}>{isFollowing ? "Following" : "Follow"}</button>
+      <div className="row" style={{ marginTop: 12, gap: 8 }}>
+        <button className={`btn grow ${isFollowing ? "" : "dark"}`} style={{ minHeight: 40 }}
+          onClick={() => (user ? toggleFollow(shop.id) : nav("/signin"))}>{isFollowing ? "Following" : "Follow"}</button>
+        <button className="btn grow" style={{ minHeight: 40 }} onClick={() => messageShop(shop.id)}><Icon name="chat" size={16} />Message</button>
+      </div>
+      {more && <MoreSheet kind="shop" targetId={shop.id} shopId={shop.id} shopHandle={shop.handle} onClose={() => setMore(false)} />}
 
       <div className="ptabs" role="tablist" aria-label="Shop">
         <button role="tab" aria-selected={tab === "posts"} onClick={() => setTab("posts")}>Posts</button>

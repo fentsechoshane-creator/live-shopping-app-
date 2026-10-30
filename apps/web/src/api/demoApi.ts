@@ -1,11 +1,11 @@
 // Demo adapter: the whole app runs in the browser with sample data, using the same rules as the server.
 // Used when no Supabase keys are set. Sign in with any email or phone and the code 123456.
 import {
-  canTransition, orderTotals, payoutDate, releasableAt, returnReasonsFor, shipBy, tierFor, TRUST_POINTS, validateListing,
+  canTransition, isRude, orderTotals, payoutDate, releasableAt, returnReasonsFor, shipBy, tierFor, TRUST_POINTS, validateListing,
   RETURN_POSTAGE_PAYER, type OrderStatus, type TrustEventKind,
 } from "@app/core";
 import type {
-  Api, Category, CheckoutInput, FeedItem, ListingInput, MyShop, Notification, Order, Payout, PendingReview, ProductPublic, ReviewStatus,
+  Api, Category, ReportReason, ReportTarget, CheckoutInput, FeedItem, ListingInput, MyShop, Notification, Order, Payout, PendingReview, ProductPublic, ReviewStatus,
   ShopPublic, User,
 } from "./types";
 
@@ -24,6 +24,11 @@ interface State {
   notifications: (Notification & { userId: string })[]; payouts: DPayout[]; clockOffsetMs: number;
   follows: { userId: string; shopId: string }[];
   reactions?: { userId: string; postId: string; kind: "like" | "repost"; at: string }[];
+  comments: { id: string; postId: string; userId: string; body: string; createdAt: string; hidden?: boolean }[];
+  conversations: { id: string; buyerId: string; shopId: string; lastAt: string }[];
+  messages: { id: string; conversationId: string; senderId: string; body: string; createdAt: string; readAt: string | null }[];
+  blocks: { blockerId: string; blockedId: string }[];
+  reports: { id: string; reporterId: string; targetKind: ReportTarget; targetId: string; reason: ReportReason; details: string; createdAt: string; status: "open" | "actioned" | "dismissed" }[];
 }
 
 const KEY = "lsa-demo-v3";
@@ -71,6 +76,12 @@ function seed(): State {
   ];
   return { users: bots, currentUserId: null, shops, products, posts, orders: [], notifications: [], payouts: [], clockOffsetMs: 0, follows: [],
     // Sample activity: Lebo reposted the cake and liked the silk shirt, so the Following feed shows a repost.
+    comments: [
+      { id: "c-1", postId: "po-1", userId: "u-sweet", body: "The sand colour is so nice. Does it shrink?", createdAt: new Date(now - 3000e3).toISOString() },
+      { id: "c-2", postId: "po-1", userId: "u-lebo", body: "No shrinking, it's pre washed heavy cotton.", createdAt: new Date(now - 2800e3).toISOString() },
+      { id: "c-3", postId: "po-3", userId: "u-luxe", body: "Ordered one for Friday, can't wait!", createdAt: new Date(now - 6000e3).toISOString() },
+    ],
+    conversations: [], messages: [], blocks: [], reports: [],
     reactions: [{ userId: "u-lebo", postId: "po-3", kind: "repost", at: new Date(now - 1800e3).toISOString() }, { userId: "u-lebo", postId: "po-2", kind: "like", at: new Date(now - 1800e3).toISOString() }] };
 }
 
@@ -202,6 +213,16 @@ export function createDemoApi(): Api {
   const toFeed = (po: DPost): FeedItem => {
     const p = s.products.find((x) => x.id === po.productId)!;
     return { postId: po.id, caption: po.caption, product: p, shop: publicShop(shopOf(po.shopId)), video: DEMO_CLIPS[po.id] ? { ...po.video, url: DEMO_CLIPS[po.id], kind: "video" } : { ...po.video, url: mediaUrl(po.video.url) } };
+  };
+  const blockedBetween = (a: string, b: string) => s.blocks.some((x) => (x.blockerId === a && x.blockedId === b) || (x.blockerId === b && x.blockedId === a));
+  const toConv = (c: State["conversations"][number], viewer: string) => {
+    const sh = shopOf(c.shopId);
+    const msgs = s.messages.filter((m) => m.conversationId === c.id);
+    const last = msgs[msgs.length - 1];
+    return { id: c.id, shopId: sh.id, shopName: sh.name, shopHandle: sh.handle,
+      otherName: c.buyerId === viewer ? sh.name : s.users.find((x) => x.id === c.buyerId)?.displayName || "Buyer",
+      iAmSeller: c.buyerId !== viewer, lastBody: last?.body ?? null, lastAt: c.lastAt,
+      unread: msgs.filter((m) => m.senderId !== viewer && !m.readAt).length };
   };
   const visible = (po: DPost) => {
     const p = s.products.find((x) => x.id === po.productId);
@@ -398,6 +419,155 @@ export function createDemoApi(): Api {
       return { title: "Denim jacket, light wash, size M", label: "pre_loved", condition: "good", priceCents: 42000,
         description: "Classic light wash denim jacket with button front and chest pockets.", demo: true };
     },
+    async report(kind, targetId, reason, details) {
+      const u = me();
+      s.reports.push({ id: id(), reporterId: u.id, targetKind: kind, targetId, reason, details: details.slice(0, 500), createdAt: now().toISOString(), status: "open" });
+      save();
+    },
+    async block(target) {
+      const u = me();
+      const who = target.userId ?? (target.shopId ? shopOf(target.shopId).ownerId : undefined);
+      if (!who || who === u.id) throw new Error("You can't block that account.");
+      if (!s.blocks.some((b) => b.blockerId === u.id && b.blockedId === who)) s.blocks.push({ blockerId: u.id, blockedId: who });
+      save();
+    },
+    async unblock(userId) {
+      const u = me();
+      s.blocks = s.blocks.filter((b) => !(b.blockerId === u.id && b.blockedId === userId));
+      save();
+    },
+    async blocked() {
+      const u = s.users.find((x) => x.id === s.currentUserId);
+      if (!u) return [];
+      return s.blocks.filter((b) => b.blockerId === u.id).map((b) => {
+        const person = s.users.find((x) => x.id === b.blockedId);
+        const sh = s.shops.find((x) => x.ownerId === b.blockedId);
+        return { userId: b.blockedId, name: person?.displayName || "User", shopId: sh?.id ?? null, shopHandle: sh?.handle ?? null };
+      });
+    },
+    async deleteAccount() {
+      const u = me();
+      const open = s.orders.filter((o) => (o.buyerId === u.id || o.shopOwnerId === u.id) && !["completed", "cancelled", "refunded"].includes(o.status)).length;
+      if (open) throw new Error(`You have ${open} open ${open === 1 ? "order" : "orders"}. Finish ${open === 1 ? "it" : "them"} first, then delete your account.`);
+      const myShops = s.shops.filter((x) => x.ownerId === u.id).map((x) => x.id);
+      s.posts = s.posts.filter((p) => !myShops.includes(p.shopId));
+      s.shops.forEach((x) => { if (x.ownerId === u.id && x.status !== "banned") x.status = "paused"; });
+      s.comments = s.comments.filter((c) => c.userId !== u.id);
+      s.reactions = (s.reactions ?? []).filter((r) => r.userId !== u.id);
+      s.follows = s.follows.filter((f) => f.userId !== u.id);
+      s.blocks = s.blocks.filter((b) => b.blockerId !== u.id && b.blockedId !== u.id);
+      const convs = s.conversations.filter((c) => c.buyerId === u.id || myShops.includes(c.shopId)).map((c) => c.id);
+      s.conversations = s.conversations.filter((c) => !convs.includes(c.id));
+      s.messages = s.messages.filter((m) => !convs.includes(m.conversationId));
+      s.notifications = s.notifications.filter((n) => n.userId !== u.id);
+      u.displayName = "Deleted user"; u.bio = ""; u.email = undefined;
+      s.currentUserId = null;
+      save();
+      listeners.forEach((l) => l(null));
+    },
+    async openReports() {
+      return s.reports.filter((r) => r.status === "open").map((r) => {
+        const summary = r.targetKind === "post" ? s.posts.find((p) => p.id === r.targetId)?.caption
+          : r.targetKind === "comment" ? s.comments.find((c) => c.id === r.targetId)?.body
+          : r.targetKind === "shop" ? s.shops.find((x) => x.id === r.targetId)?.name : "";
+        return { id: r.id, targetKind: r.targetKind, targetId: r.targetId, reason: r.reason, details: r.details, createdAt: r.createdAt, summary: summary ?? "" };
+      });
+    },
+    async handleReport(rid, action) {
+      if (!me().admin) throw new Error("Only our team can do this.");
+      const r = s.reports.find((x) => x.id === rid);
+      if (!r) throw new Error("Report not found.");
+      if (action === "remove") {
+        if (r.targetKind === "post") s.posts = s.posts.filter((p) => p.id !== r.targetId);
+        if (r.targetKind === "comment") s.comments.forEach((c) => { if (c.id === r.targetId) c.hidden = true; });
+        if (r.targetKind === "shop") s.shops.forEach((x) => { if (x.id === r.targetId) x.status = "banned"; });
+      }
+      r.status = action === "remove" ? "actioned" : "dismissed";
+      save();
+    },
+
+    async comments(postId) {
+      const viewer = s.currentUserId;
+      const post = s.posts.find((p) => p.id === postId);
+      return s.comments.filter((c) => c.postId === postId && !c.hidden && !(viewer && blockedBetween(viewer, c.userId)))
+        .map((c) => {
+          const sh = s.shops.find((x) => x.ownerId === c.userId);
+          return { id: c.id, body: c.body, createdAt: c.createdAt, userId: c.userId, name: s.users.find((x) => x.id === c.userId)?.displayName || "User",
+            shopHandle: sh?.handle ?? null, isSeller: !!post && sh?.id === post.shopId, mine: c.userId === viewer };
+        });
+    },
+    async addComment(postId, body) {
+      const u = me();
+      const text = body.trim();
+      if (!text) throw new Error("Write something first.");
+      if (isRude(text)) throw new Error("Please keep it friendly. That message has words we don't allow.");
+      const post = s.posts.find((p) => p.id === postId);
+      if (!post) throw new Error("This post is gone.");
+      if (blockedBetween(u.id, shopOf(post.shopId).ownerId)) throw new Error("You can't comment here.");
+      s.comments.push({ id: id(), postId, userId: u.id, body: text.slice(0, 300), createdAt: now().toISOString() });
+      if (shopOf(post.shopId).ownerId !== u.id) notify(shopOf(post.shopId).ownerId, "New comment", text.slice(0, 80));
+      save();
+    },
+    async deleteComment(cid) {
+      const u = me();
+      const c = s.comments.find((x) => x.id === cid);
+      const post = c && s.posts.find((p) => p.id === c.postId);
+      if (!c || !(c.userId === u.id || (post && shopOf(post.shopId).ownerId === u.id) || u.admin)) throw new Error("You can't delete this comment.");
+      s.comments = s.comments.filter((x) => x.id !== cid);
+      save();
+    },
+    async commentCounts(ids) {
+      return Object.fromEntries(ids.map((pid) => [pid, s.comments.filter((c) => c.postId === pid && !c.hidden).length]));
+    },
+
+    async conversations() {
+      const u = s.users.find((x) => x.id === s.currentUserId);
+      if (!u) return [];
+      return s.conversations.filter((c) => (c.buyerId === u.id || shopOf(c.shopId).ownerId === u.id) && !blockedBetween(c.buyerId, shopOf(c.shopId).ownerId))
+        .sort((a, b) => b.lastAt.localeCompare(a.lastAt)).map((c) => toConv(c, u.id));
+    },
+    async openConversation(shopId) {
+      const u = me();
+      if (shopOf(shopId).ownerId === u.id) throw new Error("This is your own shop.");
+      if (blockedBetween(u.id, shopOf(shopId).ownerId)) throw new Error("You can't message this shop.");
+      let c = s.conversations.find((x) => x.buyerId === u.id && x.shopId === shopId);
+      if (!c) { c = { id: id(), buyerId: u.id, shopId, lastAt: now().toISOString() }; s.conversations.push(c); save(); }
+      return c.id;
+    },
+    async thread(cid) {
+      const u = me();
+      const c = s.conversations.find((x) => x.id === cid && (x.buyerId === u.id || shopOf(x.shopId).ownerId === u.id));
+      if (!c) throw new Error("This chat isn't available.");
+      s.messages.forEach((m) => { if (m.conversationId === cid && m.senderId !== u.id && !m.readAt) m.readAt = now().toISOString(); });
+      save();
+      return { conversation: toConv(c, u.id), messages: s.messages.filter((m) => m.conversationId === cid)
+        .map((m) => ({ id: m.id, body: m.body, createdAt: m.createdAt, mine: m.senderId === u.id, readAt: m.readAt })) };
+    },
+    async sendMessage(cid, body) {
+      const u = me();
+      const text = body.trim();
+      const c = s.conversations.find((x) => x.id === cid);
+      if (!c || !text) return;
+      if (isRude(text)) throw new Error("Please keep it friendly. That message has words we don't allow.");
+      const ownerId = shopOf(c.shopId).ownerId;
+      if (blockedBetween(c.buyerId, ownerId)) throw new Error("You can't message this account.");
+      s.messages.push({ id: id(), conversationId: cid, senderId: u.id, body: text.slice(0, 1000), createdAt: now().toISOString(), readAt: null });
+      c.lastAt = now().toISOString();
+      const other = u.id === c.buyerId ? ownerId : c.buyerId;
+      notify(other, "New message", text.slice(0, 80), `/messages/${cid}`);
+      save();
+      // Demo: sample shops answer after a moment so you can see a conversation.
+      if (other.startsWith("u-") && !s.messages.some((m) => m.conversationId === cid && m.senderId === other)) {
+        window.setTimeout(() => {
+          s.messages.push({ id: id(), conversationId: cid, senderId: other, createdAt: now().toISOString(), readAt: null,
+            body: "Hi! Thanks for asking. Yes, it's available. Please order through the app so your money stays protected." });
+          c.lastAt = now().toISOString();
+          notify(c.buyerId, "New message", "Hi! Thanks for asking. Yes, it's available.", `/messages/${cid}`);
+          save();
+        }, 1500);
+      }
+    },
+
     async following() {
       const u = me();
       return s.follows.filter((f) => f.userId === u.id).map((f) => s.shops.find((x) => x.id === f.shopId)).filter(Boolean).map((sh) => publicShop(sh!));

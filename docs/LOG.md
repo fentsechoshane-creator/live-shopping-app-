@@ -57,7 +57,7 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 
 ## Next up
 
-- Store must haves: Report a post or user, Block a user, Delete my account in the app, a privacy policy. See docs/LAUNCH.md.
+- Store must haves are built. Still needed: real company details and support email in the privacy page, a lawyer's review, and apply migrations 0009 to 0011 plus deploy `delete-account` and `suggest-listing` on the live project.
 - Set up Apple and Google developer accounts now (D-U-N-S first for a company account) and start Google's 12 tester, 14 day closed test early. [Ofentse and Lehloma]
 
 - Apply migrations 0009 (public likes and reposts) and 0010 (listing photos) to the live Supabase project, and deploy the `suggest-listing` function.
@@ -66,9 +66,20 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 - Real seller video clips for the demo (Ofentse to send short clips, or allow Pexels in Claude settings).
 - Supabase dashboard: set Site URL and add `{{ .Token }}` to the magic link email so the 6 digit sign in code works. [Ofentse]
 - TradeSafe sandbox keys and Mux keys as server secrets, then test a real escrow payment. [Lehloma]
-- Messages tab and live streams with auctions are shown as "coming next".
+- Live streams with auctions are shown as "coming next". Comments and messages are built.
 
 ## Log
+
+### 2026-10-30: Report, block, delete account, privacy; comments and messages
+- **Report:** "…" on every post and shop page, and on comments and chats. Reasons: fake or counterfeit, not as shown, scam or pay outside the app, offensive, spam, other. Reports are private. The Team screen has a "Reports to check" queue with Remove (or Close shop) and Dismiss; aim to answer within 24 hours.
+- **Block:** from a post, shop page or chat. Blocked shops vanish from your feed, and neither side can message or comment. Menu > Blocked accounts lists them with Unblock.
+- **Delete my account:** Menu > Delete my account, type DELETE. Open orders must finish first. Removes name, bio, posts, comments, likes, follows and chats and the sign in; keeps order and payment records (5 years, by law). Server function `delete-account`.
+- **Privacy and terms** page (Menu, and `/privacy`) with contact details, POPIA rights, community rules and buying rules. Draft: company details, support email and Information Officer still [CONFIRM], and a lawyer should review.
+- **Filter:** rude words are blocked in comments and messages (same list in the app and the database). Chat warns when someone shares a cell number or asks to pay by EFT or outside the app.
+- **Comments:** comment button with a count next to Buy now; a sheet to read and add; delete your own (sellers can delete on their posts); report others. Seller comments get a "Seller" tag. The seller is notified.
+- **Messages:** "Message seller" in the item sheet, the post menu and shop pages. Activity > Messages lists chats with unread counts; each chat has the "keep payments in the app" tip, report and block. New messages notify the other side. Demo shops reply once so you can see it work.
+- Video: removed the time readouts (it only shows while you drag the bar).
+- Database: migration 0011 (blocks, reports, comments, conversations, messages, rude word filter, admin_handle_report, forget_user). Tested locally with `npm run test:db`. **Not yet applied to the live project**, with 0009 and 0010. Functions `delete-account` and `suggest-listing` not yet deployed. [Open]
 
 ### 2026-10-29: Sleeker player, gestures, demo videos, benchmark
 - Progress bar is a thin 2px line; the dot only appears while you drag (then it grows a little so you can see where you are). No big dot while playing.
