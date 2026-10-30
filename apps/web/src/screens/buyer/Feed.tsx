@@ -57,6 +57,10 @@ export function Feed() {
         <FeedEmpty title="Follow sellers to see their drops here" body="Tap Follow on any video, or find shops in Explore."
           action={<button className="btn vglass" onClick={() => nav("/explore")}>Find sellers</button>} />
       )}
+      {items && tab === "for_you" && visibleItems.length === 0 && (
+        <FeedEmpty title="No videos yet" body="Sellers' videos show up here. Got something to sell? Open a shop and post the first one."
+          action={<button className="btn vglass" onClick={() => withUser(() => nav("/post"), "Sign in to sell")}>Start selling</button>} />
+      )}
       {items && tab !== "live" && visibleItems.length > 0 && <FeedList items={visibleItems} key={tab} onNearEnd={tab === "for_you" ? loadMore : undefined} />}
 
       <div className="top-bar">
