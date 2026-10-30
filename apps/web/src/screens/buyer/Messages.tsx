@@ -4,7 +4,7 @@ import { isRude, looksOffApp } from "@app/core";
 import { api } from "../../api";
 import { useLoad, useSession } from "../../session";
 import { Icon } from "../../components/Icon";
-import { ErrorNote, Loading, timeAgo, useAction } from "../../components/ui";
+import { ErrorNote, Loading, timeAgo, useAction, useGoBack } from "../../components/ui";
 import { ReportSheet } from "../../components/Safety";
 
 /** Opens (or starts) the chat with a shop. Signed out people go to sign in first. */
@@ -53,11 +53,12 @@ export function Thread() {
   const { toast, refreshBlocks } = useSession();
   const nav = useNavigate();
   const endRef = useRef<HTMLDivElement>(null);
+  const goBack = useGoBack("/activity?tab=messages");
 
   useEffect(() => { const t = window.setInterval(reload, 3000); return () => window.clearInterval(t); }, [reload]); // new messages
   useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [data?.messages.length]);
 
-  if (error) return <div className="screen"><button className="bare" onClick={() => nav(-1)} aria-label="Back"><Icon name="back" /></button><ErrorNote error={error} /></div>;
+  if (error) return <div className="screen"><button className="bare" onClick={goBack} aria-label="Back"><Icon name="back" /></button><ErrorNote error={error} /></div>;
   if (!data) return <div className="screen"><Loading /></div>;
   const c = data.conversation;
   const risky = data.messages.some((m) => !m.mine && looksOffApp(m.body));
@@ -74,7 +75,7 @@ export function Thread() {
   return (
     <div className="chat">
       <div className="chat-top">
-        <button className="bare" onClick={() => nav(-1)} aria-label="Back"><Icon name="back" /></button>
+        <button className="bare" onClick={goBack} aria-label="Back"><Icon name="back" /></button>
         <Link to={`/s/${c.shopHandle}`} className="row grow" style={{ gap: 10, minWidth: 0 }}>
           <span className="avatar">{c.otherName[0]?.toUpperCase()}</span>
           <span style={{ minWidth: 0 }}><b style={{ display: "block" }}>{c.otherName}</b><span className="small muted">{c.iAmSeller ? "Buyer" : `@${c.shopHandle}`}</span></span>

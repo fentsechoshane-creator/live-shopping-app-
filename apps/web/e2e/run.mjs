@@ -179,6 +179,11 @@ try {
   await page.waitForTimeout(400);
   await shot("seller-gate");
   await page.getByRole("button", { name: "No, not now" }).click();
+  // Every inner screen has Back to the previous screen, even when opened directly.
+  await page.goto(`${BASE}/help`);
+  await page.getByRole("button", { name: "Back" }).click();
+  await page.waitForURL((u) => u.pathname === "/");
+  await page.goto(`${BASE}/explore`);
   await check(Promise.resolve(new URL(page.url()).pathname === "/explore"), "No keeps you on the same screen");
   await page.goto(`${BASE}/me`);
   await page.getByRole("tab", { name: "Posts", selected: true }).waitFor();

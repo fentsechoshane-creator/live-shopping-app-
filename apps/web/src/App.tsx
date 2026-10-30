@@ -3,7 +3,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { api } from "./api";
 import { useLoad, useSession } from "./session";
 import { Icon } from "./components/Icon";
-import { Loading } from "./components/ui";
+import { BackButton, Loading } from "./components/ui";
 import { Feed } from "./screens/buyer/Feed";
 import { Explore } from "./screens/buyer/Explore";
 import { MockPay, OrderDetail, Orders } from "./screens/buyer/Orders";
@@ -129,6 +129,7 @@ function MenuRow({ icon, t, s, onClick }: { icon: string; t: string; s: string; 
 function Help() {
   return (
     <div className="screen">
+      <BackButton />
       <h1>Returns and help</h1>
       <div className="group">
         <div className="cell"><span className="grow"><span className="t" style={{ display: "block" }}>Change your mind</span><span className="s" style={{ display: "block" }}>Buy now items can be returned within 7 days of delivery. You pay the return postage.</span></span></div>
@@ -169,7 +170,7 @@ export function App() {
           <Route path="/messages/:id" element={guard(<Thread />)} />
           <Route path="/settings/blocked" element={guard(<BlockedAccounts />)} />
           <Route path="/privacy" element={<Privacy />} />
-          <Route path="*" element={<div className="screen"><div className="empty">Page not found.</div></div>} />
+          <Route path="*" element={<div className="screen"><BackButton /><div className="empty">Page not found.</div></div>} />
         </Routes>
         {!loc.pathname.startsWith("/post") && <Tabs />}
         <SideMenu />

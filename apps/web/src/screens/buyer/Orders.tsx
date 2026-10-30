@@ -42,6 +42,7 @@ export function Orders() {
   const [orders, error] = useLoad(() => api.myOrders(), []);
   return (
     <div className="screen">
+      <BackButton />
       <h1 className="large-title" style={{ margin: "8px 0 0" }}>My orders</h1>
       {orders && <div className="tiny-count" style={{ marginBottom: 14 }}>{orders.length} {orders.length === 1 ? "order" : "orders"} in total</div>}
       <ErrorNote error={error} />
@@ -183,6 +184,7 @@ export function MockPay() {
   const nav = useNavigate();
   return (
     <div className="screen">
+      <BackButton />
       <div className="note amber" style={{ marginBottom: 16 }}>
         <b>Test payment page.</b> In live mode, buyers pay on TradeSafe's secure page and the money is held in escrow.
       </div>

@@ -2,7 +2,7 @@ import { REPORT_REASONS } from "@app/core";
 import { Navigate } from "react-router-dom";
 import { api } from "../../api";
 import { useLoad, useSession } from "../../session";
-import { ErrorNote, Loading, R, useAction } from "../../components/ui";
+import { BackButton, ErrorNote, Loading, R, useAction } from "../../components/ui";
 
 /** Our team: approve ID and food certificates, and decide disputed returns. */
 export function Admin() {
@@ -19,6 +19,7 @@ export function Admin() {
 
   return (
     <div className="screen">
+      <BackButton />
       <h1>Team</h1>
       <ErrorNote error={error ?? err1 ?? err2} />
       <h2>Reports to check{reports && reports.length > 0 ? ` (${reports.length})` : ""}</h2>

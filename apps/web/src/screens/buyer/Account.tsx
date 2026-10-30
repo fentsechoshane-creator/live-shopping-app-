@@ -4,7 +4,7 @@ import { WELCOME_CREDIT } from "@app/core";
 import { api, authMethod } from "../../api";
 import { useLoad, useSession } from "../../session";
 import { Icon } from "../../components/Icon";
-import { BackButton, ErrorNote, Field, Loading, R, Segmented, Sheet, TierPill, timeAgo, useAction } from "../../components/ui";
+import { useGoBack, BackButton, ErrorNote, Field, Loading, R, Segmented, Sheet, TierPill, timeAgo, useAction } from "../../components/ui";
 import { PostGrid } from "../../components/PostGrid";
 import { ConversationList, useMessageShop } from "./Messages";
 import { MoreSheet } from "../../components/Safety";
@@ -104,6 +104,7 @@ export function ShopPage() {
   const { following, toggleFollow, user, toast } = useSession();
   const [tab, setTab] = useState<"posts" | "likes" | "reposts">("posts");
   const [more, setMore] = useState(false);
+  const goBack = useGoBack("/explore");
   const messageShop = useMessageShop();
   const [reacted] = useLoad(() => (data && tab !== "posts" ? api.reactedPosts(tab === "likes" ? "like" : "repost", data.shop.id) : Promise.resolve([])), [data?.shop.id, tab]);
   const nav = useNavigate();
@@ -119,7 +120,7 @@ export function ShopPage() {
   return (
     <div className="screen profile">
       <div className="pbar">
-        <button className="bare" onClick={() => nav(-1)} aria-label="Back"><Icon name="back" /></button>
+        <button className="bare" onClick={goBack} aria-label="Back"><Icon name="back" /></button>
         <div className="row" style={{ gap: 2 }}>
           <button className="bare" onClick={share} aria-label="Share shop"><Icon name="share" /></button>
           <button className="bare" onClick={() => setMore(true)} aria-label="More options"><Icon name="more" size={20} strokeWidth={3} /></button>

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, type Category, type MyShop } from "../../api";
 import { useSession } from "../../session";
-import { Choice, ErrorNote, Field, Loading, Progress, useAction } from "../../components/ui";
+import { Choice, ErrorNote, Field, Loading, Progress, useAction, useGoBack } from "../../components/ui";
 import { Icon } from "../../components/Icon";
 
 const CATEGORIES: { id: Category; title: string; sub: string }[] = [
@@ -25,6 +25,7 @@ export function Onboarding() {
   const [category, setCategory] = useState<Category | null>(null);
   const [step, setStep] = useState(1);
   const nav = useNavigate();
+  const goBack = useGoBack("/me");
   const reload = () => api.myShop().then((s) => {
     setShop(s);
     if (!s) return setStep(category ? 2 : 1);
@@ -40,7 +41,7 @@ export function Onboarding() {
   return (
     <div className="screen">
       <div className="row between">
-        <button className="back" onClick={() => (step > 1 && step <= 2 ? setStep(step - 1) : nav("/me?tab=selling"))}><Icon name="back" size={20} />Back</button>
+        <button className="back" onClick={() => (step > 1 && step <= 2 ? setStep(step - 1) : goBack())}><Icon name="back" size={20} />Back</button>
         <span className="small muted">You can finish later</span>
       </div>
       <Progress step={step} of={5} />

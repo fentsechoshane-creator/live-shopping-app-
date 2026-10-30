@@ -4,7 +4,7 @@ import { goLiveBlockers, liveStock, MIN_LIVE_STOCK } from "@app/core";
 import { api } from "../../api";
 import { useLoad } from "../../session";
 import { Icon } from "../../components/Icon";
-import { Loading } from "../../components/ui";
+import { Loading, useGoBack } from "../../components/ui";
 import { CreateListing } from "./Create";
 
 type Mode = "camera" | "create" | "live";
@@ -28,7 +28,7 @@ export function Post() {
   const [sub, setSub] = useState(false);
   const [shop] = useLoad(() => api.myShop(), []);
   const nav = useNavigate();
-  const close = () => (window.history.length > 1 ? nav(-1) : nav("/"));
+  const close = useGoBack("/");
   const dark = mode !== "create";
 
   if (shop === undefined) return <div className="post dark"><div className="cam"><div className="cam-msg"><Loading /></div></div></div>;

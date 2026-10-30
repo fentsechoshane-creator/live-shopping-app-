@@ -7,7 +7,7 @@ Use these with docs/DESIGN.md on every new screen. They come from common practic
 1. **One job per screen.** A screen asks for one decision or 3 to 5 related fields at most. Long forms become steps.
 2. **Start with the easy, visual thing.** Selling starts with a photo or video, like Vinted and Depop. Typing comes after.
 3. **Always show where you are.** Steps have a thin progress bar and "2 of 4" at the top.
-4. **Back is always top left and never loses work.** Back goes one step back with everything still filled in. Only the first page shows Close (X) and the mode switch (Camera, Create, Live).
+4. **Every screen that isn't a main tab has Back, top left.** It goes to the previous screen (or a sensible screen if opened from a link), using `BackButton` or `useGoBack` in `components/ui.tsx`. **Back never loses work.** Back goes one step back with everything still filled in. Only the first page shows Close (X) and the mode switch (Camera, Create, Live).
 5. **The main button lives at the bottom, in thumb reach.** One green button per screen, full width, at least 44 points tall. Its words say what happens: "Next", "Post listing", "Pay R311".
 6. **Catch problems where they happen.** Check each step when you tap Next (for example, replicas are stopped on the title step), not only at the end.
 7. **Tap, don't type, where you can.** Pick buttons for type and condition, size chips, a plus and minus stepper for stock, a number keypad for price.

@@ -70,6 +70,10 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 
 ## Log
 
+### 2026-10-30: Back buttons everywhere
+- Added Back to Returns and help, My orders, the test payment page, Team and Page not found.
+- One back rule for the whole app (`useGoBack` and `BackButton` in `components/ui.tsx`): go to the previous screen; if the screen was opened directly (a link or a refresh), go to a sensible screen instead. Shop pages, chats, the post screen's X, shop sign up and seller screens all use it. Added to docs/UX.md.
+
 ### 2026-10-30: Smooth progress bar
 - The bar now moves every frame straight from the video (requestAnimationFrame and a GPU transform) instead of on the browser's time updates, which only come about 4 times a second. It glides now, in the demo and the real app.
 

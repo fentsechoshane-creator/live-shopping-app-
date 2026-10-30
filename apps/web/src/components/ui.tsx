@@ -1,5 +1,5 @@
 import { cloneElement, isValidElement, useEffect, useId, useRef, useState, type ReactElement, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { formatRand, type Cents, type SellerTier, TIER_INFO } from "@app/core";
 import { Icon } from "./Icon";
 
@@ -68,9 +68,17 @@ export function Segmented<T extends string>({ value, onChange, options, label, o
   );
 }
 
-export function BackButton({ to, label = "Back" }: { to?: string; label?: string }) {
+/** Goes back to the previous screen. If the screen was opened directly (a link, a refresh), goes to `fallback`. */
+export function useGoBack(fallback = "/") {
   const nav = useNavigate();
-  return <button className="back" onClick={() => (to ? nav(to) : nav(-1))}><Icon name="back" size={20} />{label}</button>;
+  const loc = useLocation();
+  return () => (loc.key !== "default" ? nav(-1) : nav(fallback, { replace: true }));
+}
+
+/** Back to the previous screen. `to` is only used when there is no previous screen. */
+export function BackButton({ to, label = "Back" }: { to?: string; label?: string }) {
+  const back = useGoBack(to ?? "/");
+  return <button className="back" onClick={back}><Icon name="back" size={20} />{label}</button>;
 }
 
 /** Grouped list row, like iOS settings. */
