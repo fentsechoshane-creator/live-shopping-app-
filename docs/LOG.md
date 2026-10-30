@@ -92,6 +92,10 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-10-30: Live database update still pending
+- Checked the live project: it has migrations up to 0008 (likes and reposts). 0009 to 0012 are not applied.
+- Applying from Claude was cancelled twice by the approval step. Fallback: run the combined file (migrations 0009 to 0012 in one transaction, in order) in Supabase SQL Editor, or `supabase db push` from Lehloma's machine.
+
 ### 2026-10-30: Debug pass
 - Ran every journey while collecting browser errors: no app errors; only expected test noise (blocked fonts, the test browser can't play iPhone video).
 - Fixed: edge swipe back could go back two screens in Safari, so it now only works in the installed app (Safari has its own); deleting an account now also deletes the person's photos, videos and ID files; React Router future warnings.
