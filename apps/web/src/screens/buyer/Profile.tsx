@@ -8,6 +8,7 @@ import { ProductArt } from "../../components/Scene";
 import { ErrorNote, Field, Loading, R, Sheet, dateText, swatch, useAction } from "../../components/ui";
 import { CertUpload } from "../seller/Selling";
 import { PostGrid } from "../../components/PostGrid";
+import { useTabSwipe } from "../../components/gestures";
 
 type Tab = "posts" | "likes" | "reposts";
 
@@ -30,6 +31,7 @@ export function Profile() {
   // "selling" is the old name for the Posts tab; links from onboarding still use it.
   const tab: Tab = asked === "likes" ? "likes" : asked === "reposts" ? "reposts" : "posts";
   const setTab = (t: Tab) => setParams(t === "posts" ? {} : { tab: t }, { replace: true });
+  const swipeTabs = useTabSwipe(["posts", "likes", "reposts"] as const, tab, setTab);
 
   useEffect(() => {
     // ID and certificate checks finish in the background, so refresh while one is pending.
@@ -119,7 +121,7 @@ export function Profile() {
         </>
       )}
 
-      <div id="grid">
+      <div id="grid" {...swipeTabs} className="swipe-area">
         {tab === "posts" && <SellerGrid shop={shop} error={shopError} sold={sold} reload={reloadShop} />}
         {tab !== "posts" && <ReactionGrid kind={tab === "likes" ? "like" : "repost"} />}
       </div>

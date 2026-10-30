@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { DELIVERY_OPTIONS, orderTotals, type DeliveryOption } from "@app/core";
-import { api, type FeedItem } from "../../api";
+import { api, type FeedItem, type Offer } from "../../api";
 import { Icon } from "../../components/Icon";
 import { ProductArt } from "../../components/Scene";
 import { Choice, ErrorNote, Field, R, Sheet, swatch, useAction } from "../../components/ui";
@@ -10,8 +10,11 @@ import { Choice, ErrorNote, Field, R, Sheet, swatch, useAction } from "../../com
 export const SAMPLE_LOCKERS = ["Rondebosch, Main Road", "Claremont, Cavendish Square", "Gardens Centre, Cape Town", "Observatory, Lower Main", "Woodstock Exchange"];
 const FOOD_SLOTS = ["10:00 to 12:00", "12:00 to 14:00", "14:00 to 16:00"];
 
-export function CheckoutSheet({ item, onClose }: { item: FeedItem; onClose: () => void }) {
+/** `offer`: a special price from the seller (one item or a bundle), sent in chat. */
+export function CheckoutSheet({ item, onClose, offer }: { item: FeedItem; onClose: () => void; offer?: Offer | null }) {
   const p = item.product;
+  const price = offer ? offer.priceCents : p.priceCents;
+  const extra = offer ? offer.productIds.length - 1 : 0;
   const food = p.mode === "order_now";
   const options = (Object.keys(DELIVERY_OPTIONS) as DeliveryOption[]).filter((d) => !!DELIVERY_OPTIONS[d].foodOnly === food);
   const [size, setSize] = useState(p.sizes.length === 1 ? p.sizes[0] : "");
@@ -29,13 +32,14 @@ export function CheckoutSheet({ item, onClose }: { item: FeedItem; onClose: () =
   const nav = useNavigate();
 
   useEffect(() => { api.welcomeCreditAvailable().then(setCredit).catch(() => {}); }, []);
-  const t = useMemo(() => orderTotals({ itemPrice: p.priceCents, delivery, welcomeCreditAvailable: credit }), [p.priceCents, delivery, credit]);
+  const t = useMemo(() => orderTotals({ itemPrice: price, delivery, welcomeCreditAvailable: credit }), [price, delivery, credit]);
 
   const pay = () => run(async () => {
     const res = await api.checkout({
       productId: p.id, size: size || undefined, delivery,
       deliveryDetails: delivery === "pudo_locker" ? { locker } : delivery === "courier" || delivery === "baker_delivers" ? { name, phone, address } : {},
       ...(food ? { foodDate, foodSlot, foodMessage } : {}),
+      ...(offer ? { offerId: offer.id } : {}),
     });
     if (/^https?:/.test(res.checkoutUrl)) window.location.href = res.checkoutUrl;
     else nav(res.checkoutUrl);
@@ -52,8 +56,12 @@ export function CheckoutSheet({ item, onClose }: { item: FeedItem; onClose: () =
       }>
       <div className="item-row">
         <div className="thumb art" style={{ width: 48, height: 48 }}><ProductArt productId={p.id} fallback={swatch(p.id)} /></div>
-        <div className="grow"><b>{p.title}</b><div className="small muted">@{item.shop.handle}</div></div>
-        <b style={{ fontSize: 17 }}>{R(p.priceCents)}</b>
+        <div className="grow"><b>{extra ? `Bundle: ${p.title} + ${extra} more` : p.title}</b>
+          <div className="small muted">@{item.shop.handle}{offer ? " · special price" : ""}</div></div>
+        <span style={{ textAlign: "right" }}>
+          {offer && offer.listedCents > offer.priceCents && <s className="small muted" style={{ display: "block" }}>{R(offer.listedCents)}</s>}
+          <b style={{ fontSize: 17 }}>{R(price)}</b>
+        </span>
       </div>
 
       {p.sizes.length > 0 && (

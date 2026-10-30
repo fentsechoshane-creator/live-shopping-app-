@@ -16,7 +16,7 @@ interface DShop {
 }
 interface DProduct extends ProductPublic { shopId: string; proofStatus: ReviewStatus }
 interface DPost { id: string; shopId: string; productId: string; caption: string; video: FeedItem["video"]; createdAt: string; photos?: string[] }
-interface DOrder extends Order { shopOwnerId: string }
+interface DOrder extends Order { shopOwnerId: string; bundleIds?: string[]; offerId?: string | null }
 interface DUser extends User { trust: number; welcomeUsed: boolean; admin: boolean; createdAt?: string; bio?: string }
 type DPayout = Payout & { shopId: string; topUpCents: number; topUpPaid: boolean };
 interface State {
@@ -26,7 +26,8 @@ interface State {
   reactions?: { userId: string; postId: string; kind: "like" | "repost"; at: string }[];
   comments: { id: string; postId: string; userId: string; body: string; createdAt: string; hidden?: boolean }[];
   conversations: { id: string; buyerId: string; shopId: string; lastAt: string }[];
-  messages: { id: string; conversationId: string; senderId: string; body: string; createdAt: string; readAt: string | null; productId?: string | null }[];
+  messages: { id: string; conversationId: string; senderId: string; body: string; createdAt: string; readAt: string | null; productId?: string | null; image?: string | null; offerId?: string | null }[];
+  offers?: { id: string; conversationId: string; productIds: string[]; priceCents: number; expiresAt: string; status: "open" | "used" | "withdrawn" }[];
   blocks: { blockerId: string; blockedId: string }[];
   reports: { id: string; reporterId: string; targetKind: ReportTarget; targetId: string; reason: ReportReason; details: string; createdAt: string; status: "open" | "actioned" | "dismissed" }[];
 }
@@ -167,7 +168,11 @@ export function createDemoApi(): Api {
       o.paidAt = t.toISOString();
       o.shipBy = shipBy(t).toISOString();
       const p = s.products.find((x) => x.id === o.product.id)!;
-      if (p.mode !== "order_now") { p.stock = Math.max(0, p.stock - 1); if (p.stock === 0) p.status = "sold_out"; }
+      for (const item of [p, ...(o.bundleIds ?? []).map((bid) => s.products.find((x) => x.id === bid)!).filter(Boolean)]) {
+        if (item.mode !== "order_now") { item.stock = Math.max(0, item.stock - 1); if (item.stock === 0) item.status = "sold_out"; }
+        item.heldFor = null; item.heldUntil = null;
+      }
+      if (o.offerId) (s.offers ?? []).forEach((of) => { if (of.id === o.offerId) of.status = "used"; });
       if (o.totals.creditUsed > 0) s.users.find((u) => u.id === o.buyerId)!.welcomeUsed = true;
       notify(o.shopOwnerId, `New order: ${title}`, "Ship within 2 days. The money is held safely until the return window closes.", `/sell/orders/${o.id}`);
       notify(o.buyerId, "Payment received", `Your money is held safely. We will tell you when ${title} ships.`, `/orders/${o.id}`);
@@ -214,15 +219,23 @@ export function createDemoApi(): Api {
     const p = s.products.find((x) => x.id === po.productId)!;
     return { postId: po.id, caption: po.caption, product: p, shop: publicShop(shopOf(po.shopId)), video: DEMO_CLIPS[po.id] ? { ...po.video, url: DEMO_CLIPS[po.id], kind: "video" } : { ...po.video, url: mediaUrl(po.video.url) } };
   };
+  const typingIn = new Set<string>();
+  const offerOf = (oid?: string | null) => {
+    const of = oid ? (s.offers ?? []).find((x) => x.id === oid) : undefined;
+    if (!of) return null;
+    const listedCents = of.productIds.reduce((n, pid) => n + (s.products.find((p) => p.id === pid)?.priceCents ?? 0), 0);
+    return { id: of.id, productIds: of.productIds, priceCents: of.priceCents, listedCents, expiresAt: of.expiresAt, status: of.status };
+  };
   const blockedBetween = (a: string, b: string) => s.blocks.some((x) => (x.blockerId === a && x.blockedId === b) || (x.blockerId === b && x.blockedId === a));
   const toConv = (c: State["conversations"][number], viewer: string) => {
     const sh = shopOf(c.shopId);
     const msgs = s.messages.filter((m) => m.conversationId === c.id);
-    const last = msgs[msgs.length - 1];
+    const lastMsg = msgs[msgs.length - 1];
+    const last = lastMsg && { ...lastMsg, body: lastMsg.offerId ? "Sent an offer" : lastMsg.body || (lastMsg.image ? "Sent a photo" : "") };
     return { id: c.id, shopId: sh.id, shopName: sh.name, shopHandle: sh.handle,
       otherName: c.buyerId === viewer ? sh.name : s.users.find((x) => x.id === c.buyerId)?.displayName || "Buyer",
       iAmSeller: c.buyerId !== viewer, lastBody: last?.body ?? null, lastAt: c.lastAt,
-      unread: msgs.filter((m) => m.senderId !== viewer && !m.readAt).length };
+      unread: msgs.filter((m) => m.senderId !== viewer && !m.readAt).length, buyerId: c.buyerId };
   };
   const visible = (po: DPost) => {
     const p = s.products.find((x) => x.id === po.productId);
@@ -247,7 +260,9 @@ export function createDemoApi(): Api {
       await wait();
       if (code.trim() !== CODE) throw new Error("That code did not work. In the demo, use 123456.");
       const key = contact.trim().toLowerCase();
-      let u = s.users.find((x) => x.email === key || x.phone === key);
+      // Demo: sign in as a sample shop owner to try the seller side of chats (lebo@, kamva@ or ayesha@shop.demo).
+      const SAMPLE: Record<string, string> = { "lebo@shop.demo": "u-lebo", "kamva@shop.demo": "u-luxe", "ayesha@shop.demo": "u-sweet" };
+      let u = SAMPLE[key] ? s.users.find((x) => x.id === SAMPLE[key]) : s.users.find((x) => x.email === key || x.phone === key);
       if (!u) {
         u = { id: id(), displayName: key.split("@")[0], trust: 50, welcomeUsed: false, admin: key.startsWith("admin"), createdAt: now().toISOString(),
           ...(key.includes("@") ? { email: key } : { phone: key }) };
@@ -291,12 +306,28 @@ export function createDemoApi(): Api {
       if (input.delivery === "courier" && !(input.deliveryDetails.address && input.deliveryDetails.name && input.deliveryDetails.phone))
         throw new Error("Add your name, phone and address for the courier.");
       if (p.mode === "order_now" && (!input.foodDate || !input.foodSlot)) throw new Error("Pick a date and time slot.");
+      if (p.heldFor && p.heldFor !== u.id && p.heldUntil && new Date(p.heldUntil) > new Date()) throw new Error("The seller is holding this item for someone else right now.");
+      let itemPrice = p.priceCents;
+      let bundleIds: string[] = [];
+      let title = p.title;
+      if (input.offerId) {
+        const of = (s.offers ?? []).find((x) => x.id === input.offerId);
+        const conv = of && s.conversations.find((c) => c.id === of.conversationId);
+        if (!of || !conv || conv.buyerId !== u.id) throw new Error("This offer is for someone else.");
+        if (of.status !== "open" || new Date(of.expiresAt) < new Date()) throw new Error("This offer has ended.");
+        if (of.productIds[0] !== p.id) throw new Error("This offer is for a different item.");
+        bundleIds = of.productIds.slice(1);
+        if (bundleIds.some((bid) => { const x = s.products.find((y) => y.id === bid); return !x || x.status !== "live" || (x.mode === "buy_now" && x.stock < 1); }))
+          throw new Error("Something in this bundle is no longer available.");
+        if (bundleIds.length) title = `Bundle: ${p.title} + ${bundleIds.length} more`;
+        itemPrice = of.priceCents;
+      }
       const paidBefore = s.orders.some((o) => o.buyerId === u.id && !["pending_payment", "cancelled"].includes(o.status));
-      const totals = orderTotals({ itemPrice: p.priceCents, delivery: input.delivery, welcomeCreditAvailable: !u.welcomeUsed && !paidBefore,
+      const totals = orderTotals({ itemPrice, delivery: input.delivery, welcomeCreditAvailable: !u.welcomeUsed && !paidBefore,
         foundingUntil: sh.foundingUntil ? new Date(sh.foundingUntil) : null, at: now() });
       const oid = id();
       const o: DOrder = {
-        id: oid, status: "pending_payment", mode: p.mode, product: { id: p.id, title: p.title }, shop: { id: sh.id, name: sh.name, handle: sh.handle },
+        id: oid, status: "pending_payment", mode: p.mode, product: { id: p.id, title }, bundleIds, offerId: input.offerId ?? null, shop: { id: sh.id, name: sh.name, handle: sh.handle },
         buyerId: u.id, shopOwnerId: sh.ownerId, size: input.size ?? null, delivery: input.delivery, deliveryDetails: input.deliveryDetails as Record<string, string>,
         foodDate: input.foodDate ?? null, foodSlot: input.foodSlot ?? null, totals, checkoutUrl: `/mock-pay/${oid}`, trackingRef: null,
         paidAt: null, shipBy: null, shippedAt: null, deliveredAt: null, releasableAt: null, createdAt: now().toISOString(), ret: null, review: null,
@@ -541,33 +572,69 @@ export function createDemoApi(): Api {
       s.messages.forEach((m) => { if (m.conversationId === cid && m.senderId !== u.id && !m.readAt) m.readAt = now().toISOString(); });
       save();
       return { conversation: toConv(c, u.id), messages: s.messages.filter((m) => m.conversationId === cid)
-        .map((m) => ({ id: m.id, body: m.body, createdAt: m.createdAt, mine: m.senderId === u.id, readAt: m.readAt, productId: m.productId ?? null })) };
+        .map((m) => ({ id: m.id, body: m.body, createdAt: m.createdAt, mine: m.senderId === u.id, readAt: m.readAt, productId: m.productId ?? null,
+          imageUrl: mediaUrl(m.image ?? null), offer: offerOf(m.offerId) })), typing: typingIn.has(cid) };
     },
-    async productCard(productId) {
+    async productItem(productId) {
       await mediaReady;
       const p = s.products.find((x) => x.id === productId);
       if (!p) return null;
       const post = s.posts.find((x) => x.productId === productId);
-      return { id: p.id, title: p.title, priceCents: p.priceCents, status: p.status, stock: p.stock, mode: p.mode, shopHandle: shopOf(p.shopId).handle,
-        video: post ? toFeed(post).video : null };
+      return post ? toFeed(post) : { postId: p.id, caption: p.title, product: p, shop: publicShop(shopOf(p.shopId)), video: {} };
     },
-    async sendMessage(cid, body, productId) {
+    async makeOffer(cid, productIds, priceCents, hours) {
+      const u = me();
+      const c = s.conversations.find((x) => x.id === cid);
+      if (!c || shopOf(c.shopId).ownerId !== u.id) throw new Error("Only the shop in this chat can make an offer.");
+      const items = productIds.map((pid) => s.products.find((p) => p.id === pid));
+      if (!productIds.length || items.some((p) => !p || p.shopId !== c.shopId || p.status !== "live")) throw new Error("Offers can only include live items from your shop.");
+      const listed = items.reduce((n, p) => n + p!.priceCents, 0);
+      if (priceCents > listed) throw new Error(`An offer can't be more than the listed price (R${listed / 100}).`);
+      if (priceCents < 1000) throw new Error("Offers start at R10.");
+      const of = { id: id(), conversationId: cid, productIds, priceCents, expiresAt: new Date(Date.now() + hours * 3600e3).toISOString(), status: "open" as const }; // real clock, not the demo time skip
+      s.offers = [...(s.offers ?? []), of];
+      s.messages.push({ id: id(), conversationId: cid, senderId: u.id, body: "", createdAt: now().toISOString(), readAt: null, offerId: of.id });
+      c.lastAt = now().toISOString();
+      notify(c.buyerId, "New offer", `${shopOf(c.shopId).name} sent you a special price.`, `/messages/${cid}`);
+      save();
+    },
+    async holdProduct(productId, buyerId, hours) {
+      const u = me();
+      const p = s.products.find((x) => x.id === productId);
+      if (!p || shopOf(p.shopId).ownerId !== u.id) throw new Error("Only the seller can hold this item.");
+      if (hours === 0) { p.heldFor = null; p.heldUntil = null; }
+      else { p.heldFor = buyerId; p.heldUntil = new Date(Date.now() + hours * 3600e3).toISOString(); }
+      save();
+    },
+    async shopReplyMinutes(shopId) {
+      if (shopId.startsWith("s-")) return { "s-lebo": 25, "s-luxe": 50, "s-sweet": 90 }[shopId] ?? null; // sample shops
+      const times = s.conversations.filter((c) => c.shopId === shopId).map((c) => {
+        const ms = s.messages.filter((m) => m.conversationId === c.id);
+        const asked = ms.find((m) => m.senderId === c.buyerId);
+        const answered = ms.find((m) => m.senderId !== c.buyerId && asked && m.createdAt > asked.createdAt);
+        return asked && answered ? (new Date(answered.createdAt).getTime() - new Date(asked.createdAt).getTime()) / 60000 : null;
+      }).filter((x): x is number => x !== null).sort((a, b) => a - b);
+      return times.length ? Math.round(times[Math.floor(times.length / 2)]) : null;
+    },
+    async sendMessage(cid, body, productId, image) {
       const u = me();
       const text = body.trim();
       const c = s.conversations.find((x) => x.id === cid);
-      if (!c || !text) return;
-      if (isRude(text)) throw new Error("Please keep it friendly. That message has words we don't allow.");
+      if (!c || (!text && !image)) return;
+      if (text && isRude(text)) throw new Error("Please keep it friendly. That message has words we don't allow.");
       const ownerId = shopOf(c.shopId).ownerId;
       if (blockedBetween(c.buyerId, ownerId)) throw new Error("You can't message this account.");
       if (productId && s.products.find((p) => p.id === productId)?.shopId !== c.shopId) throw new Error("That item is from a different shop.");
-      s.messages.push({ id: id(), conversationId: cid, senderId: u.id, body: text.slice(0, 1000), createdAt: now().toISOString(), readAt: null, productId: productId ?? null });
+      s.messages.push({ id: id(), conversationId: cid, senderId: u.id, body: text.slice(0, 1000), createdAt: now().toISOString(), readAt: null, productId: productId ?? null, image: image ? await stash(image) : null });
       c.lastAt = now().toISOString();
       const other = u.id === c.buyerId ? ownerId : c.buyerId;
       notify(other, "New message", text.slice(0, 80), `/messages/${cid}`);
       save();
       // Demo: sample shops answer after a moment so you can see a conversation.
       if (other.startsWith("u-") && !s.messages.some((m) => m.conversationId === cid && m.senderId === other)) {
+        window.setTimeout(() => typingIn.add(cid), 400); // "typing…" before the sample reply
         window.setTimeout(() => {
+          typingIn.delete(cid);
           s.messages.push({ id: id(), conversationId: cid, senderId: other, createdAt: now().toISOString(), readAt: null,
             body: "Hi! Thanks for asking. Yes, it's available. Please order through the app so your money stays protected." });
           c.lastAt = now().toISOString();

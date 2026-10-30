@@ -41,11 +41,13 @@ export interface Comment {
 }
 export interface Conversation {
   id: string; shopId: string; shopName: string; shopHandle: string; otherName: string; iAmSeller: boolean;
-  lastBody: string | null; lastAt: string; unread: number;
+  lastBody: string | null; lastAt: string; unread: number; buyerId: string;
 }
-export interface Message { id: string; body: string; createdAt: string; mine: boolean; readAt: string | null; productId: string | null }
-/** A small card for an item, used in chats. */
-export interface ProductCard { id: string; title: string; priceCents: Cents; status: ProductPublic["status"]; shopHandle: string; video: VideoSource | null; stock: number; mode: SaleMode }
+export interface Offer { id: string; productIds: string[]; priceCents: Cents; listedCents: Cents; expiresAt: string; status: "open" | "used" | "withdrawn" }
+export interface Message {
+  id: string; body: string; createdAt: string; mine: boolean; readAt: string | null; productId: string | null;
+  imageUrl: string | null; offer: Offer | null;
+}
 export interface BlockedPerson { userId: string; name: string; shopId: string | null; shopHandle: string | null }
 export interface OpenReport { id: string; targetKind: ReportTarget; targetId: string; reason: ReportReason; details: string; createdAt: string; summary: string }
 
@@ -82,6 +84,9 @@ export interface ProductPublic {
   leadDays: number | null;
   allergens: string | null;
   status: "draft" | "live" | "sold_out" | "removed";
+  /** Held by the seller for one buyer until this time. */
+  heldFor?: string | null;
+  heldUntil?: string | null;
 }
 
 export interface ShopPublic {
@@ -105,6 +110,8 @@ export interface CheckoutInput {
   foodDate?: string;
   foodSlot?: string;
   foodMessage?: string;
+  /** A special price (one item or a bundle) the seller sent in chat. */
+  offerId?: string;
 }
 
 export interface Order {
@@ -263,10 +270,18 @@ export interface Api {
   conversations(): Promise<Conversation[]>;
   /** Gets or starts the chat with a shop and returns its id. */
   openConversation(shopId: string): Promise<string>;
-  thread(conversationId: string): Promise<{ conversation: Conversation; messages: Message[] }>;
+  /** `typing`: the other person is typing right now. */
+  thread(conversationId: string): Promise<{ conversation: Conversation; messages: Message[]; typing?: boolean }>;
   /** `productId`: the item the message is about (from "Message seller" on a product). */
-  sendMessage(conversationId: string, body: string, productId?: string | null): Promise<void>;
-  productCard(productId: string): Promise<ProductCard | null>;
+  sendMessage(conversationId: string, body: string, productId?: string | null, image?: File | null): Promise<void>;
+  /** An item with its shop and video, for chat cards and buying from a chat. */
+  productItem(productId: string): Promise<FeedItem | null>;
+  /** Seller: a special price for one item or a bundle, sent as a message. */
+  makeOffer(conversationId: string, productIds: string[], priceCents: Cents, hours: number): Promise<void>;
+  /** Seller: hold an item for this buyer (0 hours releases it). */
+  holdProduct(productId: string, buyerId: string, hours: number): Promise<void>;
+  /** Median minutes a shop takes to answer a new chat, or null if not enough chats yet. */
+  shopReplyMinutes(shopId: string): Promise<number | null>;
   /** Posts reposted by the owners of shops the user follows, for the Following feed. */
   followingReposts(): Promise<FeedItem[]>;
   following(): Promise<ShopPublic[]>;

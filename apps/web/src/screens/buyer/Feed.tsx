@@ -11,6 +11,7 @@ import { Loading, R, Segmented, Sheet, TierPill } from "../../components/ui";
 import { CheckoutSheet } from "./Checkout";
 import { CommentsSheet } from "../../components/Comments";
 import { MoreSheet } from "../../components/Safety";
+import { useSwipe } from "../../components/gestures";
 import { useMessageShop } from "./Messages";
 
 type Tab = "for_you" | "following" | "live";
@@ -140,7 +141,10 @@ export function FeedList({ items, start = 0 }: { items: FeedItem[]; start?: numb
 
 function BuyButton({ item, onClick, block }: { item: FeedItem; onClick: () => void; block?: boolean }) {
   const p = item.product;
+  const { user } = useSession();
   const sold = p.mode === "buy_now" && (p.stock < 1 || p.status === "sold_out");
+  const held = !!p.heldFor && p.heldFor !== user?.id && !!p.heldUntil && new Date(p.heldUntil) > new Date();
+  if (held && !sold) return <button className={`btn ${block ? "block big" : ""}`} disabled><Icon name="lock" size={18} />On hold</button>;
   return (
     <button className={`btn green ${block ? "block big" : ""}`} onClick={onClick} disabled={sold}>
       <Icon name="bag" size={18} />{sold ? "Sold out" : p.mode === "order_now" ? "Order now" : "Buy now"}
@@ -172,6 +176,8 @@ function VideoCard({ item, counts, comments, onBrowse, onBuy, onComments, onMore
   const [start] = useState({ liked: isLiked, reposted: isReposted });
   const likes = (counts?.likes ?? 0) + (isLiked ? 1 : 0) - (start.liked ? 1 : 0);
   const reposts = (counts?.reposts ?? 0) + (isReposted ? 1 : 0) - (start.reposted ? 1 : 0);
+  // Swipe left on a video to open the shop, like TikTok.
+  const swipe = useSwipe({ onLeft: () => nav(`/s/${item.shop.handle}`) });
   const react = (kind: "like" | "repost") => (user ? toggleReaction(item.postId, kind) : nav("/signin"));
   const nav = useNavigate();
   const chip = statusChip(item);
@@ -189,7 +195,7 @@ function VideoCard({ item, counts, comments, onBrowse, onBuy, onComments, onMore
   ].filter(Boolean).join(" · ");
 
   return (
-    <section className="video-card" aria-label={`${p.title} from ${item.shop.name}`}>
+    <section className="video-card" aria-label={`${p.title} from ${item.shop.name}`} {...swipe}>
       <Video src={item.video} label={`Video: ${item.caption}`} productId={p.id} />
       <div className="shade" />
       <div className="info">

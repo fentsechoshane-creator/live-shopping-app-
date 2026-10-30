@@ -326,3 +326,29 @@ do $$ begin
   assert (select count(*) from orders where buyer_id = '00000000-0000-0000-0000-00000000000b') > 0, 'orders kept for the records';
 end $$;
 select 'safety, comment and message tests passed' as result;
+-- ===== Offers, holds, photos and reply time in chats =====
+set session_replication_role = replica; -- test setup: a live item in Other shop (owner e)
+insert into products (shop_id, title, price_cents, sizes, status, stock)
+  values ((select id from shops where handle = 'other.shop'), 'Satin scarf', 20000, '{}', 'live', 3);
+set session_replication_role = default;
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000d');
+insert into conversations (buyer_id, shop_id) select '00000000-0000-0000-0000-00000000000d', id from shops where handle = 'other.shop';
+insert into messages (conversation_id, sender_id, body) select id, '00000000-0000-0000-0000-00000000000d', 'Can you do a better price?' from conversations;
+select pg_temp.expect_error($$select make_offer((select id from conversations limit 1), array[(select id from products where title = 'Satin scarf')], 15000)$$, 'Only the shop');
+reset role;
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000e');
+select pg_temp.expect_error($$select make_offer((select id from conversations limit 1), array[(select id from products where title = 'Satin scarf')], 30000)$$, 'more than the listed price');
+select make_offer((select id from conversations limit 1), array[(select id from products where title = 'Satin scarf')], 15000);
+insert into messages (conversation_id, sender_id, body, offer_id) select c.id, '00000000-0000-0000-0000-00000000000e', '', o.id from conversations c, offers o;
+select hold_product((select id from products where title = 'Satin scarf'), '00000000-0000-0000-0000-00000000000d', 6);
+reset role;
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000d');
+select pg_temp.expect_error($$insert into messages (conversation_id, sender_id, body, offer_id) select c.id, '00000000-0000-0000-0000-00000000000d', '', o.id from conversations c, offers o$$, 'row-level security');
+select pg_temp.expect_error($$select hold_product((select id from products where title = 'Satin scarf'), '00000000-0000-0000-0000-00000000000d', 6)$$, 'Only the seller');
+do $$ begin
+  assert (select count(*) from offers) = 1, 'buyer sees the offer';
+  assert (select held_for from products where title = 'Satin scarf') = '00000000-0000-0000-0000-00000000000d', 'held for the buyer';
+  assert shop_reply_minutes((select id from shops where handle = 'other.shop')) is not null, 'reply time works';
+end $$;
+reset role;
+select 'offer, hold and reply time tests passed' as result;

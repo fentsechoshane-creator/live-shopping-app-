@@ -6,7 +6,8 @@ import { useLoad, useSession } from "../../session";
 import { Icon } from "../../components/Icon";
 import { useGoBack, BackButton, ErrorNote, Field, Loading, R, Segmented, Sheet, TierPill, timeAgo, useAction } from "../../components/ui";
 import { PostGrid } from "../../components/PostGrid";
-import { ConversationList, useMessageShop } from "./Messages";
+import { useTabSwipe } from "../../components/gestures";
+import { ConversationList, replyText, useMessageShop } from "./Messages";
 import { MoreSheet } from "../../components/Safety";
 import { OrderList } from "./Orders";
 
@@ -25,7 +26,7 @@ export function SignIn() {
       <BackButton />
       <h1 className="large-title" style={{ margin: "8px 0 6px" }}>Sign in</h1>
       <p className="muted" style={{ marginTop: 0 }}>One account for buying and selling. We send you a 6 digit code.</p>
-      {api.mode === "demo" && <div className="note amber" style={{ marginBottom: 14 }}>Demo: use any email and the code <b>123456</b>. An email starting with “admin” signs in as our team.</div>}
+      {api.mode === "demo" && <div className="note amber" style={{ marginBottom: 14 }}>Demo: use any email and the code <b>123456</b>. An email starting with “admin” signs in as our team. To try the seller side of chats, use <b>lebo@shop.demo</b>.</div>}
       <ErrorNote error={error} />
       {!sent ? (
         <form onSubmit={(e) => { e.preventDefault(); run(async () => { await api.sendCode(contact); setSent(true); }); }}>
@@ -54,6 +55,7 @@ type ActivityTab = "notifications" | "messages" | "orders";
 export function Activity() {
   const [params, setParams] = useSearchParams();
   const tab = (params.get("tab") as ActivityTab) || "notifications";
+  const swipeTabs = useTabSwipe(["notifications", "messages", "orders"] as const, tab, (v) => setParams({ tab: v }));
   const [items, error, reload] = useLoad(() => api.notifications(), []);
   const [orders] = useLoad(() => api.myOrders(), []);
   const unread = items?.filter((n) => !n.readAt).length ?? 0;
@@ -71,7 +73,7 @@ export function Activity() {
         { value: "orders", label: "Orders" },
       ]} />
       {tab === "orders" && orders && <div className="tiny-count">{orders.length} {orders.length === 1 ? "order" : "orders"} in total</div>}
-      <div style={{ marginTop: tab === "orders" ? 10 : 16 }}>
+      <div style={{ marginTop: tab === "orders" ? 10 : 16 }} {...swipeTabs} className="swipe-area">
         {tab === "notifications" && (
           <>
             <ErrorNote error={error} />
@@ -107,6 +109,8 @@ export function ShopPage() {
   const goBack = useGoBack("/explore");
   const loc = useLocation();
   const messageShop = useMessageShop();
+  const [replyMin] = useLoad(() => (data ? api.shopReplyMinutes(data.shop.id) : Promise.resolve(null)), [data?.shop.id]);
+  const swipeShopTabs = useTabSwipe(["posts", "likes", "reposts"] as const, tab, setTab);
   const [reacted] = useLoad(() => (data && tab !== "posts" ? api.reactedPosts(tab === "likes" ? "like" : "repost", data.shop.id) : Promise.resolve([])), [data?.shop.id, tab]);
   const nav = useNavigate();
   if (error) return <div className="screen"><ErrorNote error={error} /></div>;
@@ -141,6 +145,7 @@ export function ShopPage() {
         {shop.founding && <span className="standing green"><Icon name="check" size={12} strokeWidth={2.6} />Founding seller</span>}
       </div>
       {shop.bio && <p className="pbio">{shop.bio}</p>}
+      {replyText(replyMin) && <p className="pnote muted" style={{ marginTop: 4 }}><Icon name="chat" size={12} /> {replyText(replyMin)}</p>}
       <div className="row" style={{ marginTop: 12, gap: 8 }}>
         <button className={`btn grow ${isFollowing ? "" : "dark"}`} style={{ minHeight: 40 }}
           onClick={() => (user ? toggleFollow(shop.id) : nav("/signin"))}>{isFollowing ? "Following" : "Follow"}</button>
@@ -153,9 +158,11 @@ export function ShopPage() {
         <button role="tab" aria-selected={tab === "likes"} onClick={() => setTab("likes")}>Likes</button>
         <button role="tab" aria-selected={tab === "reposts"} onClick={() => setTab("reposts")}>Reposts</button>
       </div>
+      <div {...swipeShopTabs} className="swipe-area">
       {tab === "posts"
         ? <PostGrid items={items} openProductId={new URLSearchParams(loc.search).get("item")} empty={<div className="pempty">No videos yet.</div>} />
         : !reacted ? <Loading /> : <PostGrid items={reacted} empty={<div className="pempty">{tab === "likes" ? "No likes yet." : "No reposts yet."}</div>} />}
+      </div>
     </div>
   );
 }

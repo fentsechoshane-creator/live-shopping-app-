@@ -6,6 +6,7 @@ import { useLoad } from "../../session";
 import { Icon } from "../../components/Icon";
 import { Loading, useGoBack } from "../../components/ui";
 import { CreateListing } from "./Create";
+import { useTabSwipe } from "../../components/gestures";
 
 type Mode = "camera" | "create" | "live";
 
@@ -30,13 +31,14 @@ export function Post() {
   const nav = useNavigate();
   const close = useGoBack("/");
   const dark = mode !== "create";
+  const swipeModes = useTabSwipe(["camera", "create", "live"] as const, mode, setMode); // swipe between Camera, Create and Live
 
   if (shop === undefined) return <div className="post dark"><div className="cam"><div className="cam-msg"><Loading /></div></div></div>;
   // Only sellers can post. Without an open shop, ask first; "No" leaves you where you were.
   if (!shop || shop.status !== "open") return <div className="post dark"><SellerGate open onClose={close} /></div>;
 
   return (
-    <div className={`post ${dark ? "dark" : ""}`}>
+    <div className={`post ${dark ? "dark" : ""}`} {...(sub || mode === "create" ? {} : swipeModes)}>
       {mode === "camera" && <Camera onReview={setSub} onDone={(f) => { addShot(f); setFromCamera(true); setMode("create"); }} />}
       {mode === "create" && (
         <CreateListing shop={shop} media={media} onMedia={setMedia} startAtDetails={fromCamera}

@@ -17,7 +17,7 @@
 | Counterfeit blocking at listing | 🟡 | ❌ | 🟡 | 🟡 | ✅ |
 | Live selling | ✅ | ✅ | ✅ | ❌ | ❌ (stock check built) |
 | Live auctions | 🟡 | ❌ | ✅ | ❌ | ❌ |
-| Make an offer / bundles | ❌ | ❌ | 🟡 | ✅ | ❌ |
+| Make an offer / bundles | ❌ | ❌ | 🟡 | ✅ | ✅ seller special price and bundles in chat |
 | Camera with photo, video, limit | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Editing, filters, music, text | ✅ | ✅ | ❌ | ❌ | ❌ |
 | Step by step listing with AI suggestions and drafts | 🟡 | ❌ | 🟡 | ✅ | ✅ |
@@ -30,7 +30,7 @@
 
 **Where we are ahead for South Africa:** escrow on every order, clear returns, trust tiers, counterfeit blocking, founding seller 0% fee, R50 welcome credit, food "order now" with allergens.
 
-**Biggest gaps vs the greats:** live selling, push notifications, editing tools, offers, courier integration.
+**Biggest gaps vs the greats:** live selling, push notifications, editing tools, courier integration.
 
 # Are we a closed loop yet?
 

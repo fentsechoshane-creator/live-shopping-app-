@@ -223,7 +223,7 @@ function Slides({ cover, productId, label }: { cover: string; productId?: string
   }, [index, photos.length]);
   return (
     <>
-      <div className="slides" ref={ref} onPointerDown={() => (touched.current = true)}
+      <div className="slides" data-noswipe ref={ref} onPointerDown={() => (touched.current = true)}
         onScroll={(e) => setIndex(Math.round(e.currentTarget.scrollLeft / Math.max(1, e.currentTarget.clientWidth)))}>
         {photos.map((p, i) => <img key={p} src={p} alt={`${label}, photo ${i + 1} of ${photos.length}`} />)}
       </div>

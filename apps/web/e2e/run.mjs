@@ -39,6 +39,16 @@ page.on("pageerror", (e) => errors.push(e.message));
 let step = 0;
 const shot = (name) => (console.log("step", step + 1, name), page.screenshot({ path: `${shots}${String(++step).padStart(2, "0")}-${name}.png` }));
 const check = async (cond, msg) => { if (!(await cond)) throw new Error("Check failed: " + msg); };
+// Swipe on an element with real touch events (Chromium supports new Touch()).
+const swipe = (selector, dx, dy = 0, startX = 0.8, startY = 0.5) => page.evaluate(({ selector, dx, dy, startX, startY }) => {
+  const el = document.querySelector(selector);
+  const r = el.getBoundingClientRect();
+  const x = r.left + r.width * startX, y = r.top + Math.min(r.height * startY, 200);
+  const t = (cx, cy) => new Touch({ identifier: 1, target: el, clientX: cx, clientY: cy });
+  el.dispatchEvent(new TouchEvent("touchstart", { bubbles: true, touches: [t(x, y)], changedTouches: [t(x, y)] }));
+  el.dispatchEvent(new TouchEvent("touchmove", { bubbles: true, touches: [t(x + dx, y + dy)], changedTouches: [t(x + dx, y + dy)] }));
+  el.dispatchEvent(new TouchEvent("touchend", { bubbles: true, touches: [], changedTouches: [t(x + dx, y + dy)] }));
+}, { selector, dx, dy, startX, startY });
 const fakeFile = (name, type) => ({ name, mimeType: type, buffer: Buffer.from("demo file") });
 
 async function signOut() {
@@ -196,8 +206,11 @@ try {
   await shot("me-buying");
   await page.locator(".pstats button", { hasText: "Following" }).click(); // Following count opens the list
   await page.getByRole("dialog", { name: "Following" }).getByText("@thrift.with.lebo").waitFor();
-  await page.keyboard.press("Escape");
-  await page.getByRole("tab", { name: "Likes" }).click();
+  await swipe(".sheet-drag", 0, 160, 0.5, 0.2); // drag the sheet down to close it
+  await page.getByRole("dialog", { name: "Following" }).waitFor({ state: "detached" });
+  // Swipe left on the profile grid to move from Posts to Likes.
+  await swipe("#grid", -200);
+  await page.getByRole("tab", { name: "Likes", selected: true }).waitFor();
   await page.getByRole("button", { name: /Oversized tee, sand, R349/ }).waitFor(); // liked video shows on the profile
   await page.getByRole("tab", { name: "Reposts" }).click();
   await page.getByRole("button", { name: /Oversized tee, sand, R349/ }).click();
@@ -387,6 +400,35 @@ try {
   await page.waitForURL((u) => u.pathname === "/");
   await page.goto(`${BASE}/me`);
   await page.waitForURL(/signin/); // signed out
+
+  // ===== Selling in chat: the shop sends a special price and holds the item; the buyer buys from the chat =====
+  await signIn("lebo@shop.demo");
+  await page.goto(`${BASE}/activity?tab=messages`);
+  await page.getByRole("link", { name: /buyer/ }).first().click();
+  await page.waitForURL(/\/messages\//);
+  await page.getByRole("link", { name: /Oversized tee/ }).first().waitFor(); // the order shows inside the chat too
+  await page.getByRole("button", { name: "Add" }).click();
+  await page.getByRole("menuitem", { name: "Send a special price" }).click();
+  await page.getByLabel("Offer price (rand)").fill("300");
+  await page.getByRole("button", { name: "Send R300" }).click();
+  await page.getByText("Special price", { exact: true }).first().waitFor();
+  await page.getByRole("button", { name: "Add" }).click();
+  await page.getByRole("menuitem", { name: "Hold an item for them" }).click();
+  await page.getByRole("button", { name: "Hold for 6 hours" }).click();
+  await page.getByText(/I'm holding this for you/).waitFor();
+  await page.getByRole("group", { name: "Saved replies" }).getByRole("button", { name: "Yes, it's available." }).click();
+  await page.getByText("Yes, it's available.").last().waitFor();
+  await page.waitForTimeout(300);
+  await shot("chat-seller");
+  await signOut();
+  await signIn("buyer@test.co.za");
+  await page.goto(`${BASE}/activity?tab=messages`);
+  await page.getByRole("link", { name: /Lebo's Thrift/ }).first().click();
+  await page.getByRole("button", { name: "Buy for R300" }).click();
+  await page.getByRole("dialog", { name: "Checkout" }).getByText("special price", { exact: false }).waitFor();
+  await check(page.getByText(/Ends in (24|23) hours/).count().then((n) => n > 0), "offer ends in a day");
+  await page.waitForTimeout(400);
+  await shot("chat-offer-checkout");
 
   if (errors.length) throw new Error("Page errors: " + errors.join(" | "));
   console.log(`E2E passed. Screenshots in ${shots}`);

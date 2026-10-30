@@ -624,3 +624,35 @@ button.g3 { border: 0; padding: 0; display: block; width: 100%; }
 /* Scrolling columns must never squash their rows (the menu was cutting rows in half). */
 .drawer > *, .chat-body > *, .sheet-body > * { flex-shrink: 0; }
 .drawer .cell .s { white-space: normal; }
+.sheet-drag { touch-action: none; }
+
+/* ===== Chat: glass message box, offers, orders, typing ===== */
+.compose.glassy { gap: 6px; padding: 5px; border-radius: 999px; background: var(--glass); -webkit-backdrop-filter: blur(18px) saturate(180%); backdrop-filter: blur(18px) saturate(180%);
+  box-shadow: inset 0 1px 0 var(--glass-shine), 0 0 0 0.5px var(--hairline), 0 6px 20px rgba(0, 0, 0, 0.08); }
+.compose.glassy input { background: transparent; height: 38px; padding: 0 6px; }
+.compose.glassy .send { width: 38px; height: 38px; }
+.compose .plus { width: 38px; height: 38px; border-radius: 50%; border: 0; background: var(--surface-2); color: var(--ink); display: grid; place-items: center; flex-shrink: 0; }
+.chat-foot { background: transparent; border-top: 0; }
+.quick .edit { color: var(--blue); }
+.chat-photo { display: block; width: 100%; max-width: 230px; border-radius: 12px; margin: -3px -6px 6px; object-fit: cover; }
+.bubble.has-offer { min-width: 230px; }
+.offer-card { display: flex; flex-direction: column; gap: 6px; padding: 10px; margin: -3px -6px 6px; border-radius: 13px; background: rgba(255, 255, 255, 0.6); color: var(--ink); }
+.bubble:not(.mine) .offer-card { background: var(--surface-2); }
+.offer-tag { align-self: flex-start; padding: 2px 8px; border-radius: 999px; background: var(--green); color: #052e16; font-size: 11px; font-weight: 800; }
+.offer-price { display: flex; align-items: baseline; gap: 8px; }
+.offer-price s { opacity: 0.55; font-size: 13px; }
+.offer-price b { font-size: 22px; letter-spacing: -0.01em; }
+.offer-card .btn { min-height: 38px; font-size: 14px; }
+.chat-product { justify-content: space-between; }
+.cp-buy { flex-shrink: 0; height: 30px; padding: 0 12px; border-radius: 999px; border: 0; background: var(--green); color: #052e16; font-size: 12.5px; font-weight: 800; }
+.cp-held { color: var(--amber-text); font-weight: 700; }
+.order-event { align-self: center; display: flex; align-items: center; gap: 10px; width: 100%; max-width: 330px; padding: 10px 12px; margin: 4px 0; border-radius: 14px;
+  background: var(--glass); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); box-shadow: 0 0 0 0.5px var(--hairline); font-size: 13.5px; color: var(--ink); }
+.bubble.typing { display: inline-flex; gap: 4px; padding: 12px 14px; width: auto; }
+.bubble.typing span { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-3); animation: dot 1s infinite ease-in-out; }
+.bubble.typing span:nth-child(2) { animation-delay: 0.15s; }
+.bubble.typing span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes dot { 0%, 80%, 100% { opacity: 0.3; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
+.tick-box { width: 22px; height: 22px; border-radius: 7px; border: 2px solid var(--hairline); display: grid; place-items: center; flex-shrink: 0; color: #fff; }
+.tick-box.round { border-radius: 50%; }
+.tick-box.on { background: var(--green); border-color: var(--green); }

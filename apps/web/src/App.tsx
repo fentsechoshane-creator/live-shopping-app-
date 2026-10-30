@@ -1,5 +1,6 @@
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useSwipe } from "./components/gestures";
 import { api } from "./api";
 import { useLoad, useSession } from "./session";
 import { Icon } from "./components/Icon";
@@ -65,6 +66,7 @@ function SideMenu() {
   const [shop] = useLoad(() => (user && menuOpen ? api.myShop() : Promise.resolve(null)), [user?.id, menuOpen]);
   const [admin] = useLoad(() => (user && menuOpen ? api.isAdmin() : Promise.resolve(false)), [user?.id, menuOpen]);
   const [deleting, setDeleting] = useState(false);
+  const swipeClose = useSwipe({ onRight: () => setMenuOpen(false) }); // swipe the menu away
   if (!menuOpen || !user) return null;
   // Deleting: show only the confirm sheet, not the menu behind it.
   if (deleting) return <DeleteAccountSheet onClose={() => { setDeleting(false); setMenuOpen(false); }} />;
@@ -72,7 +74,7 @@ function SideMenu() {
   const name = user.displayName || user.email?.split("@")[0] || "You";
   return (
     <div className="drawer-backdrop" onClick={(e) => e.target === e.currentTarget && setMenuOpen(false)}>
-      <aside className="drawer glass" role="dialog" aria-modal="true" aria-label="Menu and settings">
+      <aside className="drawer glass" role="dialog" aria-modal="true" aria-label="Menu and settings" {...swipeClose}>
         <div className="row between" style={{ marginBottom: 14 }}>
           <div className="row">
             <span className="avatar" style={{ width: 44, height: 44, fontSize: 18 }}>{name[0]?.toUpperCase()}</span>
@@ -145,9 +147,22 @@ const guard = (el: ReactNode) => <RequireUser>{el}</RequireUser>;
 
 export function App() {
   const loc = useLocation();
+  const nav = useNavigate();
+  // Swipe in from the left edge to go back, like iPhone apps. Not on the main tabs.
+  const edgeStart = useRef<{ x: number; y: number } | null>(null);
+  const isTabRoot = ["/", "/explore", "/activity", "/me", "/post"].includes(loc.pathname);
+  const edgeBack = {
+    onTouchStart: (e: React.TouchEvent) => { const t = e.touches[0]; edgeStart.current = t.clientX < 24 && !isTabRoot ? { x: t.clientX, y: t.clientY } : null; },
+    onTouchEnd: (e: React.TouchEvent) => {
+      const s = edgeStart.current; edgeStart.current = null;
+      if (!s) return;
+      const t = e.changedTouches[0];
+      if (t.clientX - s.x > 70 && Math.abs(t.clientY - s.y) < 60) (loc.key !== "default" ? nav(-1) : nav("/"));
+    },
+  };
   return (
     <div className="phone">
-      <div className="content">
+      <div className="content" {...edgeBack}>
         <Routes>
           <Route path="/" element={<Feed />} />
           <Route path="/explore" element={<Explore />} />

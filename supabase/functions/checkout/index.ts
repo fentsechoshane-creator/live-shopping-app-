@@ -11,13 +11,13 @@ const FOOD: DeliveryOption[] = ["collect_baker", "baker_delivers"];
 Deno.serve(handler(async (req, body) => {
   const db = adminClient();
   const uid = await requireUser(req, db);
-  const { productId, size, delivery, deliveryDetails = {}, foodDate, foodSlot, foodMessage } = body ?? {};
+  const { productId, size, delivery, deliveryDetails = {}, foodDate, foodSlot, foodMessage, offerId } = body ?? {};
   if (!productId) throw new UserError("Pick an item first.");
   if (!(delivery in DELIVERY_OPTIONS)) throw new UserError("Pick a delivery option.");
 
   const product = must(
     await db.from("products")
-      .select("id, title, price_cents, mode, sizes, stock, status, lead_days, shop_id, shops!inner(id, owner_id, status, name, founding_until, seller_checks(escrow_token))")
+      .select("id, title, price_cents, mode, sizes, stock, status, lead_days, shop_id, held_for, held_until, shops!inner(id, owner_id, status, name, founding_until, seller_checks(escrow_token))")
       .eq("id", productId).single(),
     "load product",
   ) as any;
@@ -26,6 +26,28 @@ Deno.serve(handler(async (req, body) => {
   if (shop.owner_id === uid) throw new UserError("You cannot buy your own item.");
   if (product.mode === "auction") throw new UserError("Auctions are not open yet.");
   if (product.mode === "buy_now" && product.stock < 1) throw new UserError("Sold out.");
+  if (product.held_for && product.held_for !== uid && new Date(product.held_until) > new Date())
+    throw new UserError("The seller is holding this item for someone else right now.");
+
+  // A special price from the seller in chat, for this item or a bundle.
+  let itemPrice = product.price_cents as number;
+  let bundleIds: string[] = [];
+  let title = product.title as string;
+  if (offerId) {
+    const offer = must(await db.from("offers").select("*").eq("id", offerId).single(), "load offer") as any;
+    if (offer.buyer_id !== uid) throw new UserError("This offer is for someone else.");
+    if (offer.status !== "open" || new Date(offer.expires_at) < new Date()) throw new UserError("This offer has ended.");
+    if (offer.product_ids[0] !== product.id) throw new UserError("This offer is for a different item.");
+    bundleIds = offer.product_ids.slice(1);
+    if (bundleIds.length) {
+      const extras = must(await db.from("products").select("id, status, stock, mode, shop_id, held_for, held_until").in("id", bundleIds), "load bundle") as any[];
+      if (extras.length !== bundleIds.length || extras.some((x) => x.status !== "live" || x.shop_id !== product.shop_id || (x.mode === "buy_now" && x.stock < 1)
+        || (x.held_for && x.held_for !== uid && new Date(x.held_until) > new Date())))
+        throw new UserError("Something in this bundle is no longer available.");
+      title = `Bundle: ${product.title} + ${bundleIds.length} more`;
+    }
+    itemPrice = offer.price_cents;
+  }
   if (product.sizes?.length && !product.sizes.includes(size)) throw new UserError("Pick a size.");
   const allowed = product.mode === "order_now" ? FOOD : NON_FOOD;
   if (!allowed.includes(delivery)) throw new UserError("That delivery option is not available for this item.");
@@ -46,7 +68,7 @@ Deno.serve(handler(async (req, body) => {
     .eq("buyer_id", uid).not("status", "in", "(pending_payment,cancelled)");
 
   const t = orderTotals({
-    itemPrice: product.price_cents,
+    itemPrice,
     delivery,
     welcomeCreditAvailable: !profile.welcome_credit_used && (paidBefore ?? 0) === 0,
     foundingUntil: shop.founding_until ? new Date(shop.founding_until) : null,
@@ -71,13 +93,14 @@ Deno.serve(handler(async (req, body) => {
     item_price_cents: t.itemPrice, delivery, delivery_fee_cents: t.deliveryFee, protection_fee_cents: t.protectionFee,
     credit_cents: t.creditUsed, credit_topup_cents: t.creditTopUp, total_cents: t.total, seller_fee_cents: t.sellerFee, seller_payout_cents: t.sellerPayout,
     delivery_details: deliveryDetails, food_date: foodDate ?? null, food_slot: foodSlot ?? null, food_message: foodMessage ?? null,
+    bundle_product_ids: bundleIds, offer_id: offerId ?? null,
   }), "create order");
 
   const days = ESCROW_DAYS[product.mode as keyof typeof ESCROW_DAYS];
   const tx = await es.createTransaction({
     reference: orderId,
-    title: product.title.slice(0, 60),
-    description: `${product.title} from ${shop.name}`,
+    title: title.slice(0, 60),
+    description: `${title} from ${shop.name}`,
     buyerToken, sellerToken,
     amountCents: t.total,
     // Our cut inside escrow. If the welcome credit is bigger, it is 0 and we top the seller up ourselves.

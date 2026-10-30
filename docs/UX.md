@@ -17,7 +17,8 @@ Use these with docs/DESIGN.md on every new screen. They come from common practic
 11. **Ask before a dead end.** If someone can't do something (a buyer tapping +), explain why in one sentence and offer Yes or No. No changes nothing.
 12. **Give the real reason and the next step.** "You can't go live without stock. You have 1 of 5." plus a button that fixes it.
 13. **Hide what you don't need right now.** Bars and switches disappear on later steps so the task fills the screen.
-14. **Plain words.** Short sentences, no jargon, no hyphens or em dashes in app text.
+14. **Swipe where it's natural, tap still works.** Sheets drag down to close, the left edge swipes back, tabs swipe sideways, videos swipe left to the shop. Every swipe also has a button.
+15. **Plain words.** Short sentences, no jargon, no hyphens or em dashes in app text.
 
 ## Ideas for later
 

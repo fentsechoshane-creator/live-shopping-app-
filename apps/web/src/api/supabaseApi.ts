@@ -88,7 +88,7 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
 
   const toConversation = (r: any): Conversation => ({
     id: r.id, shopId: r.shop_id, shopName: r.shop_name, shopHandle: r.shop_handle, otherName: r.other_name, iAmSeller: r.i_am_seller,
-    lastBody: r.last_body, lastAt: r.last_at, unread: r.unread,
+    lastBody: r.last_body, lastAt: r.last_at, unread: r.unread, buyerId: r.buyer_id,
   });
   const feedItem = (r: any): FeedItem => ({
     postId: r.post_id, caption: r.caption,
@@ -312,20 +312,42 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
       const convs = (check(await sb.rpc("my_conversations")) as any[]).map(toConversation);
       const conversation = convs.find((c) => c.id === conversationId);
       if (!conversation) throw new Error("This chat isn't available.");
-      const rows = check(await sb.from("messages").select("id, body, created_at, sender_id, read_at, product_id").eq("conversation_id", conversationId).order("created_at")) as any[];
+      const rows = check(await sb.from("messages").select("id, body, created_at, sender_id, read_at, product_id, image_path, offers(id, product_ids, price_cents, expires_at, status)")
+        .eq("conversation_id", conversationId).order("created_at")) as any[];
+      const offerIds = rows.flatMap((r) => r.offers?.product_ids ?? []);
+      const prices = offerIds.length ? Object.fromEntries(((await sb.from("products").select("id, price_cents").in("id", offerIds)).data ?? []).map((p: any) => [p.id, p.price_cents])) : {};
+      const images = await Promise.all(rows.map(async (r) => (r.image_path ? (await sb.storage.from("private").createSignedUrl(r.image_path, 3600)).data?.signedUrl ?? null : null)));
       await sb.from("messages").update({ read_at: new Date().toISOString() }).eq("conversation_id", conversationId).neq("sender_id", me).is("read_at", null);
-      return { conversation, messages: rows.map((r) => ({ id: r.id, body: r.body, createdAt: r.created_at, mine: r.sender_id === me, readAt: r.read_at, productId: r.product_id })) };
+      return { conversation, messages: rows.map((r, i) => ({ id: r.id, body: r.body, createdAt: r.created_at, mine: r.sender_id === me, readAt: r.read_at, productId: r.product_id,
+        imageUrl: images[i],
+        offer: r.offers ? { id: r.offers.id, productIds: r.offers.product_ids, priceCents: r.offers.price_cents, expiresAt: r.offers.expires_at, status: r.offers.status,
+          listedCents: r.offers.product_ids.reduce((n: number, id: string) => n + (prices[id] ?? 0), 0) } : null })) };
     },
-    async sendMessage(conversationId, body, productId) {
-      check(await sb.from("messages").insert({ conversation_id: conversationId, sender_id: await uid(), body: body.trim(), product_id: productId ?? null }));
+    async sendMessage(conversationId, body, productId, image) {
+      const imagePath = image ? await upload("private", image, "chat") : null;
+      check(await sb.from("messages").insert({ conversation_id: conversationId, sender_id: await uid(), body: body.trim(), product_id: productId ?? null, image_path: imagePath }));
     },
-    async productCard(productId) {
-      const p = (await sb.from("products").select("id, title, price_cents, status, stock, mode, shops(handle)").eq("id", productId).maybeSingle()).data as any;
+    async productItem(productId) {
+      const p = (await sb.from("products").select("*, shops(id, name, handle, category)").eq("id", productId).maybeSingle()).data as any;
       if (!p) return null;
-      const post = (await sb.from("posts").select("media(mux_playback_id, storage_path)").eq("product_id", productId).order("created_at", { ascending: false }).limit(1).maybeSingle()).data as any;
+      const post = (await sb.from("posts").select("id, caption, media(mux_playback_id, storage_path)").eq("product_id", productId).order("created_at", { ascending: false }).limit(1).maybeSingle()).data as any;
       const m = post?.media;
-      return { id: p.id, title: p.title, priceCents: p.price_cents, status: p.status, stock: p.stock, mode: p.mode, shopHandle: p.shops?.handle ?? "",
-        video: m ? { muxPlaybackId: m.mux_playback_id, url: videoUrl(m.storage_path), kind: isImage(m.storage_path) ? "image" : "video" } : null };
+      return {
+        postId: post?.id ?? p.id, caption: post?.caption ?? p.title, product: { ...toProduct(p), heldFor: p.held_for, heldUntil: p.held_until },
+        shop: { id: p.shops.id, name: p.shops.name, handle: p.shops.handle, category: p.shops.category, trustScore: 50, tier: "standard" },
+        video: m ? { muxPlaybackId: m.mux_playback_id, url: videoUrl(m.storage_path), kind: isImage(m.storage_path) ? "image" : "video" } : {},
+      };
+    },
+    async makeOffer(conversationId, productIds, priceCents, hours) {
+      const offerId = check(await sb.rpc("make_offer", { p_conversation: conversationId, p_products: productIds, p_price: priceCents, p_hours: hours })) as string;
+      check(await sb.from("messages").insert({ conversation_id: conversationId, sender_id: await uid(), body: "", offer_id: offerId }));
+    },
+    async holdProduct(productId, buyerId, hours) {
+      check(await sb.rpc("hold_product", { p_product: productId, p_buyer: buyerId, p_hours: hours }));
+    },
+    async shopReplyMinutes(shopId) {
+      const { data } = await sb.rpc("shop_reply_minutes", { p_shop: shopId });
+      return typeof data === "number" ? data : null;
     },
 
     async following() {

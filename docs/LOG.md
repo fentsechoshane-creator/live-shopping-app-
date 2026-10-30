@@ -57,7 +57,7 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 
 ## Next up
 
-- Store must haves are built. Still needed: real company details and support email in the privacy page, a lawyer's review, and apply migrations 0009 to 0011 plus deploy `delete-account` and `suggest-listing` on the live project.
+- Store must haves are built. Still needed: real company details and support email in the privacy page, a lawyer's review, and apply migrations 0009 to 0012 plus deploy `delete-account`, `suggest-listing` and the updated `checkout` on the live project.
 - Set up Apple and Google developer accounts now (D-U-N-S first for a company account) and start Google's 12 tester, 14 day closed test early. [Ofentse and Lehloma]
 
 - Apply migrations 0009 (public likes and reposts) and 0010 (listing photos) to the live Supabase project, and deploy the `suggest-listing` function.
@@ -69,6 +69,22 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 - Live streams with auctions are shown as "coming next". Comments and messages are built.
 
 ## Log
+
+### 2026-10-30: Swipes, and selling inside chats
+- **Swipes** (`components/gestures.ts`): drag any sheet down to close it; swipe in from the left edge to go back on inner screens; swipe left or right to change tabs on the profile, shop pages and Activity; swipe the menu to the right to close it; swipe between Camera, Create and Live; swipe left on a video to open the shop (like TikTok). Photo slideshows keep their own sideways swipe.
+- **Chat message box** is a glass bubble with a + button.
+- **Buy now on the item card** in a chat (buyers), straight into checkout.
+- **Order updates in the chat:** orders between that buyer and shop show in the conversation with their current status, and open the order.
+- **Special price (offer):** seller taps + > Send a special price, picks one item or several (a bundle), sets a price (never above the listed total) and how long it lasts (6, 24 or 48 hours). The buyer sees the card and taps "Buy for R…"; checkout charges that price and stays in escrow. Server checks it in `checkout` (offer belongs to the buyer, still open, not expired).
+- **Bundles:** an offer with several items becomes one order, one delivery fee; all items' stock goes down when paid (`orders.bundle_product_ids`).
+- **Hold an item:** seller holds an item for that buyer for 2, 6 or 24 hours; others see "On hold" and checkout refuses them. Paying releases the hold.
+- **Photos in chat:** + > Send a photo (stored privately; only the two people in the chat can open it).
+- **Saved replies** for sellers: one tap to send, edit the list (saved on the phone for now).
+- **"Usually replies within …"** on shop pages and in the chat header (median first answer time, last 60 days).
+- **Typing indicator** in the chat (demo shows it before a sample shop replies; live needs Supabase Realtime presence, next).
+- **Push notifications** need the native app (Lehloma) or web push keys; not built yet. In app notifications already cover new messages and offers.
+- Database: migration 0012 (offers, make_offer, message photos and offers, holds, bundles, reply time). Tested locally. Not yet applied to the live project, with 0009 to 0011. [Open]
+- Demo: sign in as **lebo@shop.demo** to try the seller side of chats.
 
 ### 2026-10-30: Item in chats, sizing pass
 - "Message seller about this" (item sheet) and Message in a post's menu now attach the item: the chat opens with "Asking about [item]" above the box and quick questions (Is this still available? What sizes do you have? Can I see more photos? When can you ship?). The first message carries the item as a card (picture, title, price, Sold out if gone) that opens the item in the shop. Database: `messages.product_id` (must be from the chat's shop), in migration 0011.

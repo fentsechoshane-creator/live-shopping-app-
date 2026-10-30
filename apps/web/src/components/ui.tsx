@@ -8,6 +8,21 @@ export const R = (c: Cents) => formatRand(c);
 /** Bottom sheet in frosted glass. Escape and tapping outside close it. */
 export function Sheet({ title, onClose, children, footer }: { title: string; onClose: () => void; children: ReactNode; footer?: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
+  // Drag the top of the sheet down to close it, like iOS.
+  const drag = useRef<{ y: number; dy: number } | null>(null);
+  const onDragStart = (e: React.TouchEvent) => { drag.current = { y: e.touches[0].clientY, dy: 0 }; if (ref.current) ref.current.style.transition = "none"; };
+  const onDragMove = (e: React.TouchEvent) => {
+    if (!drag.current || !ref.current) return;
+    drag.current.dy = Math.max(0, e.touches[0].clientY - drag.current.y);
+    ref.current.style.transform = `translateY(${drag.current.dy}px)`;
+  };
+  const onDragEnd = () => {
+    const d = drag.current; drag.current = null;
+    if (!ref.current || !d) return;
+    ref.current.style.transition = "transform 0.2s ease";
+    if (d.dy > 90) { ref.current.style.transform = "translateY(100%)"; window.setTimeout(onClose, 180); }
+    else ref.current.style.transform = "";
+  };
   useEffect(() => {
     const prev = document.activeElement as HTMLElement | null;
     ref.current?.focus({ preventScroll: true });
@@ -18,10 +33,12 @@ export function Sheet({ title, onClose, children, footer }: { title: string; onC
   return (
     <div className="sheet-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="sheet glass" role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} ref={ref}>
+        <div className="sheet-drag" onTouchStart={onDragStart} onTouchMove={onDragMove} onTouchEnd={onDragEnd} onTouchCancel={onDragEnd}>
         <div className="grabber" />
         <div className="sheet-head">
           <h2>{title}</h2>
           <button className="icon-btn" onClick={onClose} aria-label="Close"><Icon name="close" /></button>
+        </div>
         </div>
         <div className="sheet-body">{children}</div>
         {footer && <div className="sheet-foot">{footer}</div>}
