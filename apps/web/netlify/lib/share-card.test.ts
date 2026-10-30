@@ -1,4 +1,4 @@
-// Run: node --experimental-strip-types netlify/edge-functions/share-card.test.ts
+// Run: node --experimental-strip-types netlify/lib/share-card.test.ts
 import assert from "node:assert/strict";
 import { cardHtml, isPreviewBot, rand } from "./share-card.ts";
 

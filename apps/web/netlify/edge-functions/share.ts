@@ -4,7 +4,7 @@
 // Runs on Netlify (the web host) [CONFIRM host]. Needs VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY
 // in the host's settings: both are public values, never the secret service key.
 import type { Config, Context } from "https://edge.netlify.com";
-import { cardHtml, isPreviewBot, rand } from "./share-card.ts";
+import { cardHtml, isPreviewBot, rand } from "../lib/share-card.ts";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
