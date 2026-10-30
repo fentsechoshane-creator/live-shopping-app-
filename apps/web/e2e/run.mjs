@@ -245,7 +245,7 @@ try {
   await page.keyboard.press("Escape");
 
   await page.goto(`${BASE}/activity`);
-  await page.getByText("Payment received").waitFor();
+  await page.getByText("Payment received").first().waitFor();
   await shot("activity");
   await page.getByRole("button", { name: "Orders", exact: true }).click();
   await page.getByText("Oversized tee, sand").first().waitFor();

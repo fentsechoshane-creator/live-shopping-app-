@@ -79,6 +79,19 @@ try {
   await shot("order-cake");
   await page.keyboard.press("Escape");
 
+  // Auction: feed card and the bid sheet
+  await page.goto(BASE);
+  const jacket = page.getByRole("region", { name: /Vintage 90s denim jacket/ });
+  await jacket.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(1500);
+  await shot("feed-auction");
+  await jacket.getByRole("button", { name: /^Bid ·/ }).click();
+  const bidSheet = page.getByRole("dialog", { name: /Vintage 90s denim jacket/ });
+  await bidSheet.getByText("Recent bids").waitFor();
+  await shot("auction-sheet");
+  await page.keyboard.press("Escape");
+  await page.goto(BASE);
+
   // Chat with a special price (selling in chat)
   await page.getByRole("region", { name: /Oversized tee/ }).getByRole("button", { name: "More options" }).click();
   await page.getByRole("button", { name: /^Message @/ }).click();
