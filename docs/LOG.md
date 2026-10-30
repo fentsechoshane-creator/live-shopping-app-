@@ -70,6 +70,9 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 
 ## Log
 
+### 2026-10-30: Smooth progress bar
+- The bar now moves every frame straight from the video (requestAnimationFrame and a GPU transform) instead of on the browser's time updates, which only come about 4 times a second. It glides now, in the demo and the real app.
+
 ### 2026-10-30: Sound always on, cleaner feed, glass progress bar
 - Sound is always on, like TikTok; the phone's volume buttons control it. The sound button is gone. Browsers only allow sound after the first tap, so a video can start silent until then, and that first tap turns sound on instead of pausing. A native app can play with sound straight away.
 - Comments moved beside the item, next to like and repost (three small glass buttons). The row under it is just Buy now and Share.

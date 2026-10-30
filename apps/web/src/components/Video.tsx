@@ -152,6 +152,23 @@ function Player({ hlsUrl, url, poster, label }: { hlsUrl: string | null; url: st
   };
 
   const pct = length ? (time / length) * 100 : 0;
+  // Move the bar every frame (60 times a second) straight from the video, so it glides instead of stepping.
+  const fillRef = useRef<HTMLSpanElement>(null);
+  const knobRef = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    let raf = 0;
+    const tick = () => {
+      const v = ref.current;
+      if (v && v.duration && !scrubbing) {
+        const p = Math.min(1, v.currentTime / v.duration);
+        if (fillRef.current) fillRef.current.style.transform = `scaleX(${p})`;
+        if (knobRef.current) knobRef.current.style.left = `${p * 100}%`;
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    if (onScreen && !paused) raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [onScreen, paused, scrubbing]);
   return (
     <>
       <video ref={ref} src={hlsUrl ? undefined : url ?? undefined} poster={poster} loop playsInline aria-label={label}
@@ -177,8 +194,8 @@ function Player({ hlsUrl, url, poster, label }: { hlsUrl: string | null; url: st
             if (e.key === "ArrowLeft") v.currentTime = Math.max(0, v.currentTime - 5);
             if (e.key === "ArrowRight") v.currentTime = Math.min(length, v.currentTime + 5);
           }}>
-          <span className="vfill" style={{ width: `${pct}%` }} />
-          <span className="vknob" style={{ left: `${pct}%` }} />
+          <span className="vfill" ref={fillRef} style={{ transform: `scaleX(${pct / 100})` }} />
+          <span className="vknob" ref={knobRef} style={{ left: `${pct}%` }} />
         </div>
       </div>
     </>
