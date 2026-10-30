@@ -70,6 +70,11 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 
 ## Log
 
+### 2026-10-30: Item in chats, sizing pass
+- "Message seller about this" (item sheet) and Message in a post's menu now attach the item: the chat opens with "Asking about [item]" above the box and quick questions (Is this still available? What sizes do you have? Can I see more photos? When can you ship?). The first message carries the item as a card (picture, title, price, Sold out if gone) that opens the item in the shop. Database: `messages.product_id` (must be from the chat's shop), in migration 0011.
+- Sizing pass: the menu was squashing rows (Returns and help, Privacy, Data saver cut in half); scrolling columns no longer shrink their rows. Feed product strip is slimmer (title 13px, price 14px, smaller picture). Checkout size buttons smaller.
+- Ideas for chat suggested to Ofentse: Buy now on the chat card, seller custom price or offer, order updates inside the chat, photos in chat, saved replies, "usually replies in" badge, hold an item, bundles.
+
 ### 2026-10-30: Back buttons everywhere
 - Added Back to Returns and help, My orders, the test payment page, Team and Page not found.
 - One back rule for the whole app (`useGoBack` and `BackButton` in `components/ui.tsx`): go to the previous screen; if the screen was opened directly (a link or a refresh), go to a sensible screen instead. Shop pages, chats, the post screen's X, shop sign up and seller screens all use it. Added to docs/UX.md.

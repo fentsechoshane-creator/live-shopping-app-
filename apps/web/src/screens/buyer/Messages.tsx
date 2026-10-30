@@ -1,19 +1,24 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { isRude, looksOffApp } from "@app/core";
-import { api } from "../../api";
+import { api, type ProductCard } from "../../api";
+import { ProductArt } from "../../components/Scene";
 import { useLoad, useSession } from "../../session";
 import { Icon } from "../../components/Icon";
-import { ErrorNote, Loading, timeAgo, useAction, useGoBack } from "../../components/ui";
+import { ErrorNote, Loading, R, swatch, timeAgo, useAction, useGoBack } from "../../components/ui";
 import { ReportSheet } from "../../components/Safety";
 
 /** Opens (or starts) the chat with a shop. Signed out people go to sign in first. */
 export function useMessageShop() {
   const { user, toast } = useSession();
   const nav = useNavigate();
-  return async (shopId: string) => {
+  /** `productId` attaches that item to the chat, so the seller knows what you're asking about. */
+  return async (shopId: string, productId?: string) => {
     if (!user) return nav("/signin");
-    try { nav(`/messages/${await api.openConversation(shopId)}`); } catch (e: any) { toast(e?.message ?? "Couldn't open the chat."); }
+    try {
+      const id = await api.openConversation(shopId);
+      nav(`/messages/${id}${productId ? `?about=${productId}` : ""}`);
+    } catch (e: any) { toast(e?.message ?? "Couldn't open the chat."); }
   };
 }
 
@@ -47,6 +52,8 @@ export function Thread() {
   const { id = "" } = useParams();
   const [data, error, reload] = useLoad(() => api.thread(id), [id]);
   const [text, setText] = useState("");
+  const [params, setParams] = useSearchParams();
+  const about = params.get("about"); // the item from "Message seller", attached to the next message
   const [menu, setMenu] = useState(false);
   const [reporting, setReporting] = useState(false);
   const { busy, error: sendError, run, setError } = useAction();
@@ -64,7 +71,12 @@ export function Thread() {
   const risky = data.messages.some((m) => !m.mine && looksOffApp(m.body));
   const send = () => {
     if (isRude(text)) return setError("Please keep it friendly. That message has words we don't allow.");
-    run(async () => { await api.sendMessage(id, text); setText(""); reload(); });
+    run(async () => {
+      await api.sendMessage(id, text, about);
+      setText("");
+      if (about) setParams({}, { replace: true });
+      reload();
+    });
   };
 
   if (reporting) {
@@ -87,6 +99,7 @@ export function Thread() {
         <div className="chat-tip"><Icon name="shield" size={14} />Keep payments in the app. Your money is only protected when you pay here.</div>
         {data.messages.map((m) => (
           <div key={m.id} className={`bubble ${m.mine ? "mine" : ""}`}>
+            {m.productId && <ChatProduct productId={m.productId} />}
             {m.body}
             <span className="when">{timeAgo(m.createdAt)}{m.mine && m.readAt ? " · Seen" : ""}</span>
           </div>
@@ -98,8 +111,24 @@ export function Thread() {
       <div className="chat-foot">
         <ErrorNote error={sendError} />
         {looksOffApp(text) && <div className="small" style={{ color: "var(--amber-text)", margin: "0 4px 6px" }}>Sharing numbers or bank details moves you outside buyer protection.</div>}
+        {about && (
+          <>
+            <div className="attach">
+              <span className="small muted">Asking about</span>
+              <ChatProduct productId={about} compact />
+              <button className="bare" onClick={() => setParams({}, { replace: true })} aria-label="Remove item"><Icon name="close" size={16} /></button>
+            </div>
+            {!text && (
+              <div className="quick" role="group" aria-label="Quick questions">
+                {(c.iAmSeller ? [] : ["Is this still available?", "What sizes do you have?", "Can I see more photos?", "When can you ship?"]).map((q) => (
+                  <button key={q} type="button" onClick={() => setText(q)}>{q}</button>
+                ))}
+              </div>
+            )}
+          </>
+        )}
         <form className="compose" onSubmit={(e) => { e.preventDefault(); send(); }}>
-          <input value={text} onChange={(e) => setText(e.target.value)} maxLength={1000} placeholder="Message" aria-label="Message" />
+          <input value={text} onChange={(e) => setText(e.target.value)} maxLength={1000} placeholder={about ? "Ask about this item" : "Message"} aria-label="Message" />
           <button className="send" disabled={!text.trim() || busy} aria-label="Send"><Icon name="send" size={18} /></button>
         </form>
       </div>
@@ -118,5 +147,27 @@ export function Thread() {
         </div>
       )}
     </div>
+  );
+}
+
+const cards = new Map<string, Promise<ProductCard | null>>();
+/** The item a message is about: picture, title, price and a link to it. */
+function ChatProduct({ productId, compact }: { productId: string; compact?: boolean }) {
+  if (!cards.has(productId)) cards.set(productId, api.productCard(productId));
+  const [p] = useLoad(() => cards.get(productId)!, [productId]);
+  if (!p) return <span className={`chat-product ${compact ? "compact" : ""}`}><span className="cp-thumb" /><span className="small muted">Loading item…</span></span>;
+  const sold = p.status !== "live" || (p.mode === "buy_now" && p.stock < 1);
+  const thumb = p.video?.url
+    ? (p.video.kind === "image" ? <img src={p.video.url} alt="" /> : <video src={`${p.video.url}#t=0.1`} muted playsInline preload="metadata" />)
+    : <ProductArt productId={p.id} fallback={p.video?.demo?.bg ?? swatch(p.id)} />;
+  return (
+    <Link to={`/s/${p.shopHandle}?item=${p.id}`} className={`chat-product ${compact ? "compact" : ""}`} aria-label={`Item: ${p.title}, ${R(p.priceCents)}`}>
+      <span className="cp-thumb art">{thumb}</span>
+      <span className="grow" style={{ minWidth: 0 }}>
+        <span className="cp-title">{p.title}</span>
+        <span className="cp-price">{R(p.priceCents)}{sold && <span className="cp-sold"> · Sold out</span>}</span>
+      </span>
+      {!compact && <span className="cp-view">View</span>}
+    </Link>
   );
 }

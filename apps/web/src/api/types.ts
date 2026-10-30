@@ -43,7 +43,9 @@ export interface Conversation {
   id: string; shopId: string; shopName: string; shopHandle: string; otherName: string; iAmSeller: boolean;
   lastBody: string | null; lastAt: string; unread: number;
 }
-export interface Message { id: string; body: string; createdAt: string; mine: boolean; readAt: string | null }
+export interface Message { id: string; body: string; createdAt: string; mine: boolean; readAt: string | null; productId: string | null }
+/** A small card for an item, used in chats. */
+export interface ProductCard { id: string; title: string; priceCents: Cents; status: ProductPublic["status"]; shopHandle: string; video: VideoSource | null; stock: number; mode: SaleMode }
 export interface BlockedPerson { userId: string; name: string; shopId: string | null; shopHandle: string | null }
 export interface OpenReport { id: string; targetKind: ReportTarget; targetId: string; reason: ReportReason; details: string; createdAt: string; summary: string }
 
@@ -262,7 +264,9 @@ export interface Api {
   /** Gets or starts the chat with a shop and returns its id. */
   openConversation(shopId: string): Promise<string>;
   thread(conversationId: string): Promise<{ conversation: Conversation; messages: Message[] }>;
-  sendMessage(conversationId: string, body: string): Promise<void>;
+  /** `productId`: the item the message is about (from "Message seller" on a product). */
+  sendMessage(conversationId: string, body: string, productId?: string | null): Promise<void>;
+  productCard(productId: string): Promise<ProductCard | null>;
   /** Posts reposted by the owners of shops the user follows, for the Following feed. */
   followingReposts(): Promise<FeedItem[]>;
   following(): Promise<ShopPublic[]>;

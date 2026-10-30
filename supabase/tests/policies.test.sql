@@ -279,6 +279,7 @@ update shops set status = 'open' where handle = 'other.shop'; -- test setup: the
 select pg_temp.act_as('00000000-0000-0000-0000-00000000000b');
 insert into conversations (buyer_id, shop_id) select '00000000-0000-0000-0000-00000000000b', id from shops where handle = 'other.shop';
 insert into messages (conversation_id, sender_id, body) select id, '00000000-0000-0000-0000-00000000000b', 'Hi, what sizes do you have?' from conversations;
+select pg_temp.expect_error($$insert into messages (conversation_id, sender_id, body, product_id) select c.id, '00000000-0000-0000-0000-00000000000b', 'About this', (select id from products where title = 'Oversized tee, sand') from conversations c$$, 'different shop');
 reset role;
 do $$ begin assert (select count(*) from notifications where user_id = '00000000-0000-0000-0000-00000000000e' and kind = 'message') = 1, 'shop told about the message'; end $$;
 select pg_temp.act_as('00000000-0000-0000-0000-00000000000a');

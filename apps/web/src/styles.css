@@ -174,7 +174,7 @@ a { color: inherit; text-decoration: none; }
   flex-shrink: 0; min-width: 46px; height: 34px; padding: 0 14px; font-weight: 600; font-size: 13.5px; line-height: 34px; white-space: nowrap; color: var(--ink);
 }
 .chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); box-shadow: none; }
-.size-chip { width: 52px; height: 52px; padding: 0; border-radius: 50%; }
+.size-chip { width: 46px; height: 46px; padding: 0; border-radius: 50%; line-height: 46px; }
 .pill { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 700; background: var(--surface-2); color: var(--ink-2); white-space: nowrap; }
 .pill.green { background: var(--green-soft); color: var(--green-text); }
 .pill.amber { background: var(--amber-soft); color: var(--amber-text); }
@@ -254,7 +254,7 @@ a { color: inherit; text-decoration: none; }
 .react span { font-size: 10.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .react.on.like svg { fill: #ff4d6d; stroke: #ff4d6d; }
 .react.on.repost { color: #4ade80; }
-.product-chip { display: flex; align-items: center; gap: 10px; border-radius: 16px; padding: 7px 14px 7px 7px; min-height: 50px; }
+.product-chip { display: flex; align-items: center; gap: 9px; border-radius: 15px; padding: 6px 12px 6px 6px; min-height: 46px; }
 .art { position: relative; overflow: hidden; padding: 0 !important; }
 .art svg, .tile .media svg { position: absolute; inset: 0; width: 100%; height: 100%; }
 .tile .media { overflow: hidden; }
@@ -267,10 +267,10 @@ a { color: inherit; text-decoration: none; }
 .scene.live .flame { transform-box: view-box; animation: flame 0.35s ease-in-out infinite alternate; }
 @keyframes flame { from { transform: scaleY(1) skewX(0); } to { transform: scaleY(1.25) skewX(4deg); } }
 .scene.live .bokeh { animation: float 7s ease-in-out infinite alternate; }
-.product-chip .sw { width: 36px; height: 36px; border-radius: 11px; background: rgba(255, 255, 255, 0.25); flex-shrink: 0; }
-.product-chip .t { font-weight: 700; font-size: 14.5px; }
-.product-chip .s { font-size: 12.5px; color: var(--on-video-2); }
-.product-chip .p { font-weight: 800; font-size: 16px; font-variant-numeric: tabular-nums; }
+.product-chip .sw { width: 34px; height: 34px; border-radius: 10px; background: rgba(255, 255, 255, 0.25); flex-shrink: 0; }
+.product-chip .t { font-weight: 650; font-size: 13px; letter-spacing: -0.005em; }
+.product-chip .s { font-size: 11.5px; color: var(--on-video-2); }
+.product-chip .p { font-weight: 700; font-size: 14px; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; flex-shrink: 0; }
 .actions { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
 .actions .btn { min-height: 46px; }
 .vround { width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; border: 0; }
@@ -607,3 +607,20 @@ button.g3 { border: 0; padding: 0; display: block; width: 100%; }
 .legal h2 { font-size: 17px; margin: 20px 0 6px; }
 .legal p, .legal li { font-size: 14.5px; line-height: 1.5; color: var(--ink-2); }
 .legal ul { padding-left: 20px; margin: 0; }
+.chat-product { display: flex; align-items: center; gap: 10px; padding: 6px; margin: -3px -6px 6px; border-radius: 13px; background: rgba(255, 255, 255, 0.55); color: var(--ink); min-width: 210px; }
+.bubble:not(.mine) .chat-product { background: var(--surface-2); }
+.chat-product.compact { margin: 0; min-width: 0; flex: 1; background: var(--surface); box-shadow: 0 0 0 0.5px var(--hairline); }
+.cp-thumb { position: relative; width: 44px; height: 54px; border-radius: 9px; overflow: hidden; background: var(--surface-2); flex-shrink: 0; }
+.cp-thumb img, .cp-thumb video, .cp-thumb svg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.cp-title { display: block; font-size: 13.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cp-price { display: block; font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.cp-sold { color: var(--red-text); font-weight: 700; }
+.cp-view { font-size: 12.5px; font-weight: 700; color: var(--blue); padding: 0 6px; }
+.attach { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.attach > .small { flex-shrink: 0; }
+.quick { display: flex; gap: 6px; overflow-x: auto; margin: 0 -12px 8px; padding: 0 12px; scrollbar-width: none; }
+.quick button { flex-shrink: 0; height: 32px; padding: 0 12px; border-radius: 999px; border: 0; background: var(--surface); box-shadow: 0 0 0 0.5px var(--hairline); font-size: 13px; font-weight: 600; color: var(--ink); }
+
+/* Scrolling columns must never squash their rows (the menu was cutting rows in half). */
+.drawer > *, .chat-body > *, .sheet-body > * { flex-shrink: 0; }
+.drawer .cell .s { white-space: normal; }

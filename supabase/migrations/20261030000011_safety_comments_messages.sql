@@ -109,6 +109,8 @@ create table messages (
   conversation_id uuid not null references conversations (id) on delete cascade,
   sender_id uuid not null references profiles (id) on delete cascade,
   body text not null check (length(trim(body)) between 1 and 1000),
+  -- The item the message is about (from "Message seller" on a product). Must belong to the chat's shop.
+  product_id uuid references products (id) on delete set null,
   read_at timestamptz,
   created_at timestamptz not null default now()
 );
@@ -153,6 +155,10 @@ create function social_guard() returns trigger language plpgsql security definer
 begin
   if rude_text(new.body) then raise exception 'Please keep it friendly. That message has words we don''t allow.'; end if;
   if tg_table_name = 'messages' then
+    if new.product_id is not null and (select shop_id from products where id = new.product_id)
+       <> (select shop_id from conversations where id = new.conversation_id) then
+      raise exception 'That item is from a different shop.';
+    end if;
     update conversations set last_message_at = now() where id = new.conversation_id;
     perform notify(other_person_of(new.conversation_id, new.sender_id), 'message', 'New message', left(new.body, 80), '/messages/' || new.conversation_id);
   elsif tg_table_name = 'comments' then

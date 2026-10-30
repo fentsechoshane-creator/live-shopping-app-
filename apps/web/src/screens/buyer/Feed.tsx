@@ -133,7 +133,7 @@ export function FeedList({ items, start = 0 }: { items: FeedItem[]; start?: numb
       {commenting && <CommentsSheet postId={commenting.postId} postOwnerShopHandle={commenting.shop.handle} onClose={() => setCommenting(null)}
         onCount={(n) => setCommentCounts((c) => ({ ...c, [commenting.postId]: n }))} />}
       {more && <MoreSheet kind="post" targetId={more.postId} shopId={more.shop.id} shopHandle={more.shop.handle} onClose={() => setMore(null)}
-        onMessage={() => { setMore(null); messageShop(more.shop.id); }} />}
+        onMessage={() => { setMore(null); messageShop(more.shop.id, more.product.id); }} />}
     </>
   );
 }
@@ -264,7 +264,7 @@ function ProductDetails({ item }: { item: FeedItem }) {
           <TierPill tier={item.shop.tier} />
         </div>
       </Link>
-      <button className="btn block" onClick={() => messageShop(item.shop.id)}><Icon name="chat" size={18} />Message seller</button>
+      <button className="btn block" onClick={() => messageShop(item.shop.id, p.id)}><Icon name="chat" size={18} />Message seller about this</button>
     </div>
   );
 }

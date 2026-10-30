@@ -312,12 +312,20 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
       const convs = (check(await sb.rpc("my_conversations")) as any[]).map(toConversation);
       const conversation = convs.find((c) => c.id === conversationId);
       if (!conversation) throw new Error("This chat isn't available.");
-      const rows = check(await sb.from("messages").select("id, body, created_at, sender_id, read_at").eq("conversation_id", conversationId).order("created_at")) as any[];
+      const rows = check(await sb.from("messages").select("id, body, created_at, sender_id, read_at, product_id").eq("conversation_id", conversationId).order("created_at")) as any[];
       await sb.from("messages").update({ read_at: new Date().toISOString() }).eq("conversation_id", conversationId).neq("sender_id", me).is("read_at", null);
-      return { conversation, messages: rows.map((r) => ({ id: r.id, body: r.body, createdAt: r.created_at, mine: r.sender_id === me, readAt: r.read_at })) };
+      return { conversation, messages: rows.map((r) => ({ id: r.id, body: r.body, createdAt: r.created_at, mine: r.sender_id === me, readAt: r.read_at, productId: r.product_id })) };
     },
-    async sendMessage(conversationId, body) {
-      check(await sb.from("messages").insert({ conversation_id: conversationId, sender_id: await uid(), body: body.trim() }));
+    async sendMessage(conversationId, body, productId) {
+      check(await sb.from("messages").insert({ conversation_id: conversationId, sender_id: await uid(), body: body.trim(), product_id: productId ?? null }));
+    },
+    async productCard(productId) {
+      const p = (await sb.from("products").select("id, title, price_cents, status, stock, mode, shops(handle)").eq("id", productId).maybeSingle()).data as any;
+      if (!p) return null;
+      const post = (await sb.from("posts").select("media(mux_playback_id, storage_path)").eq("product_id", productId).order("created_at", { ascending: false }).limit(1).maybeSingle()).data as any;
+      const m = post?.media;
+      return { id: p.id, title: p.title, priceCents: p.price_cents, status: p.status, stock: p.stock, mode: p.mode, shopHandle: p.shops?.handle ?? "",
+        video: m ? { muxPlaybackId: m.mux_playback_id, url: videoUrl(m.storage_path), kind: isImage(m.storage_path) ? "image" : "video" } : null };
     },
 
     async following() {

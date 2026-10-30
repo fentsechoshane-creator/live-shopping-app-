@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { WELCOME_CREDIT } from "@app/core";
 import { api, authMethod } from "../../api";
 import { useLoad, useSession } from "../../session";
@@ -105,6 +105,7 @@ export function ShopPage() {
   const [tab, setTab] = useState<"posts" | "likes" | "reposts">("posts");
   const [more, setMore] = useState(false);
   const goBack = useGoBack("/explore");
+  const loc = useLocation();
   const messageShop = useMessageShop();
   const [reacted] = useLoad(() => (data && tab !== "posts" ? api.reactedPosts(tab === "likes" ? "like" : "repost", data.shop.id) : Promise.resolve([])), [data?.shop.id, tab]);
   const nav = useNavigate();
@@ -153,7 +154,7 @@ export function ShopPage() {
         <button role="tab" aria-selected={tab === "reposts"} onClick={() => setTab("reposts")}>Reposts</button>
       </div>
       {tab === "posts"
-        ? <PostGrid items={items} empty={<div className="pempty">No videos yet.</div>} />
+        ? <PostGrid items={items} openProductId={new URLSearchParams(loc.search).get("item")} empty={<div className="pempty">No videos yet.</div>} />
         : !reacted ? <Loading /> : <PostGrid items={reacted} empty={<div className="pempty">{tab === "likes" ? "No likes yet." : "No reposts yet."}</div>} />}
     </div>
   );

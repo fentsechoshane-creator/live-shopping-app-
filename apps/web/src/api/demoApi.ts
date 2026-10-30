@@ -26,7 +26,7 @@ interface State {
   reactions?: { userId: string; postId: string; kind: "like" | "repost"; at: string }[];
   comments: { id: string; postId: string; userId: string; body: string; createdAt: string; hidden?: boolean }[];
   conversations: { id: string; buyerId: string; shopId: string; lastAt: string }[];
-  messages: { id: string; conversationId: string; senderId: string; body: string; createdAt: string; readAt: string | null }[];
+  messages: { id: string; conversationId: string; senderId: string; body: string; createdAt: string; readAt: string | null; productId?: string | null }[];
   blocks: { blockerId: string; blockedId: string }[];
   reports: { id: string; reporterId: string; targetKind: ReportTarget; targetId: string; reason: ReportReason; details: string; createdAt: string; status: "open" | "actioned" | "dismissed" }[];
 }
@@ -541,9 +541,17 @@ export function createDemoApi(): Api {
       s.messages.forEach((m) => { if (m.conversationId === cid && m.senderId !== u.id && !m.readAt) m.readAt = now().toISOString(); });
       save();
       return { conversation: toConv(c, u.id), messages: s.messages.filter((m) => m.conversationId === cid)
-        .map((m) => ({ id: m.id, body: m.body, createdAt: m.createdAt, mine: m.senderId === u.id, readAt: m.readAt })) };
+        .map((m) => ({ id: m.id, body: m.body, createdAt: m.createdAt, mine: m.senderId === u.id, readAt: m.readAt, productId: m.productId ?? null })) };
     },
-    async sendMessage(cid, body) {
+    async productCard(productId) {
+      await mediaReady;
+      const p = s.products.find((x) => x.id === productId);
+      if (!p) return null;
+      const post = s.posts.find((x) => x.productId === productId);
+      return { id: p.id, title: p.title, priceCents: p.priceCents, status: p.status, stock: p.stock, mode: p.mode, shopHandle: shopOf(p.shopId).handle,
+        video: post ? toFeed(post).video : null };
+    },
+    async sendMessage(cid, body, productId) {
       const u = me();
       const text = body.trim();
       const c = s.conversations.find((x) => x.id === cid);
@@ -551,7 +559,8 @@ export function createDemoApi(): Api {
       if (isRude(text)) throw new Error("Please keep it friendly. That message has words we don't allow.");
       const ownerId = shopOf(c.shopId).ownerId;
       if (blockedBetween(c.buyerId, ownerId)) throw new Error("You can't message this account.");
-      s.messages.push({ id: id(), conversationId: cid, senderId: u.id, body: text.slice(0, 1000), createdAt: now().toISOString(), readAt: null });
+      if (productId && s.products.find((p) => p.id === productId)?.shopId !== c.shopId) throw new Error("That item is from a different shop.");
+      s.messages.push({ id: id(), conversationId: cid, senderId: u.id, body: text.slice(0, 1000), createdAt: now().toISOString(), readAt: null, productId: productId ?? null });
       c.lastAt = now().toISOString();
       const other = u.id === c.buyerId ? ownerId : c.buyerId;
       notify(other, "New message", text.slice(0, 80), `/messages/${cid}`);

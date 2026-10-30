@@ -148,9 +148,14 @@ try {
   await page.getByRole("button", { name: "Message @thrift.with.lebo" }).click();
   await page.waitForURL(/\/messages\//);
   await page.getByText("Keep payments in the app").waitFor();
+  // The item comes with you: "Asking about" the tee, with quick questions.
+  await page.getByText("Asking about").waitFor();
+  await page.getByRole("button", { name: "Is this still available?" }).click();
   await page.getByLabel("Message", { exact: true }).fill("Hi, is the tee still available in L?");
   await page.getByRole("button", { name: "Send" }).click();
   await page.getByText(/Thanks for asking/).waitFor({ timeout: 8000 });
+  await page.getByRole("link", { name: /Item: Oversized tee, sand/ }).first().waitFor(); // the item is on the message
+  await check(page.getByText("Asking about").count().then((n) => n === 0), "attachment sent with the message");
   await page.getByLabel("Message", { exact: true }).fill("Can I WhatsApp you on 082 123 4567?");
   await page.getByText(/Sharing numbers or bank details/).waitFor();
   await page.getByLabel("Message", { exact: true }).fill("");

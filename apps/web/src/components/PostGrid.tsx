@@ -7,8 +7,9 @@ import { R, swatch } from "./ui";
 import { clock, useVideoLength } from "./Video";
 
 /** Three across grid of videos, like a TikTok profile. Tapping one opens the full screen player at that video. */
-export function PostGrid({ items, empty }: { items: FeedItem[]; empty: React.ReactNode }) {
-  const [open, setOpen] = useState<number | null>(null);
+export function PostGrid({ items, empty, openProductId }: { items: FeedItem[]; empty: React.ReactNode; openProductId?: string | null }) {
+  const startAt = openProductId ? items.findIndex((it) => it.product.id === openProductId) : -1;
+  const [open, setOpen] = useState<number | null>(startAt >= 0 ? startAt : null);
   if (items.length === 0) return <>{empty}</>;
   return (
     <>
