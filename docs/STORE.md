@@ -117,7 +117,8 @@ Apple and Google need a way to sign in. Our normal sign in sends a code, which r
 
 ## Still to do before submitting
 
-- [ ] Paste `supabase/update-live-database.sql` (migrations 0011 to 0014) in the live SQL Editor and deploy the server functions
+- [x] Live database up to date (0001 to 0014)
+- [ ] Deploy the server functions `delete-account`, `suggest-listing`, `checkout` [Lehloma]
 - [ ] Domain, hosted web pages, support mailbox [Ofentse]
 - [ ] Company or owner details and Information Officer in the privacy pages; lawyer review [Ofentse]
 - [ ] Apple Developer account (R1,700 a year or so [CONFIRM current price]) and Google Play account (once off, about R450 [CONFIRM]) [Ofentse]

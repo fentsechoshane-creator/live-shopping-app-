@@ -11,7 +11,7 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 | Area | Status |
 | --- | --- |
 | Business rules (fees, credit, returns, payouts, trust) | Done and tested |
-| Database, security rules, server functions | Done. Live project is behind: paste `supabase/update-live-database.sql` (0011 to 0014) |
+| Database, security rules, server functions | Done. Live database fully up to date (0001 to 0014). Server functions still to deploy [Lehloma] |
 | Seller side (sign up, checks, listings, orders, payouts) | Done in the web app |
 | Buyer side (feed, Explore, checkout, orders, returns) | Done in the web app |
 | Design (Liquid Glass, iPhone first, TikTok style profile) | Done, keeps improving |
@@ -61,7 +61,7 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 
 ## Next up
 
-- **Live database:** paste `supabase/update-live-database.sql` into Supabase > SQL Editor and run it (migrations 0011 to 0014; 0009 and 0010 are applied). Then deploy `delete-account`, `suggest-listing` and `checkout` after `npm run check:functions`. [Ofentse or Lehloma]
+- **Server functions:** deploy `delete-account`, `suggest-listing` and `checkout` after `npm run check:functions`. The live database is up to date. [Lehloma]
 - **Web host and domain:** connect the repo to Netlify (`netlify.toml` is ready), set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` there, point myhaul.co.za at it. This gives the privacy and help pages, WhatsApp previews and links that open the app. [Ofentse]
 - **Links open the app:** put the Apple Team ID in `public/.well-known/apple-app-site-association` and the Play signing SHA256 in `assetlinks.json`; turn on Associated Domains and Push in Xcode. [Lehloma]
 - Developer accounts, Google's 12 tester 14 day closed test, reviewer test account. [Ofentse]
@@ -74,7 +74,7 @@ Debug as we go: anyone who finds or fixes a problem updates this list. Highest r
 
 | # | Issue | Risk | Fix / owner |
 | --- | --- | --- | --- |
-| 1 | The live Supabase project is behind the code: migrations 0011 to 0014 not applied (0009 and 0010 applied 30 Oct); `delete-account`, `suggest-listing` and the updated `checkout` not deployed. The real app would error on likes lists, comments, messages, extra photos, offers, saved delivery and error reports. | High | Paste `supabase/update-live-database.sql` in the SQL Editor, then a live smoke test. [Ofentse] |
+| 1 | Live server functions `delete-account`, `suggest-listing` and the updated `checkout` are not deployed yet (the database is up to date). Delete account, photo suggestions and offer checkout won't work live until then. | High | `npm run check:functions`, then deploy. [Lehloma] |
 | 2 | The live (Supabase) side of the app has never been run end to end. Tests run in demo mode; this workspace can't reach supabase.co. | High | After 1, click through every flow on the live project with two accounts. [Lehloma] |
 | 3 | Server functions can't be type checked here (no Deno). | Medium | `npm run check:functions` on Lehloma's machine before deploying. [Lehloma] |
 | 4 | Only tested in Chrome's engine. Safari (iPhone) not automated. | Medium | Test on Ofentse's iPhone every round; add WebKit to the tests on a machine that has it. |
@@ -94,6 +94,11 @@ Debug as we go: anyone who finds or fixes a problem updates this list. Highest r
 Fixed in this round: Safari double back on the edge swipe (now only in the installed app), deleting an account now also deletes the person's photos and videos, React Router warnings.
 
 ## Log
+
+### 2026-10-30: Live database up to date
+- Migrations 0009 to 0014 applied to the live Supabase project. It now has comments, messages, reports, blocks, offers, holds, device tokens, saved delivery, interests, error reports and share previews.
+- The live project records them under the times they were applied (for example `20261030142734_flow`), not the file names in `supabase/migrations`. Before the next `supabase db push`, Lehloma runs `supabase migration repair` to mark 0009 to 0014 as applied, so they aren't run twice.
+- Removed `supabase/update-live-database.sql` (no longer needed).
 
 ### 2026-10-30: Live database: 0009 and 0010 applied
 - Public likes and reposts (0009) and listing photos (0010) are on the live project. 0011 stopped at a Supabase confirmation that timed out; nothing changed. `supabase/update-live-database.sql` now holds 0011 to 0014.
