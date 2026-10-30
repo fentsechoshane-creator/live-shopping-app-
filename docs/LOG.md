@@ -68,7 +68,35 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 - TradeSafe sandbox keys and Mux keys as server secrets, then test a real escrow payment. [Lehloma]
 - Live streams with auctions are shown as "coming next". Comments and messages are built.
 
+## Known issues and risks
+
+Debug as we go: anyone who finds or fixes a problem updates this list. Highest risk first.
+
+| # | Issue | Risk | Fix / owner |
+| --- | --- | --- | --- |
+| 1 | The live Supabase project is behind the code: migrations 0009 to 0012 not applied; `delete-account`, `suggest-listing` and the updated `checkout` not deployed. The real app would error on likes lists, comments, messages, extra photos, offers. | High | Approve the Supabase prompt, then a live smoke test. [Ofentse] |
+| 2 | The live (Supabase) side of the app has never been run end to end. Tests run in demo mode; this workspace can't reach supabase.co. | High | After 1, click through every flow on the live project with two accounts. [Lehloma] |
+| 3 | Server functions can't be type checked here (no Deno). | Medium | `npm run check:functions` on Lehloma's machine before deploying. [Lehloma] |
+| 4 | Only tested in Chrome's engine. Safari (iPhone) not automated. | Medium | Test on Ofentse's iPhone every round; add WebKit to the tests on a machine that has it. |
+| 5 | iPhone videos are often HEVC (.mov): fine on iPhone, may not play on Android or Chrome until Mux converts them. | Medium | Add Mux keys; all uploads then play everywhere. [Lehloma] |
+| 6 | Chats refresh every 3 seconds instead of live updates; typing indicator only works in the demo. | Low now, cost at scale | Supabase Realtime for messages and typing. |
+| 7 | "Liked", "Reposted", "Following reposts" and chat cards only find items in the first 50 of the feed (live). | Low now | Server function that returns posts by id. |
+| 8 | Bundles: a return refunds the whole bundle (no partial returns yet). | Medium for sellers | Decide the rule, then build partial returns. [CONFIRM] |
+| 9 | Rude word filter may block innocent Afrikaans words ("naai" also means sew, "moer" a nut). | Low | Review the list with a native speaker. [CONFIRM] |
+| 10 | Saved replies are stored on the phone, not the account. | Low | Move to the database later. |
+| 11 | Sound starts after the first tap in a browser (browser rule). | Low | Native app plays with sound straight away. |
+| 12 | Push notifications not built. | Medium for launch | Native app. [Lehloma] |
+| 13 | Privacy page has placeholders (company, support email, Information Officer). | High for store review | Fill in, lawyer review. [Ofentse] |
+
+Fixed in this round: Safari double back on the edge swipe (now only in the installed app), deleting an account now also deletes the person's photos and videos, React Router warnings.
+
 ## Log
+
+### 2026-10-30: Debug pass
+- Ran every journey while collecting browser errors: no app errors; only expected test noise (blocked fonts, the test browser can't play iPhone video).
+- Fixed: edge swipe back could go back two screens in Safari, so it now only works in the installed app (Safari has its own); deleting an account now also deletes the person's photos, videos and ID files; React Router future warnings.
+- Added a "Known issues and risks" table above, to keep debugging as we go.
+- The tests now report browser console errors, warnings and failed requests at the end of every run.
 
 ### 2026-10-30: Swipes, and selling inside chats
 - **Swipes** (`components/gestures.ts`): drag any sheet down to close it; swipe in from the left edge to go back on inner screens; swipe left or right to change tabs on the profile, shop pages and Activity; swipe the menu to the right to close it; swipe between Camera, Create and Live; swipe left on a video to open the shop (like TikTok). Photo slideshows keep their own sideways swipe.

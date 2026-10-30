@@ -11,6 +11,11 @@ Deno.serve(handler(async (req, body) => {
   const open = must(await db.rpc("open_orders_for", { p_user: uid }), "check orders") as number;
   if (open > 0) throw new UserError(`You have ${open} open ${open === 1 ? "order" : "orders"}. Finish ${open === 1 ? "it" : "them"} first, then delete your account.`, 409);
   must(await db.rpc("forget_user", { p_user: uid }), "remove data");
+  // Remove their uploaded photos, videos and ID files (each person's files live in a folder named after them).
+  for (const bucket of ["videos", "private"]) {
+    const { data: files } = await db.storage.from(bucket).list(uid, { limit: 1000 });
+    if (files?.length) await db.storage.from(bucket).remove(files.map((f) => `${uid}/${f.name}`));
+  }
   const { error } = await db.auth.admin.deleteUser(uid, true); // soft delete: the sign in is removed and can't be used again
   if (error) throw new Error(`delete user: ${error.message}`);
   return json({ ok: true });

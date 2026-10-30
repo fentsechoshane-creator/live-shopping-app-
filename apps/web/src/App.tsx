@@ -151,8 +151,10 @@ export function App() {
   // Swipe in from the left edge to go back, like iPhone apps. Not on the main tabs.
   const edgeStart = useRef<{ x: number; y: number } | null>(null);
   const isTabRoot = ["/", "/explore", "/activity", "/me", "/post"].includes(loc.pathname);
+  // Only in the installed app: Safari and Chrome already swipe back from the edge, and doing it too would go back two screens.
+  const standalone = typeof window !== "undefined" && (window.matchMedia?.("(display-mode: standalone)").matches || (navigator as any).standalone === true);
   const edgeBack = {
-    onTouchStart: (e: React.TouchEvent) => { const t = e.touches[0]; edgeStart.current = t.clientX < 24 && !isTabRoot ? { x: t.clientX, y: t.clientY } : null; },
+    onTouchStart: (e: React.TouchEvent) => { const t = e.touches[0]; edgeStart.current = standalone && t.clientX < 24 && !isTabRoot ? { x: t.clientX, y: t.clientY } : null; },
     onTouchEnd: (e: React.TouchEvent) => {
       const s = edgeStart.current; edgeStart.current = null;
       if (!s) return;

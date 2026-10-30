@@ -36,6 +36,10 @@ page.setDefaultTimeout(15000);
 await page.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.abort());
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
+// Console errors and warnings are reported (not failed) so we can keep the app clean.
+const consoleIssues = new Set();
+page.on("requestfailed", (r) => consoleIssues.add(`failed request: ${r.url().slice(0, 90)} (${r.failure()?.errorText})`));
+page.on("console", (m) => { if (m.type() === "error" || m.type() === "warning") consoleIssues.add(`${m.type()}: ${m.text().slice(0, 160)}`); });
 let step = 0;
 const shot = (name) => (console.log("step", step + 1, name), page.screenshot({ path: `${shots}${String(++step).padStart(2, "0")}-${name}.png` }));
 const check = async (cond, msg) => { if (!(await cond)) throw new Error("Check failed: " + msg); };
@@ -431,6 +435,7 @@ try {
   await shot("chat-offer-checkout");
 
   if (errors.length) throw new Error("Page errors: " + errors.join(" | "));
+  if (consoleIssues.size) console.log("Console issues:\n  " + [...consoleIssues].join("\n  "));
   console.log(`E2E passed. Screenshots in ${shots}`);
 } catch (e) {
   await shot("failure").catch(() => {});
