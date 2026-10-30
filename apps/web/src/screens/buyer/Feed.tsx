@@ -224,10 +224,12 @@ function VideoCard({ item, counts, comments, onBrowse, onBuy, onComments, onMore
           <button className={`react vglass ${isReposted ? "on repost" : ""}`} onClick={() => react("repost")} aria-pressed={isReposted} aria-label={`Repost, ${reposts}`}>
             <Icon name="repost" size={20} /><span>{short(reposts)}</span>
           </button>
+          <button className="react vglass" onClick={onComments} aria-label={`Comments, ${comments}`}>
+            <Icon name="comment" size={20} /><span>{short(comments)}</span>
+          </button>
         </div>
         <div className="actions">
           <BuyButton item={item} onClick={onBuy} />
-          <button className="vround vglass with-count" onClick={onComments} aria-label={`Comments, ${comments}`}><Icon name="comment" size={20} /><span>{short(comments)}</span></button>
           <button className="vround vglass" onClick={share} aria-label="Share"><Icon name="share" /></button>
         </div>
       </div>

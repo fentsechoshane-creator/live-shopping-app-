@@ -70,6 +70,11 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 
 ## Log
 
+### 2026-10-30: Sound always on, cleaner feed, glass progress bar
+- Sound is always on, like TikTok; the phone's volume buttons control it. The sound button is gone. Browsers only allow sound after the first tap, so a video can start silent until then, and that first tap turns sound on instead of pausing. A native app can play with sound straight away.
+- Comments moved beside the item, next to like and repost (three small glass buttons). The row under it is just Buy now and Share.
+- The progress bar is Liquid Glass: a 3px frosted track with a soft glowing fill; while dragging, a small glass bubble shows where you are.
+
 ### 2026-10-30: Report, block, delete account, privacy; comments and messages
 - **Report:** "…" on every post and shop page, and on comments and chats. Reasons: fake or counterfeit, not as shown, scam or pay outside the app, offensive, spam, other. Reports are private. The Team screen has a "Reports to check" queue with Remove (or Close shop) and Dismiss; aim to answer within 24 hours.
 - **Block:** from a post, shop page or chat. Blocked shops vanish from your feed, and neither side can message or comment. Menu > Blocked accounts lists them with Unblock.

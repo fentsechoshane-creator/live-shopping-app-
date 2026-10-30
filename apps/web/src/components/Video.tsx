@@ -30,7 +30,7 @@ export function Video({ src, label, productId }: { src: VideoSource; label: stri
 function Player({ hlsUrl, url, poster, label }: { hlsUrl: string | null; url: string | null; poster?: string; label: string }) {
   const ref = useRef<HTMLVideoElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
-  const { dataSaver, soundOn, setSoundOn } = useSession();
+  const { dataSaver } = useSession();
   const [paused, setPaused] = useState(true);
   const [time, setTime] = useState(0);
   const [length, setLength] = useState(0);
@@ -69,14 +69,20 @@ function Player({ hlsUrl, url, poster, label }: { hlsUrl: string | null; url: st
     if (!v) return;
     if (!onScreen) { v.pause(); return; }
     if (userPaused.current) return;
-    v.muted = !soundOn;
+    // Sound is always on, like TikTok: the phone's volume buttons control it.
+    // Browsers only allow sound after the first tap, so until then a video may start silent and the first tap turns sound on.
+    v.muted = false;
     v.play().catch(() => {
-      // Phones block sound until you tap. Play silently and show the sound button as off.
       v.muted = true;
-      if (soundOn) setSoundOn(false);
       v.play().catch(() => {});
     });
-  }, [onScreen, soundOn]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [onScreen]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    // After the first tap anywhere, unmute this video if it's on screen.
+    const unlock = () => { const v = ref.current; if (v && v.muted) { v.muted = false; if (!v.paused) v.play().catch(() => { v.muted = true; }); } };
+    window.addEventListener("pointerdown", unlock, { once: true, capture: true });
+    return () => window.removeEventListener("pointerdown", unlock, { capture: true });
+  }, []);
 
   // Gestures: tap to pause, double tap left to go back 10 seconds (right: forward 10), hold for 2x speed.
   const [flash, setFlash] = useState<string | null>(null);
@@ -118,6 +124,7 @@ function Player({ hlsUrl, url, poster, label }: { hlsUrl: string | null; url: st
       return;
     }
     lastTap.current = now;
+    if (v && v.muted) { v.muted = false; return; } // first tap turns sound on instead of pausing
     tapTimer.current = window.setTimeout(toggle, 280); // wait a moment in case it's a double tap
   };
   useEffect(() => () => { window.clearTimeout(tapTimer.current); window.clearTimeout(holdTimer.current); }, []);
@@ -128,13 +135,6 @@ function Player({ hlsUrl, url, poster, label }: { hlsUrl: string | null; url: st
     if (v.paused) { userPaused.current = false; v.play().catch(() => {}); }
     else { userPaused.current = true; v.pause(); }
   };
-  const toggleSound = () => {
-    const v = ref.current;
-    const on = !soundOn;
-    setSoundOn(on);
-    if (v) { v.muted = !on; if (on && v.paused && !userPaused.current) v.play().catch(() => {}); }
-  };
-
   // Drag the bar to rewind or skip ahead.
   const seekTo = (clientX: number) => {
     const v = ref.current, bar = barRef.current;
@@ -154,7 +154,7 @@ function Player({ hlsUrl, url, poster, label }: { hlsUrl: string | null; url: st
   const pct = length ? (time / length) * 100 : 0;
   return (
     <>
-      <video ref={ref} src={hlsUrl ? undefined : url ?? undefined} poster={poster} muted={!soundOn} loop playsInline aria-label={label}
+      <video ref={ref} src={hlsUrl ? undefined : url ?? undefined} poster={poster} loop playsInline aria-label={label}
         onPlay={() => setPaused(false)} onPause={() => setPaused(true)}
         onTimeUpdate={(e) => !scrubbing && setTime(e.currentTarget.currentTime)}
         onLoadedMetadata={(e) => setLength(e.currentTarget.duration)} onDurationChange={(e) => setLength(e.currentTarget.duration)} />
@@ -165,9 +165,6 @@ function Player({ hlsUrl, url, poster, label }: { hlsUrl: string | null; url: st
         {fast && <span className="speed-chip vglass">2x <Icon name="forward" size={14} /></span>}
         {paused && onScreen && userPaused.current && <span className="big-play vglass"><Icon name="play" size={30} /></span>}
         {scrubbing && <span className="vtime">{clock(time)} / {clock(length)}</span>}
-      </button>
-      <button className="sound-btn vglass" onClick={toggleSound} aria-label={soundOn ? "Sound off" : "Sound on"} aria-pressed={soundOn}>
-        <Icon name={soundOn ? "sound" : "mute"} size={18} />
       </button>
       <div className={`vbar ${scrubbing ? "drag" : ""}`}>
         <div className="vtrack" ref={barRef} role="slider" aria-label="Video position" aria-valuemin={0} aria-valuemax={Math.round(length)} aria-valuenow={Math.round(time)}

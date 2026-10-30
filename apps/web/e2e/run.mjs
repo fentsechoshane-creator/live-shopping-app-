@@ -337,8 +337,7 @@ try {
   await clipCard.getByRole("button", { name: "Pause" }).click(); // it plays by itself once on screen
   await clipCard.getByRole("button", { name: "Play" }).waitFor(); // paused: big play button and the time shows
   await check(clipCard.getByRole("slider", { name: "Video position" }).isVisible(), "rewind bar");
-  await clipCard.getByRole("button", { name: "Sound on" }).click();
-  await check(clipCard.getByRole("button", { name: "Sound off" }).isVisible(), "sound turned on");
+  await check(clipCard.locator("video").first().evaluate((v) => !v.muted), "sound is on");
   await shot("video-paused");
   // Hold for 2x speed, double tap the left side to go back 10 seconds.
   const box = await clipCard.boundingBox();
