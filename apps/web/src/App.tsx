@@ -4,6 +4,8 @@ import { useSwipe } from "./components/gestures";
 import { isNative, registerPush, setNavigator, startNative, statusBarFor } from "./native";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Welcome, hasSeenWelcome } from "./components/Welcome";
+import { AccountSetup } from "./components/AccountSetup";
+import { Avatar } from "./components/Avatar";
 import { api } from "./api";
 import { useLoad, useSession } from "./session";
 import { Icon } from "./components/Icon";
@@ -74,7 +76,7 @@ function Tabs() {
 
 /** Side menu with account settings, opened from the menu button on the profile. */
 function SideMenu() {
-  const { user, menuOpen, setMenuOpen, dataSaver, setDataSaver } = useSession();
+  const { user, menuOpen, setMenuOpen, dataSaver, setDataSaver, profile } = useSession();
   const nav = useNavigate();
   const [shop] = useLoad(() => (user && menuOpen ? api.myShop() : Promise.resolve(null)), [user?.id, menuOpen]);
   const [admin] = useLoad(() => (user && menuOpen ? api.isAdmin() : Promise.resolve(false)), [user?.id, menuOpen]);
@@ -90,14 +92,14 @@ function SideMenu() {
   // Deleting: show only the confirm sheet, not the menu behind it.
   if (deleting) return <DeleteAccountSheet onClose={() => { setDeleting(false); setMenuOpen(false); }} />;
   const go = (to: string) => { setMenuOpen(false); nav(to); };
-  const name = user.displayName || user.email?.split("@")[0] || "You";
+  const name = profile?.displayName || profile?.handle || user.email?.split("@")[0] || "You";
   return (
     <div className="drawer-backdrop" onClick={(e) => e.target === e.currentTarget && setMenuOpen(false)}>
       <aside className="drawer glass" role="dialog" aria-modal="true" aria-label="Menu and settings" {...swipeClose}>
         <div className="row between" style={{ marginBottom: 14 }}>
           <div className="row">
-            <span className="avatar" style={{ width: 44, height: 44, fontSize: 18 }}>{name[0]?.toUpperCase()}</span>
-            <div><b>{name}</b><div className="small muted">{user.email ?? user.phone}</div></div>
+            <Avatar url={profile?.avatarUrl} name={name} size={44} />
+            <div><b>{name}</b><div className="small muted">{profile?.handle ? `@${profile.handle}` : user.email ?? user.phone}</div></div>
           </div>
           <button className="icon-btn" onClick={() => setMenuOpen(false)} aria-label="Close menu"><Icon name="close" /></button>
         </div>
@@ -172,7 +174,7 @@ export function App() {
   const isTabRoot = ["/", "/explore", "/activity", "/me", "/post"].includes(loc.pathname);
   // Only in the installed app: Safari and Chrome already swipe back from the edge, and doing it too would go back two screens.
   const standalone = isNative || (typeof window !== "undefined" && (window.matchMedia?.("(display-mode: standalone)").matches || (navigator as any).standalone === true));
-  const { user } = useSession();
+  const { user, needsSetup } = useSession();
   // First open: the welcome screens, but not when someone arrives on a shared link (show it later, on the feed).
   const [welcome, setWelcome] = useState(() => !hasSeenWelcome() && loc.pathname === "/");
   useEffect(() => { if (loc.pathname === "/" && !hasSeenWelcome()) setWelcome(true); }, [loc.pathname]);
@@ -223,6 +225,7 @@ export function App() {
         <SideMenu />
         <SignInSheet />
         {welcome && <Welcome onDone={() => setWelcome(false)} />}
+        {needsSetup && <AccountSetup />}
       </div>
     </div>
   );

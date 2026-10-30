@@ -395,3 +395,31 @@ select pg_temp.act_as_anon();
 do $$ begin assert (select count(*) from share_card((select id from products where title = 'Satin scarf'))) = 1, 'share card for a live item'; end $$;
 reset role;
 select 'share card tests passed' as result;
+-- Accounts: unique usernames shared with shop handles, change limits, age and terms, photos in your own folder.
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000d');
+select pg_temp.expect_error($$select complete_account('Thandi', 'thandi.m', false, true)$$, '18 or older');
+select pg_temp.expect_error($$select complete_account('Thandi', 'thandi.m', true, false)$$, 'accept the terms');
+select pg_temp.expect_error($$select set_username('Ab')$$, 'at least 3');
+select pg_temp.expect_error($$select set_username('.thandi')$$, 'start or end');
+select pg_temp.expect_error($$select set_username('thandi..m')$$, 'two dots');
+select pg_temp.expect_error($$select set_username('support')$$, 'reserved');
+select pg_temp.expect_error($$select set_username('other.shop')$$, 'taken');
+select complete_account('Thandi M', 'Thandi.M', true, true);
+do $$ begin
+  assert (select handle from profiles where id = '00000000-0000-0000-0000-00000000000d') = 'thandi.m', 'username saved in lowercase';
+  assert (select adult_confirmed_at is not null and terms_accepted_at is not null from profiles where id = '00000000-0000-0000-0000-00000000000d'), 'age and terms saved';
+  assert available_handles(array['thandi.m', 'thandi.m2', 'support', 'other.shop']) = array['thandi.m', 'thandi.m2'], 'your own and free usernames come back';
+end $$;
+select set_username('thandi.new'); -- the first change after signing up is allowed
+select pg_temp.expect_error($$select set_username('thandi.again')$$, 'change your username again');
+select pg_temp.expect_error($$update profiles set handle = 'sneaky' where id = '00000000-0000-0000-0000-00000000000d'$$, 'permission denied');
+select pg_temp.expect_error($$update profiles set avatar_path = '00000000-0000-0000-0000-00000000000a/me.jpg' where id = '00000000-0000-0000-0000-00000000000d'$$, 'avatar_in_own_folder');
+update profiles set avatar_path = '00000000-0000-0000-0000-00000000000d/me.jpg' where id = '00000000-0000-0000-0000-00000000000d';
+reset role;
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000a');
+select pg_temp.expect_error($$select set_username('thandi.new')$$, 'taken');
+reset role;
+select pg_temp.act_as_anon();
+do $$ begin assert (select avatar_path from people_cards(array['00000000-0000-0000-0000-00000000000d'::uuid])) like '%me.jpg', 'photos are public'; end $$;
+reset role;
+select 'account tests passed' as result;

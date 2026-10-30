@@ -62,12 +62,31 @@ async function signOut() {
   await page.waitForURL(BASE + "/");
 }
 
+// New accounts go through Create account: birthday, name and username, photo (skipped here).
+let setupCount = 0;
+async function maybeSetup(name = "Test Person") {
+  const setup = page.getByRole("dialog", { name: "Create your account" });
+  try { await setup.waitFor({ timeout: 2500 }); } catch { return false; }
+  await setup.getByLabel("Birthday").fill("1999-04-12");
+  await setup.getByRole("button", { name: "Next" }).click();
+  await setup.getByLabel("Name", { exact: true }).fill(name);
+  const handle = `tester.${++setupCount}${Date.now() % 1000}`;
+  await setup.getByLabel("Username", { exact: true }).fill(handle);
+  await setup.getByText(`@${handle} is available`).waitFor();
+  await setup.getByRole("button", { name: "Create account" }).click();
+  await setup.getByText("Add a profile photo").waitFor();
+  await setup.getByRole("button", { name: "Skip for now" }).click();
+  await setup.waitFor({ state: "detached" });
+  return true;
+}
+
 async function signIn(email) {
   await page.goto(`${BASE}/signin`);
   await page.getByLabel("Email").fill(email);
   await page.getByRole("button", { name: "Send code" }).click();
   await page.getByLabel("Code").fill("123456"); // signs in by itself once 6 digits are in
   await page.waitForURL((u) => !u.pathname.startsWith("/signin"));
+  await maybeSetup();
 }
 
 try {
@@ -101,6 +120,26 @@ try {
   await signSheet.getByLabel("Email").fill("buyer@test.co.za");
   await signSheet.getByRole("button", { name: "Send code" }).click();
   await signSheet.getByLabel("Code").fill("123456");
+  // A new account: Create account first (age check, name, unique username, photo), then checkout opens by itself.
+  const setup = page.getByRole("dialog", { name: "Create your account" });
+  await setup.getByText("When's your birthday?").waitFor();
+  await setup.getByLabel("Birthday").fill("2012-01-01");
+  await setup.getByText("You need to be 18 or older").waitFor();
+  await check(setup.getByRole("button", { name: "Next" }).isDisabled(), "under 18 can't continue");
+  await setup.getByLabel("Birthday").fill("1999-04-12");
+  await setup.getByRole("button", { name: "Next" }).click();
+  await setup.getByLabel("Name", { exact: true }).fill("Thandi Mokoena");
+  await setup.getByLabel("Username", { exact: true }).fill("lebo.m"); // a sample seller already has this one
+  await setup.getByText("@lebo.m is taken").waitFor();
+  await setup.getByLabel("Username", { exact: true }).fill("support");
+  await setup.getByText("That username is reserved.").waitFor();
+  await setup.getByLabel("Username", { exact: true }).fill("thandi.mokoena");
+  await setup.getByText("@thandi.mokoena is available").waitFor();
+  await shot("create-account");
+  await setup.getByRole("button", { name: "Create account" }).click();
+  await setup.getByText("Add a profile photo").waitFor();
+  await setup.locator('input[type="file"]').setInputFiles(here + "fixtures/denim.jpg");
+  await setup.getByRole("button", { name: "Done" }).click();
   await page.getByRole("dialog", { name: "Checkout" }).waitFor();
   await check(page.url() === BASE + "/", "still on the feed after signing in");
   await shot("signin-then-checkout");
@@ -141,6 +180,23 @@ try {
   await page.goto(`${BASE}/i/p-tee`);
   await page.waitForURL(/\/s\/thrift\.with\.lebo\?item=p-tee/);
   await page.getByRole("region", { name: /Oversized tee/ }).waitFor();
+  // The new account shows its username and photo on the profile; Edit profile checks a new username.
+  await page.goto(`${BASE}/me`);
+  await page.getByText("@thandi.mokoena").waitFor();
+  await check(page.locator(".pavatar img").count().then((n) => n === 1), "profile photo shows");
+  await page.getByRole("button", { name: "Edit profile" }).click();
+  const edit = page.getByRole("dialog", { name: "Edit profile" });
+  await edit.getByLabel("Username", { exact: true }).fill("kamva.luxe");
+  await edit.getByText("@kamva.luxe is taken").waitFor();
+  await edit.getByLabel("Username", { exact: true }).fill("thandi.sells");
+  await edit.getByText("@thandi.sells is available").waitFor();
+  await shot("edit-profile");
+  await edit.getByRole("button", { name: "Save" }).click();
+  await page.getByText("@thandi.sells").waitFor();
+  await page.getByRole("button", { name: "Edit profile" }).click();
+  await page.getByRole("dialog", { name: "Edit profile" }).getByText(/You can change it again on/).waitFor();
+  await page.keyboard.press("Escape");
+
   // The wallet button explains the credit instead of jumping to the profile.
   await page.goto(BASE);
   await page.getByRole("button", { name: /^Wallet/ }).click();
@@ -443,7 +499,7 @@ try {
   // ===== Selling in chat: the shop sends a special price and holds the item; the buyer buys from the chat =====
   await signIn("lebo@shop.demo");
   await page.goto(`${BASE}/activity?tab=messages`);
-  await page.getByRole("link", { name: /buyer/ }).first().click();
+  await page.getByRole("link", { name: /Thandi/ }).first().click();
   await page.waitForURL(/\/messages\//);
   await page.getByRole("link", { name: /Oversized tee/ }).first().waitFor(); // the order shows inside the chat too
   await page.getByRole("button", { name: "Add" }).click();

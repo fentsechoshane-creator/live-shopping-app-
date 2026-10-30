@@ -4,6 +4,7 @@ import {
   canTransition, isRude, orderTotals, payoutDate, releasableAt, returnReasonsFor, shipBy, tierFor, TRUST_POINTS, validateListing,
   RETURN_POSTAGE_PAYER, type OrderStatus, type TrustEventKind,
 } from "@app/core";
+import { handleProblem } from "../lib/handle";
 import type {
   Api, Category, ReportReason, ReportTarget, CheckoutInput, FeedItem, ListingInput, MyShop, Notification, Order, Payout, PendingReview, ProductPublic, ReviewStatus,
   ShopPublic, User, SavedDelivery, AppError,
@@ -17,7 +18,8 @@ interface DShop {
 interface DProduct extends ProductPublic { shopId: string; proofStatus: ReviewStatus }
 interface DPost { id: string; shopId: string; productId: string; caption: string; video: FeedItem["video"]; createdAt: string; photos?: string[] }
 interface DOrder extends Order { shopOwnerId: string; bundleIds?: string[]; offerId?: string | null }
-interface DUser extends User { trust: number; welcomeUsed: boolean; admin: boolean; createdAt?: string; bio?: string }
+interface DUser extends User { trust: number; welcomeUsed: boolean; admin: boolean; createdAt?: string; bio?: string;
+  handle?: string | null; avatar?: string | null; handleChangedAt?: string | null; adult?: boolean; terms?: boolean }
 type DPayout = Payout & { shopId: string; topUpCents: number; topUpPaid: boolean };
 interface State {
   users: DUser[]; currentUserId: string | null; shops: DShop[]; products: DProduct[]; posts: DPost[]; orders: DOrder[];
@@ -49,9 +51,9 @@ const approvedChecks = (): MyShop["checks"] => ({
 
 function seed(): State {
   const bots: DUser[] = [
-    { id: "u-lebo", displayName: "Lebo", trust: 78, welcomeUsed: true, admin: false },
-    { id: "u-luxe", displayName: "Kamva", trust: 92, welcomeUsed: true, admin: false },
-    { id: "u-sweet", displayName: "Ayesha", trust: 66, welcomeUsed: true, admin: false },
+    { id: "u-lebo", displayName: "Lebo", handle: "lebo.m", adult: true, terms: true, trust: 78, welcomeUsed: true, admin: false },
+    { id: "u-luxe", displayName: "Kamva", handle: "kamva.luxe", adult: true, terms: true, trust: 92, welcomeUsed: true, admin: false },
+    { id: "u-sweet", displayName: "Ayesha", handle: "ayesha.bakes", adult: true, terms: true, trust: 66, welcomeUsed: true, admin: false },
   ];
   const shops: DShop[] = [
     { id: "s-lebo", ownerId: "u-lebo", name: "Lebo's Thrift", handle: "thrift.with.lebo", category: "clothes", bio: "Thrift and new basics. Cape Town.", status: "open", foundingUntil: null, checks: approvedChecks() },
@@ -137,6 +139,9 @@ export function createDemoApi(): Api {
     try { localStorage.setItem(KEY, JSON.stringify(s)); } catch { /* ignore */ }
   };
   const now = () => new Date(Date.now() + s.clockOffsetMs);
+  // Usernames and shop handles share one list, like the database.
+  const demoHandleProblem = (h: string, self?: string) => handleProblem(h)
+    ?? (s.users.some((x) => x.handle === h && x.id !== self) || s.shops.some((x) => x.handle === h && x.ownerId !== self) ? "That username is taken." : null);
   const wait = (ms = 250) => new Promise((r) => setTimeout(r, ms));
   const me = (): DUser => {
     const u = s.users.find((x) => x.id === s.currentUserId);
@@ -396,9 +401,11 @@ export function createDemoApi(): Api {
       save();
     },
     async myProfile() {
+      await mediaReady;
       const u = me();
       return {
         id: u.id, displayName: u.displayName, bio: u.bio ?? "", email: u.email, trustScore: u.trust, createdAt: u.createdAt ?? now().toISOString(),
+        handle: u.handle ?? null, avatarUrl: mediaUrl(u.avatar), handleChangedAt: u.handleChangedAt ?? null, setUp: !!(u.handle && u.adult && u.terms),
         ordersCount: s.orders.filter((o) => o.buyerId === u.id && !["pending_payment", "cancelled"].includes(o.status)).length,
       };
     },
@@ -407,6 +414,47 @@ export function createDemoApi(): Api {
       me().bio = bio.trim().slice(0, 150);
       save();
       listeners.forEach((l) => l(me()));
+    },
+    async availableHandles(list) {
+      const u = s.users.find((x) => x.id === s.currentUserId);
+      return list.slice(0, 12).map((h) => h.toLowerCase()).filter((h) => !demoHandleProblem(h, u?.id));
+    },
+    async completeAccount(name, handle, adult, terms) {
+      await wait();
+      if (!adult) throw new Error("You need to be 18 or older to use myHaul.");
+      if (!terms) throw new Error("Please accept the terms to continue.");
+      if (!name.trim() || name.trim().length > 40) throw new Error("Add your name (up to 40 characters).");
+      await this.setUsername(handle);
+      const u = me();
+      u.displayName = name.trim(); u.adult = true; u.terms = true;
+      save();
+      listeners.forEach((l) => l(u));
+    },
+    async setUsername(handle) {
+      const u = me();
+      const h = handle.trim().toLowerCase();
+      if (u.handle === h) return;
+      const problem = demoHandleProblem(h, u.id);
+      if (problem) throw new Error(problem);
+      if (u.handle && u.handleChangedAt && new Date(u.handleChangedAt).getTime() > Date.now() - 30 * 86400e3) {
+        throw new Error(`You can change your username again on ${new Date(new Date(u.handleChangedAt).getTime() + 30 * 86400e3).toLocaleDateString("en-ZA", { day: "numeric", month: "long" })}.`);
+      }
+      u.handleChangedAt = u.handle ? new Date().toISOString() : null;
+      u.handle = h;
+      save();
+    },
+    async setAvatar(photo) {
+      const u = me();
+      u.avatar = photo ? await stash(photo) : null;
+      save();
+      listeners.forEach((l) => l(u));
+      return mediaUrl(u.avatar);
+    },
+    async shopAvatars(ids) {
+      await mediaReady;
+      const out: Record<string, string> = {};
+      ids.forEach((sid) => { const sh = s.shops.find((x) => x.id === sid); const url = sh && mediaUrl(s.users.find((x) => x.id === sh.ownerId)?.avatar); if (url) out[sid] = url; });
+      return out;
     },
     async reactions() {
       const u = s.users.find((x) => x.id === s.currentUserId);
@@ -553,13 +601,15 @@ export function createDemoApi(): Api {
     },
 
     async comments(postId) {
+      await mediaReady;
       const viewer = s.currentUserId;
       const post = s.posts.find((p) => p.id === postId);
       return s.comments.filter((c) => c.postId === postId && !c.hidden && !(viewer && blockedBetween(viewer, c.userId)))
         .map((c) => {
           const sh = s.shops.find((x) => x.ownerId === c.userId);
-          return { id: c.id, body: c.body, createdAt: c.createdAt, userId: c.userId, name: s.users.find((x) => x.id === c.userId)?.displayName || "User",
-            shopHandle: sh?.handle ?? null, isSeller: !!post && sh?.id === post.shopId, mine: c.userId === viewer };
+          const who = s.users.find((x) => x.id === c.userId);
+          return { id: c.id, body: c.body, createdAt: c.createdAt, userId: c.userId, name: who?.displayName || who?.handle || "User",
+            shopHandle: sh?.handle ?? null, isSeller: !!post && sh?.id === post.shopId, mine: c.userId === viewer, userHandle: who?.handle ?? null, avatarUrl: mediaUrl(who?.avatar) };
         });
     },
     async addComment(postId, body) {
@@ -711,8 +761,8 @@ export function createDemoApi(): Api {
       await wait();
       const u = me();
       const h = handle.toLowerCase();
-      if (!/^[a-z0-9._]{3,30}$/.test(h)) throw new Error("Use 3 to 30 letters, numbers, dots or underscores.");
-      if (s.shops.some((x) => x.handle === h && x.ownerId !== u.id)) throw new Error("That shop name is taken.");
+      const problem = demoHandleProblem(h, u.id);
+      if (problem) throw new Error(`Shop handle: ${problem}`);
       const existing = myShopRow();
       if (existing) {
         if (existing.status !== "onboarding") throw new Error("Your shop is already open");

@@ -11,6 +11,7 @@ import { useTabSwipe } from "../../components/gestures";
 import { ConversationList, replyText, useMessageShop } from "./Messages";
 import { MoreSheet } from "../../components/Safety";
 import { OrderList } from "./Orders";
+import { Avatar } from "../../components/Avatar";
 
 export function SignIn() {
   const [params] = useSearchParams();
@@ -147,6 +148,7 @@ export function ShopPage() {
   const loc = useLocation();
   const messageShop = useMessageShop();
   const [replyMin] = useLoad(() => (data ? api.shopReplyMinutes(data.shop.id) : Promise.resolve(null)), [data?.shop.id]);
+  const [avatars] = useLoad(() => (data ? api.shopAvatars([data.shop.id]) : Promise.resolve({} as Record<string, string>)), [data?.shop.id]);
   const swipeShopTabs = useTabSwipe(["posts", "likes", "reposts"] as const, tab, setTab);
   const [reacted] = useLoad(() => (data && tab !== "posts" ? api.reactedPosts(tab === "likes" ? "like" : "repost", data.shop.id) : Promise.resolve([])), [data?.shop.id, tab]);
   if (error) return <div className="screen"><ErrorNote error={error} /></div>;
@@ -165,7 +167,7 @@ export function ShopPage() {
         </div>
       </div>
       <div className="phead">
-        <div className="pavatar green">{shop.name[0]}</div>
+        <Avatar url={avatars?.[shop.id]} name={shop.name} className="pavatar green" />
         <div className="pstats">
           <button onClick={() => setTab("posts")}><b>{items.length}</b><span>Posts</span></button>
           <div><b>{shop.sales ?? 0}</b><span>Sales</span></div>

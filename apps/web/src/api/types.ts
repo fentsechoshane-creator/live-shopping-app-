@@ -38,6 +38,7 @@ export type ReportTarget = "post" | "shop" | "comment" | "message" | "user";
 
 export interface Comment {
   id: string; body: string; createdAt: string; userId: string; name: string; shopHandle: string | null; isSeller: boolean; mine: boolean;
+  userHandle?: string | null; avatarUrl?: string | null;
 }
 export interface Conversation {
   id: string; shopId: string; shopName: string; shopHandle: string; otherName: string; iAmSeller: boolean;
@@ -64,6 +65,13 @@ export interface ListingSuggestion {
 export interface MyProfile {
   id: string;
   displayName: string;
+  /** @username. Empty until the account is set up. */
+  handle: string | null;
+  avatarUrl: string | null;
+  /** When the username was last changed (it can change once every 30 days). */
+  handleChangedAt: string | null;
+  /** Name, username, 18 and over and terms are done. */
+  setUp: boolean;
   bio: string;
   email?: string;
   trustScore: number;
@@ -246,6 +254,15 @@ export interface Api {
   welcomeCreditAvailable(): Promise<boolean>;
   myProfile(): Promise<MyProfile>;
   updateProfile(displayName: string, bio: string): Promise<void>;
+  /** Which of these usernames are free (yours counts as free). */
+  availableHandles(handles: string[]): Promise<string[]>;
+  /** The sign up step: name, username, 18 and over, terms. */
+  completeAccount(name: string, handle: string, adult: boolean, terms: boolean): Promise<void>;
+  setUsername(handle: string): Promise<void>;
+  /** Upload a profile photo (already square), or null to remove it. Returns the new photo's address. */
+  setAvatar(photo: Blob | null): Promise<string | null>;
+  /** Profile photos of shop owners, by shop id. */
+  shopAvatars(shopIds: string[]): Promise<Record<string, string>>;
   /** Posts the signed in user liked or reposted (ids). Empty when signed out. */
   reactions(): Promise<{ liked: string[]; reposted: string[] }>;
   react(postId: string, kind: Reaction, on: boolean): Promise<void>;

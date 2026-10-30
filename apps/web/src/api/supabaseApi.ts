@@ -39,6 +39,7 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
   }
 
   const isImage = (path: string | null) => !!path && /\.(jpe?g|png|webp|heic|heif|gif)$/i.test(path);
+  const avatarUrl = (path: string | null | undefined) => (path ? sb.storage.from("avatars").getPublicUrl(path).data.publicUrl : null);
   const videoUrl = (path: string | null) => (path ? sb.storage.from("videos").getPublicUrl(path).data.publicUrl : null);
 
   const toProduct = (p: any): ProductPublic => ({
@@ -183,16 +184,45 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
     async myProfile(): Promise<MyProfile> {
       const { data: u } = await sb.auth.getUser();
       if (!u.user) throw new Error("Please sign in.");
-      const { data: p } = await sb.from("profiles").select("display_name, bio, trust_score, created_at").eq("id", u.user.id).single();
+      const { data: p } = await sb.from("profiles").select("display_name, bio, trust_score, created_at, handle, avatar_path, handle_changed_at, adult_confirmed_at, terms_accepted_at").eq("id", u.user.id).single();
       const { count } = await sb.from("orders").select("id", { count: "exact", head: true }).eq("buyer_id", u.user.id)
         .not("status", "in", "(pending_payment,cancelled)");
       return {
         id: u.user.id, displayName: p?.display_name || u.user.email?.split("@")[0] || "", bio: p?.bio ?? "", email: u.user.email,
         trustScore: p?.trust_score ?? 50, createdAt: p?.created_at ?? u.user.created_at, ordersCount: count ?? 0,
+        handle: p?.handle ?? null, avatarUrl: avatarUrl(p?.avatar_path), handleChangedAt: p?.handle_changed_at ?? null,
+        setUp: !!(p?.handle && p?.adult_confirmed_at && p?.terms_accepted_at),
       };
     },
     async updateProfile(displayName, bio) {
       check(await sb.from("profiles").update({ display_name: displayName.trim(), bio: bio.trim().slice(0, 150) }).eq("id", await uid()));
+    },
+    async availableHandles(list) {
+      return (check(await sb.rpc("available_handles", { p_handles: list.slice(0, 12).map((h) => h.toLowerCase()) })) as string[]) ?? [];
+    },
+    async completeAccount(name, handle, adult, terms) {
+      check(await sb.rpc("complete_account", { p_name: name, p_handle: handle, p_adult: adult, p_terms: terms }));
+    },
+    async setUsername(handle) {
+      check(await sb.rpc("set_username", { p_handle: handle }));
+    },
+    async setAvatar(photo) {
+      const me = await uid();
+      const { data: old } = await sb.from("profiles").select("avatar_path").eq("id", me).single();
+      let path: string | null = null;
+      if (photo) {
+        path = `${me}/avatar-${Date.now()}.jpg`; // a new name each time, so phones don't show the old photo from cache
+        const up = await sb.storage.from("avatars").upload(path, photo, { contentType: photo.type || "image/jpeg", upsert: true });
+        if (up.error) throw new Error("Couldn't upload the photo. Try again.");
+      }
+      check(await sb.from("profiles").update({ avatar_path: path }).eq("id", me));
+      if ((old as any)?.avatar_path) await sb.storage.from("avatars").remove([(old as any).avatar_path]).catch(() => {});
+      return avatarUrl(path);
+    },
+    async shopAvatars(ids) {
+      if (!ids.length) return {};
+      const rows = check(await sb.rpc("shop_avatars", { p_shops: [...new Set(ids)].slice(0, 100) })) as any[];
+      return Object.fromEntries(rows.map((r) => [r.shop_id, avatarUrl(r.avatar_path)!]));
     },
     async reactions() {
       const { data: u } = await sb.auth.getUser();
@@ -325,7 +355,7 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
       const { data: u } = await sb.auth.getUser();
       const rows = check(await sb.rpc("post_comments", { p_post: postId })) as any[];
       return rows.map((r) => ({ id: r.id, body: r.body, createdAt: r.created_at, userId: r.user_id, name: r.name, shopHandle: r.shop_handle,
-        isSeller: r.is_seller, mine: r.user_id === u.user?.id }));
+        isSeller: r.is_seller, mine: r.user_id === u.user?.id, userHandle: r.user_handle ?? null, avatarUrl: avatarUrl(r.avatar_path) }));
     },
     async addComment(postId, body) {
       check(await sb.from("comments").insert({ post_id: postId, user_id: await uid(), body: body.trim() }));

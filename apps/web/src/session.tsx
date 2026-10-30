@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import { api, type Category, type Reaction, type User } from "./api";
+import { api, type Category, type MyProfile, type Reaction, type User } from "./api";
 import { keepInterests, savedInterests } from "./lib/rank";
 
 interface Session {
@@ -33,6 +33,11 @@ interface Session {
   /** Categories picked on the welcome screens. Kept on this phone and on the account. */
   interests: Category[];
   setInterests: (list: Category[]) => void;
+  /** The signed in person's profile: name, @username, photo. Null while loading or signed out. */
+  profile: MyProfile | null;
+  refreshProfile: () => Promise<void>;
+  /** A new account that still needs its name, username and age check (shown as the Create account steps). */
+  needsSetup: boolean;
 }
 
 const Ctx = createContext<Session>({
@@ -40,6 +45,7 @@ const Ctx = createContext<Session>({
   liked: new Set(), reposted: new Set(), toggleReaction: async () => {}, blockedShops: new Set(), refreshBlocks: () => {},
   dataSaver: false, setDataSaver: () => {}, soundOn: false, setSoundOn: () => {}, menuOpen: false, setMenuOpen: () => {},
   withUser: () => {}, signInAsk: null, closeSignIn: () => {}, interests: [], setInterests: () => {},
+  profile: null, refreshProfile: async () => {}, needsSetup: false,
 });
 
 const readPref = (k: string) => {
@@ -79,22 +85,32 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   // Interests picked before signing in follow you onto the account.
   useEffect(() => { if (user && interests.length) api.saveInterests(interests).catch(() => {}); }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // The profile (name, @username, photo). New accounts have no username yet, so they get the Create account steps.
+  const [profile, setProfile] = useState<MyProfile | null>(null);
+  const refreshProfile = useCallback(async () => {
+    try { setProfile(await api.myProfile()); } catch { setProfile(null); }
+  }, []);
+  useEffect(() => { if (user) refreshProfile(); else setProfile(null); }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const needsSetup = !!user && !!profile && profile.id === user.id && !profile.setUp;
+
   // Signing in from a sheet keeps you where you were, then finishes what you tapped (like, follow, buy, message).
+  // A brand new account sets up its name and username first, then the action runs.
   const [signInAsk, setSignInAsk] = useState<string | null>(null);
   const pending = useRef<(() => void) | null>(null);
   const withUser = useCallback((action?: () => void, why?: string) => {
-    if (user) return action?.();
+    if (user && !needsSetup) return action?.();
     pending.current = action ?? null;
-    setSignInAsk(why ?? "Sign in to continue");
-  }, [user]);
+    if (!user) setSignInAsk(why ?? "Sign in to continue");
+  }, [user, needsSetup]);
   const closeSignIn = useCallback(() => { pending.current = null; setSignInAsk(null); }, []);
+  useEffect(() => { if (user) setSignInAsk(null); }, [user?.id]);
+  const ready2 = !!user && !!profile && profile.id === user.id && profile.setUp;
   useEffect(() => {
-    if (!user) return;
-    setSignInAsk(null);
+    if (!ready2) return;
     const act = pending.current;
     pending.current = null;
     if (act) window.setTimeout(act, 50);
-  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [ready2]);
 
   useEffect(() => {
     if (!user) { setLiked(new Set()); setReposted(new Set()); setBlockedShops(new Set()); return setFollowing(new Set()); }
@@ -139,7 +155,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <Ctx.Provider value={{ user, ready, toast, following, toggleFollow, liked, reposted, toggleReaction, blockedShops, refreshBlocks, dataSaver, setDataSaver, soundOn, setSoundOn, menuOpen, setMenuOpen, withUser, signInAsk, closeSignIn, interests, setInterests }}>
+    <Ctx.Provider value={{ user, ready, toast, following, toggleFollow, liked, reposted, toggleReaction, blockedShops, refreshBlocks, dataSaver, setDataSaver, soundOn, setSoundOn, menuOpen, setMenuOpen, withUser, signInAsk, closeSignIn, interests, setInterests, profile, refreshProfile, needsSetup }}>
       {children}
       {msg && <div className="toast" role="status">{msg}</div>}
     </Ctx.Provider>

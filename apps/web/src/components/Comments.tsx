@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { Avatar } from "./Avatar";
 import { isRude } from "@app/core";
 import { api, type Comment } from "../api";
 import { useLoad, useSession } from "../session";
@@ -43,7 +44,7 @@ export function CommentsSheet({ postId, postOwnerShopHandle, onClose, onCount }:
       <div className="comments">
         {list?.map((c) => (
           <div key={c.id} className="comment">
-            <span className="avatar">{c.name[0]?.toUpperCase()}</span>
+            <Avatar url={c.avatarUrl} name={c.name} />
             <div className="grow">
               <div className="c-head">
                 {c.shopHandle ? <Link to={`/s/${c.shopHandle}`} onClick={onClose}><b>{c.name}</b></Link> : <b>{c.name}</b>}

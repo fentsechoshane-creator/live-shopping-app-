@@ -1,3 +1,4 @@
+import { cleanHandle } from "../../lib/handle";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, type Category, type MyShop } from "../../api";
@@ -66,9 +67,10 @@ function StepCategory({ value, onPick }: { value: Category | null; onPick: (c: C
 }
 
 function StepName({ category, onDone }: { category: Category; onDone: () => void }) {
-  const { user } = useSession();
+  const { user, profile } = useSession();
   const [name, setName] = useState("");
-  const [handle, setHandle] = useState("");
+  // Your username is your shop handle too, so people find you by one name. You can pick another.
+  const [handle, setHandle] = useState(profile?.handle ?? "");
   const { busy, error, run } = useAction();
   useEffect(() => { if (!handle) setHandle(name.toLowerCase().replace(/[^a-z0-9]+/g, ".").replace(/^\.|\.$/g, "").slice(0, 30)); }, [name]); // eslint-disable-line
   return (
@@ -77,8 +79,8 @@ function StepName({ category, onDone }: { category: Category; onDone: () => void
       <p className="muted">Buyers see this on every video. Signed in as {user?.email ?? user?.phone}.</p>
       <ErrorNote error={error} />
       <Field label="Shop name"><input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} required /></Field>
-      <Field label="Shop handle" hint="Letters, numbers and dots. Your link: /s/handle">
-        <input value={handle} onChange={(e) => setHandle(e.target.value.toLowerCase())} pattern="[a-z0-9._]{3,30}" required />
+      <Field label="Shop handle" hint={`Your shop link: myhaul.co.za/s/${handle || "handle"}. Same as your username unless you change it.`}>
+        <input value={handle} onChange={(e) => setHandle(cleanHandle(e.target.value))} autoCapitalize="none" autoCorrect="off" spellCheck={false} required />
       </Field>
       <button className="btn green block big" disabled={busy}>Continue</button>
     </form>

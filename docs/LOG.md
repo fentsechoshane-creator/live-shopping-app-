@@ -95,6 +95,15 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-10-30: Proper accounts (like Instagram and TikTok)
+- **Create account** after the email code (`components/AccountSetup.tsx`): 1) birthday as an age check (18 and over; the date isn't saved, only that it was confirmed), 2) name and a unique @username, checked while typing with a green tick or the reason, plus free suggestions from the name, agreeing to the terms on the button, 3) profile photo (optional, cropped square on the phone). Whatever you tapped before signing in (buy, like, follow) carries on after.
+- **Usernames:** 3 to 30 lowercase letters, numbers, dots and underscores; no dot at the start or end or two in a row; at least one letter; reserved words blocked (admin, myhaul, support and so on). Usernames and shop handles share one list, so nobody can take another person's name as a shop. Change once every 30 days. Rules in `lib/handle.ts` and the database (`handle_problem`, `set_username`, `complete_account`, migration 0015).
+- **Profile photos** in a public `avatars` bucket (your own folder only). Shown on your profile, the menu, comments, the feed and shop pages. Deleting an account removes the photo.
+- **Edit profile:** photo (change or remove), name, username with the live check and the 30 day rule, bio.
+- Opening a shop suggests your username as the shop handle.
+- Existing accounts without a username get the Create account steps the next time they open the app.
+- Not yet: public profile pages for buyers (`/u/username`), photos in the chat list, @mentions. [Next]
+
 ### 2026-10-30: Live web version on Netlify
 - Live app: https://myhaul-app.netlify.app (Netlify project `myhaul-app`, builds from `main` on every push, public Supabase URL and anon key set in Netlify). The site is set to Private in Netlify for now: only Ofentse's Netlify account can open it until "Make public" is clicked.
 - Supabase Site URL set to https://myhaul-app.netlify.app.

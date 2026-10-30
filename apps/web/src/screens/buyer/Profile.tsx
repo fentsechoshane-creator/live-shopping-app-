@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { canUse, TIER_INFO, tierFor, TRUST_POINTS, WELCOME_CREDIT } from "@app/core";
-import { api, type MyShop, type Order } from "../../api";
+import { api, type MyProfile, type MyShop, type Order } from "../../api";
 import { useLoad, useSession } from "../../session";
 import { Icon } from "../../components/Icon";
 import { ProductArt } from "../../components/Scene";
@@ -10,6 +10,9 @@ import { CertUpload } from "../seller/Selling";
 import { PostGrid } from "../../components/PostGrid";
 import { shareOrCopy } from "../../native";
 import { useTabSwipe } from "../../components/gestures";
+import { Avatar } from "../../components/Avatar";
+import { cleanHandle, handleProblem } from "../../lib/handle";
+import { squarePhoto } from "../../lib/image";
 
 type Tab = "posts" | "likes" | "reposts";
 
@@ -18,7 +21,7 @@ type Tab = "posts" | "likes" | "reposts";
  * tabs only change the numbers, the short line under them, the small buttons and the grid.
  */
 export function Profile() {
-  const { user, setMenuOpen, following, toast } = useSession();
+  const { user, setMenuOpen, following, toast, refreshProfile } = useSession();
   const [params, setParams] = useSearchParams();
   const [profile, , reloadProfile] = useLoad(() => (user ? api.myProfile() : Promise.resolve(null)), [user?.id]);
   const [credit] = useLoad(() => (user ? api.welcomeCreditAvailable() : Promise.resolve(false)), [user?.id]);
@@ -44,8 +47,8 @@ export function Profile() {
 
   if (!user) return null;
   if (!profile) return <div className="screen"><Loading /></div>;
-  const name = profile.displayName || user.email?.split("@")[0] || "You";
-  const handle = name.toLowerCase().replace(/[^a-z0-9.]+/g, ".");
+  const name = profile.displayName || profile.handle || user.email?.split("@")[0] || "You";
+  const handle = profile.handle ?? "";
   const share = async () => { if ((await shareOrCopy(hasShop ? `/s/${shop!.handle}` : "/")) === "copied") toast("Link copied"); };
 
   const sold = (sales ?? []).filter((o) => !["cancelled", "refunded"].includes(o.status)).length;
@@ -73,7 +76,9 @@ export function Profile() {
       </div>
 
       <div className="phead">
-        <div className={`pavatar ${hasShop ? "green" : ""}`}>{name[0]?.toUpperCase()}</div>
+        <button className="pavatar-btn" onClick={() => setSheet("edit")} aria-label="Change profile photo">
+          <Avatar url={profile.avatarUrl} name={name} className={`pavatar ${hasShop ? "green" : ""}`} />
+        </button>
         <div className="pstats">
           <button onClick={() => { setTab("posts"); document.getElementById("grid")?.scrollIntoView({ behavior: "smooth" }); }}>
             <b>{hasShop ? shop!.products.filter((p) => p.status === "live").length : 0}</b><span>Posts</span></button>
@@ -121,7 +126,7 @@ export function Profile() {
         {tab !== "posts" && <ReactionGrid kind={tab === "likes" ? "like" : "repost"} />}
       </div>
 
-      {sheet === "edit" && <EditProfile name={name} bio={profile.bio} onClose={() => setSheet(null)} onSaved={reloadProfile} />}
+      {sheet === "edit" && <EditProfile profile={profile} onClose={() => setSheet(null)} onSaved={() => { reloadProfile(); refreshProfile(); }} />}
       {sheet === "following" && <FollowingSheet onClose={() => setSheet(null)} />}
       {sheet === "trust" && hasShop && <TrustSheet shop={shop!} onClose={() => setSheet(null)} />}
     </div>
@@ -269,16 +274,59 @@ function TrustSheet({ shop, onClose }: { shop: MyShop; onClose: () => void }) {
   );
 }
 
-function EditProfile({ name, bio, onClose, onSaved }: { name: string; bio: string; onClose: () => void; onSaved: () => void }) {
-  const [value, setValue] = useState(name);
-  const [text, setText] = useState(bio);
+/** Edit profile like Instagram: photo, name, @username (once every 30 days) and bio, in one sheet. */
+function EditProfile({ profile, onClose, onSaved }: { profile: MyProfile; onClose: () => void; onSaved: () => void }) {
+  const [name, setName] = useState(profile.displayName);
+  const [handle, setHandle] = useState(profile.handle ?? "");
+  const [bio, setBio] = useState(profile.bio);
+  const [photo, setPhoto] = useState<{ blob: Blob | null; url: string | null } | null>(null);
+  const [free, setFree] = useState<boolean | null>(null);
   const { busy, error, run } = useAction();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const changed = handle !== (profile.handle ?? "");
+  const nextChange = profile.handleChangedAt ? new Date(new Date(profile.handleChangedAt).getTime() + 30 * 86400e3) : null;
+  const locked = !!nextChange && nextChange > new Date();
+  const problem = changed ? handleProblem(handle) : null;
+  useEffect(() => {
+    setFree(null);
+    if (!changed || problem) return;
+    const t = window.setTimeout(() => api.availableHandles([handle]).then((f) => setFree(f.includes(handle))).catch(() => {}), 350);
+    return () => window.clearTimeout(t);
+  }, [handle, changed, problem]);
+  const pick = async (f: File | undefined) => { if (f) { const blob = await squarePhoto(f); setPhoto({ blob, url: URL.createObjectURL(blob) }); } };
+  const save = () => run(async () => {
+    if (photo) await api.setAvatar(photo.blob);
+    if (changed) await api.setUsername(handle);
+    await api.updateProfile(name, bio);
+    onSaved();
+    onClose();
+  });
+  const shownPhoto = photo ? photo.url : profile.avatarUrl;
   return (
     <Sheet title="Edit profile" onClose={onClose}
-      footer={<button className="btn green block big" disabled={busy || !value.trim()} onClick={() => run(async () => { await api.updateProfile(value, text); onSaved(); onClose(); })}>Save</button>}>
+      footer={<button className="btn green block big" disabled={busy || !name.trim() || (changed && (!!problem || free !== true))} onClick={save}>{busy ? "Saving…" : "Save"}</button>}>
       <ErrorNote error={error} />
-      <Field label="Name"><input value={value} onChange={(e) => setValue(e.target.value)} maxLength={40} /></Field>
-      <Field label="Bio" hint={`${text.length} of 150`}><textarea value={text} onChange={(e) => setText(e.target.value)} maxLength={150} rows={3} placeholder="What you sell or love to buy" /></Field>
+      <div className="stack" style={{ alignItems: "center", marginBottom: 12 }}>
+        <button className="setup-photo" style={{ marginTop: 0 }} onClick={() => fileRef.current?.click()} aria-label="Change profile photo">
+          <Avatar url={shownPhoto} name={name || "?"} className="pavatar" />
+          <span className="cam"><Icon name="edit" size={14} /></span>
+        </button>
+        <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => pick(e.target.files?.[0])} />
+        <div className="row" style={{ gap: 16 }}>
+          <button className="link" onClick={() => fileRef.current?.click()}>{shownPhoto ? "Change photo" : "Add a photo"}</button>
+          {shownPhoto && <button className="link" style={{ color: "var(--red-text)" }} onClick={() => setPhoto({ blob: null, url: null })}>Remove</button>}
+        </div>
+      </div>
+      <Field label="Name"><input value={name} onChange={(e) => setName(e.target.value)} maxLength={40} autoComplete="name" /></Field>
+      <Field label="Username" hint={locked && !changed ? `You can change it again on ${nextChange!.toLocaleDateString("en-ZA", { day: "numeric", month: "long" })}.`
+        : changed ? (problem ?? (free === true ? `@${handle} is available` : free === false ? `@${handle} is taken` : "Checking…")) : "You can change it once every 30 days."}>
+        <div className={`handle-input ${changed && free ? "ok" : changed && (problem || free === false) ? "bad" : ""}`}>
+          <span>@</span>
+          <input value={handle} onChange={(e) => setHandle(cleanHandle(e.target.value))} disabled={locked}
+            autoCapitalize="none" autoCorrect="off" spellCheck={false} maxLength={30} aria-label="Username" />
+        </div>
+      </Field>
+      <Field label="Bio" hint={`${bio.length} of 150`}><textarea value={bio} onChange={(e) => setBio(e.target.value)} maxLength={150} rows={3} placeholder="What you sell or love to buy" /></Field>
     </Sheet>
   );
 }

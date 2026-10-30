@@ -15,6 +15,7 @@ import { useSwipe } from "../../components/gestures";
 import { shareOrCopy, tap } from "../../native";
 import { useMessageShop } from "./Messages";
 import { rankFeed } from "../../lib/rank";
+import { Avatar } from "../../components/Avatar";
 
 type Tab = "for_you" | "following" | "live";
 
@@ -135,6 +136,8 @@ export function FeedList({ items, start = 0, onNearEnd }: { items: FeedItem[]; s
 
   const [counts, setCounts] = useState<Record<string, { likes: number; reposts: number }>>({});
   useEffect(() => { api.postCounts(items.map((it) => it.postId)).then(setCounts).catch(() => {}); }, [items]);
+  const [avatars, setAvatars] = useState<Record<string, string>>({});
+  useEffect(() => { api.shopAvatars(items.map((it) => it.shop.id)).then(setAvatars).catch(() => {}); }, [items]);
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
   useEffect(() => { api.commentCounts(items.map((it) => it.postId)).then(setCommentCounts).catch(() => {}); }, [items]);
   const [commenting, setCommenting] = useState<FeedItem | null>(null);
@@ -147,7 +150,7 @@ export function FeedList({ items, start = 0, onNearEnd }: { items: FeedItem[]; s
   return (
     <>
       <div className="feed" ref={ref} aria-label="Video feed">
-        {items.map((it) => <VideoCard key={it.postId} item={it} counts={counts[it.postId]} comments={commentCounts[it.postId] ?? 0}
+        {items.map((it) => <VideoCard key={it.postId} item={it} avatar={avatars[it.shop.id]} counts={counts[it.postId]} comments={commentCounts[it.postId] ?? 0}
           onBrowse={() => setBrowse(it)} onBuy={() => startBuy(it)} onComments={() => setCommenting(it)} onMore={() => setMore(it)} />)}
       </div>
       {items.length > 1 && (
@@ -199,8 +202,8 @@ function statusChip(it: FeedItem): { text: string; tone: "green" | "amber" } | n
 /** Short count like TikTok: 1234 shows as 1.2K. */
 const short = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1).replace(/\.0$/, "")}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1).replace(/\.0$/, "")}K` : String(n));
 
-function VideoCard({ item, counts, comments, onBrowse, onBuy, onComments, onMore }: {
-  item: FeedItem; counts?: { likes: number; reposts: number }; comments: number; onBrowse: () => void; onBuy: () => void; onComments: () => void; onMore: () => void;
+function VideoCard({ item, avatar, counts, comments, onBrowse, onBuy, onComments, onMore }: {
+  item: FeedItem; avatar?: string; counts?: { likes: number; reposts: number }; comments: number; onBrowse: () => void; onBuy: () => void; onComments: () => void; onMore: () => void;
 }) {
   const p = item.product;
   const { following, toggleFollow, liked, reposted, toggleReaction, toast, withUser } = useSession();
@@ -235,7 +238,7 @@ function VideoCard({ item, counts, comments, onBrowse, onBuy, onComments, onMore
         )}
         <div className="seller-row">
           <Link to={`/s/${item.shop.handle}`} className="row" style={{ gap: 8 }}>
-            <span className="avatar">{item.shop.name[0]}</span>
+            <Avatar url={avatar} name={item.shop.name} />
             <span className="handle">@{item.shop.handle}</span>
           </Link>
           <button className="follow-btn vglass" onClick={() => withUser(() => toggleFollow(item.shop.id), "Sign in to follow")} aria-pressed={isFollowing}>
