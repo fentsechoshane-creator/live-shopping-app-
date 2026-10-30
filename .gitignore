@@ -9,3 +9,4 @@ supabase/.branches/
 apps/web/e2e/shots/
 dist-artifact/
 .netlify
+apps/web/e2e/audit/

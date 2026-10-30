@@ -76,6 +76,18 @@ body { background: var(--bg); color: var(--ink); font-family: var(--font); font-
 button, a { touch-action: manipulation; -webkit-user-select: none; user-select: none; }
 button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
+/* iPhone Safari: form fields keep their own minimum width (date and select boxes ran off the screen) and zoom in under 16px.
+   Every field shrinks to fit, never wider than its box, at 16px or more. */
+input, select, textarea { min-width: 0; max-width: 100%; }
+input[type="date"], input[type="time"], input[type="datetime-local"], input[type="month"] {
+  -webkit-appearance: none; appearance: none; display: block; width: 100%; min-width: 0; text-align: left; line-height: normal;
+}
+input[type="date"]::-webkit-date-and-time-value, input[type="time"]::-webkit-date-and-time-value { text-align: left; margin: 0; }
+input[type="date"]::-webkit-calendar-picker-indicator { margin-left: auto; }
+select { -webkit-appearance: none; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%238e8e93' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 14px center; padding-right: 36px !important; text-overflow: ellipsis; }
+input, select, textarea { font-size: max(16px, 1em); }
+img, video { max-width: 100%; }
 a { color: inherit; text-decoration: none; }
 :focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; border-radius: 10px; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
@@ -148,7 +160,7 @@ a { color: inherit; text-decoration: none; }
 .field label { font-size: 13px; font-weight: 600; color: var(--ink-2); padding-left: 4px; }
 .field input, .field select, .field textarea {
   border: 1px solid transparent; border-radius: var(--r-sm); padding: 13px 14px; min-height: 50px; width: 100%; font-size: 16px;
-  background: var(--surface); color: var(--ink); box-shadow: 0 0 0 0.5px var(--hairline);
+  background-color: var(--surface); color: var(--ink); box-shadow: 0 0 0 0.5px var(--hairline);
 }
 .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--blue); }
 .field textarea { min-height: 96px; resize: vertical; }
