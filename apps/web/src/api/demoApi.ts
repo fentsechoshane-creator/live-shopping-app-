@@ -1,13 +1,13 @@
 // Demo adapter: the whole app runs in the browser with sample data, using the same rules as the server.
 // Used when no Supabase keys are set. Sign in with any email or phone and the code 123456.
 import {
-  canTransition, isRude, orderTotals, payoutDate, releasableAt, returnReasonsFor, shipBy, tierFor, TRUST_POINTS, validateListing,
+  bidStep, maskHandle, canTransition, isRude, orderTotals, payoutDate, releasableAt, returnReasonsFor, shipBy, tierFor, TRUST_POINTS, validateListing,
   RETURN_POSTAGE_PAYER, type OrderStatus, type TrustEventKind,
 } from "@app/core";
 import { handleProblem } from "../lib/handle";
 import type {
   Api, Category, ReportReason, ReportTarget, CheckoutInput, FeedItem, ListingInput, MyShop, Notification, Order, Payout, PendingReview, ProductPublic, ReviewStatus,
-  ShopPublic, User, SavedDelivery, AppError,
+  ShopPublic, User, SavedDelivery, AppError, AuctionInfo,
 } from "./types";
 
 interface DShop {
@@ -15,7 +15,9 @@ interface DShop {
   status: MyShop["status"]; foundingUntil: string | null;
   checks: MyShop["checks"];
 }
-interface DProduct extends ProductPublic { shopId: string; proofStatus: ReviewStatus }
+interface DProduct extends ProductPublic { shopId: string; proofStatus: ReviewStatus;
+  auctionEndsAt?: string | null; reserveCents?: number | null; auctionState?: AuctionInfo["state"]; auctionRound?: number;
+  auctionWinner?: string | null; auctionPriceCents?: number | null; auctionPayBy?: string | null }
 interface DPost { id: string; shopId: string; productId: string; caption: string; video: FeedItem["video"]; createdAt: string; photos?: string[] }
 interface DOrder extends Order { shopOwnerId: string; bundleIds?: string[]; offerId?: string | null }
 interface DUser extends User { trust: number; welcomeUsed: boolean; admin: boolean; createdAt?: string; bio?: string;
@@ -35,9 +37,10 @@ interface State {
   delivery?: Record<string, SavedDelivery>;
   interests?: Record<string, Category[]>;
   errors?: AppError[];
+  bids?: { id: string; productId: string; round: number; bidderId: string; amountCents: number; at: string }[];
 }
 
-const KEY = "lsa-demo-v3";
+const KEY = "lsa-demo-v4"; // v4: adds a sample auction
 // Made up seller videos (drawn product scenes with captions and music) so the player can be tested.
 import teeClip from "../assets/demo/tee.mp4";
 import cakeClip from "../assets/demo/cake.mp4";
@@ -69,6 +72,9 @@ function seed(): State {
     p({ id: "p-denim", shopId: "s-lebo", title: "Vintage denim jacket", priceCents: 45000, label: "pre_loved", condition: "good", sizes: ["M"], stock: 1, description: "Small mark on the left cuff, shown in the video." }),
     p({ id: "p-runner", shopId: "s-lebo", title: "Chunky white runner", priceCents: 52000, label: "unbranded_dupe", sizes: ["5", "6", "7", "8"] }),
     p({ id: "p-shirt", shopId: "s-luxe", title: "Designer silk shirt", priceCents: 120000, label: "authentic_designer", condition: "like_new", sizes: ["M"], stock: 1, proofStatus: "approved", description: "Receipt and tags checked." }),
+    p({ id: "p-auction", shopId: "s-luxe", title: "Vintage 90s denim jacket, rare wash", priceCents: 60000, mode: "auction", label: "pre_loved", condition: "good",
+      sizes: ["L"], stock: 1, description: "Original 90s wash. Every mark shown in the video.", reserveCents: 90000, auctionState: "open", auctionRound: 0,
+      auctionEndsAt: new Date(Date.now() + 26 * 3600e3 + 14 * 60e3).toISOString() }),
     p({ id: "p-cake", shopId: "s-sweet", title: "Celebration cake, 20 cm", priceCents: 65000, mode: "order_now", leadDays: 2, stock: 99, allergens: "Gluten, eggs, dairy", description: "Vanilla, chocolate or red velvet. Add a message." }),
   ];
   const v = (bg: string, label: string, scene?: string) => ({ demo: { bg, label, scene } });
@@ -78,9 +84,16 @@ function seed(): State {
     { id: "po-2", shopId: "s-luxe", productId: "p-shirt", caption: "Silk shirt, worn twice. Receipt checked.", video: v("#2f3a4a", "Seller video: shirt close up", "shirt"), createdAt: new Date(now - 7200e3).toISOString() },
     { id: "po-3", shopId: "s-sweet", productId: "p-cake", caption: "Decorating a celebration cake", video: v("#6b4a4a", "Seller video: decorating a cake", "cake"), createdAt: new Date(now - 9000e3).toISOString() },
     { id: "po-4", shopId: "s-lebo", productId: "p-denim", caption: "Real denim, every mark on camera", video: v("#34495e", "Seller video: denim jacket", "denim"), createdAt: new Date(now - 12000e3).toISOString() },
+    { id: "po-6", shopId: "s-luxe", productId: "p-auction", caption: "Auction: 90s denim, one of one. Starts at R600.", video: v("#2c3e50", "Seller video: 90s denim jacket", "denim"), createdAt: new Date(now - 5400e3).toISOString() },
     { id: "po-5", shopId: "s-lebo", productId: "p-runner", caption: "Chunky runner, no logos", video: v("#4a4a3a", "Seller video: runners", "runner"), createdAt: new Date(now - 15000e3).toISOString() },
   ];
-  return { users: bots, currentUserId: null, shops, products, posts, orders: [], notifications: [], payouts: [], clockOffsetMs: 0, follows: [],
+  const ago = (m: number) => new Date(now - m * 60e3).toISOString();
+  const bids = [
+    { id: "b-1", productId: "p-auction", round: 0, bidderId: "u-lebo", amountCents: 60000, at: ago(80) },
+    { id: "b-2", productId: "p-auction", round: 0, bidderId: "u-sweet", amountCents: 64000, at: ago(55) },
+    { id: "b-3", productId: "p-auction", round: 0, bidderId: "u-lebo", amountCents: 70000, at: ago(20) },
+  ];
+  return { bids, users: bots, currentUserId: null, shops, products, posts, orders: [], notifications: [], payouts: [], clockOffsetMs: 0, follows: [],
     // Sample activity: Lebo reposted the cake and liked the silk shirt, so the Following feed shows a repost.
     comments: [
       { id: "c-1", postId: "po-1", userId: "u-sweet", body: "The sand colour is so nice. Does it shrink?", createdAt: new Date(now - 3000e3).toISOString() },
@@ -212,8 +225,49 @@ export function createDemoApi(): Api {
       topUpCents: o.totals.creditTopUp ?? 0, topUpPaid: false });
   }
 
+  // ===== Auctions (same rules as migration 0016). Auctions use the real clock, not the demo day skip. =====
+  const roundBids = (p: DProduct) => (s.bids ?? []).filter((b) => b.productId === p.id && b.round === (p.auctionRound ?? 0)).sort((a, b) => b.amountCents - a.amountCents || a.at.localeCompare(b.at));
+  const handleOf = (uid: string) => s.users.find((x) => x.id === uid)?.handle ?? null;
+  function settleAuction(p: DProduct) {
+    if (p.mode !== "auction") return;
+    const owner = shopOf(p.shopId).ownerId;
+    if (p.auctionState === "open" && p.auctionEndsAt && Date.now() >= new Date(p.auctionEndsAt).getTime()) {
+      const top = roundBids(p)[0];
+      if (top && top.amountCents >= (p.reserveCents ?? 0)) {
+        Object.assign(p, { auctionState: "won", auctionWinner: top.bidderId, auctionPriceCents: top.amountCents, auctionPayBy: new Date(Date.now() + 2 * 3600e3).toISOString(), status: "sold_out" });
+        notify(top.bidderId, `You won: ${p.title}`, `Pay R${top.amountCents / 100} within 2 hours to keep it. Your money is held safely until it arrives.`, `/i/${p.id}`);
+        notify(owner, `Sold at auction: ${p.title}`, `R${top.amountCents / 100}. The winner has 2 hours to pay.`, `/i/${p.id}`);
+      } else {
+        Object.assign(p, { auctionState: "unsold", status: "draft" });
+        notify(owner, `Auction ended: ${p.title}`, top ? "The reserve wasn't met. You can list it again." : "No bids this time. You can list it again.");
+      }
+      save();
+    } else if (p.auctionState === "won" && p.auctionPayBy && Date.now() > new Date(p.auctionPayBy).getTime()
+               && !s.orders.some((o) => o.product.id === p.id && o.buyerId === p.auctionWinner && !["pending_payment", "cancelled"].includes(o.status))) {
+      Object.assign(p, { auctionState: "unpaid", status: "draft" });
+      if (p.auctionWinner) { trust(p.auctionWinner, "unpaid_auction_win"); notify(p.auctionWinner, "Auction win cancelled", `${p.title} wasn't paid within 2 hours, so you lost trust points.`); }
+      notify(owner, `Winner didn't pay: ${p.title}`, "You can list it again.");
+      save();
+    }
+  }
+  function auctionInfoFor(p: DProduct): AuctionInfo {
+    const viewer = s.currentUserId;
+    const bs = roundBids(p);
+    const top = bs[0];
+    return {
+      productId: p.id, state: p.auctionState ?? null, endsAt: p.auctionEndsAt ?? null, startCents: p.priceCents,
+      currentCents: top?.amountCents ?? null, bidCount: bs.length,
+      minNextCents: top ? top.amountCents + bidStep(top.amountCents) : p.priceCents,
+      reserveSet: p.reserveCents != null, reserveMet: p.reserveCents == null || (top?.amountCents ?? 0) >= p.reserveCents,
+      leaderIsMe: !!top && top.bidderId === viewer, myTopCents: bs.filter((b) => b.bidderId === viewer)[0]?.amountCents ?? null,
+      winnerIsMe: !!viewer && p.auctionWinner === viewer, priceCents: p.auctionPriceCents ?? null, payBy: p.auctionPayBy ?? null,
+      recent: bs.slice(0, 5).map((b) => ({ who: b.bidderId === viewer ? "You" : maskHandle(handleOf(b.bidderId)), amountCents: b.amountCents, at: b.at })),
+    };
+  }
+
   /** Same jobs as the run-due server function. */
   function runDue() {
+    for (const p of s.products) settleAuction(p);
     const t = now();
     for (const o of s.orders) {
       if (o.status === "paid" && o.shipBy && new Date(o.shipBy) < t) setStatus(o, "refunded");
@@ -306,7 +360,13 @@ export function createDemoApi(): Api {
       await wait();
       const u = me();
       const p = s.products.find((x) => x.id === input.productId);
-      if (!p || p.status !== "live") throw new Error("This item is no longer available.");
+      if (p) settleAuction(p);
+      const auction = p?.mode === "auction";
+      if (auction) {
+        if (p!.auctionState !== "won" || p!.auctionWinner !== u.id) throw new Error("Only the winner can pay for this auction.");
+        if (!p!.auctionPayBy || new Date(p!.auctionPayBy) < new Date()) throw new Error("The 2 hours to pay have passed.");
+      } else if (!p || p.status !== "live") throw new Error("This item is no longer available.");
+      if (!p) throw new Error("This item is no longer available.");
       const sh = shopOf(p.shopId);
       if (sh.ownerId === u.id) throw new Error("You cannot buy your own item.");
       if (p.sizes.length && !p.sizes.includes(input.size ?? "")) throw new Error("Pick a size.");
@@ -315,7 +375,7 @@ export function createDemoApi(): Api {
         throw new Error("Add your name, phone and address for the courier.");
       if (p.mode === "order_now" && (!input.foodDate || !input.foodSlot)) throw new Error("Pick a date and time slot.");
       if (p.heldFor && p.heldFor !== u.id && p.heldUntil && new Date(p.heldUntil) > new Date()) throw new Error("The seller is holding this item for someone else right now.");
-      let itemPrice = p.priceCents;
+      let itemPrice = auction ? p.auctionPriceCents! : p.priceCents;
       let bundleIds: string[] = [];
       let title = p.title;
       if (input.offerId) {
@@ -349,6 +409,8 @@ export function createDemoApi(): Api {
       const o = s.orders.find((x) => x.id === orderId && x.buyerId === me().id);
       if (!o || o.status !== "pending_payment") throw new Error("Nothing to pay.");
       setStatus(o, "paid");
+      const ap = s.products.find((x) => x.id === o.product.id && x.mode === "auction");
+      if (ap) Object.assign(ap, { auctionState: "paid", status: "sold_out", stock: 0 });
       save();
     },
     async myOrders() {
@@ -528,6 +590,38 @@ export function createDemoApi(): Api {
       });
     },
     async savePushToken() { /* demo: nothing to send to */ },
+    async auctionInfo(ids) {
+      const out: Record<string, AuctionInfo> = {};
+      for (const pid of ids) { const p = s.products.find((x) => x.id === pid && x.mode === "auction"); if (p) { settleAuction(p); out[pid] = auctionInfoFor(p); } }
+      return out;
+    },
+    async placeBid(productId, amountCents) {
+      await wait(200);
+      const u = me();
+      const p = s.products.find((x) => x.id === productId);
+      if (p) settleAuction(p);
+      if (!p || p.mode !== "auction" || p.status !== "live" || p.auctionState !== "open" || !p.auctionEndsAt || Date.now() >= new Date(p.auctionEndsAt).getTime()) throw new Error("This auction has ended.");
+      const sh = shopOf(p.shopId);
+      if (sh.status !== "open") throw new Error("This auction has ended.");
+      if (sh.ownerId === u.id) throw new Error("You can't bid on your own item.");
+      if (!u.handle || !u.adult) throw new Error("Finish setting up your account to bid.");
+      if (u.trust < 40) throw new Error("Your account is under review, so you can't bid right now.");
+      if (blockedBetween(u.id, sh.ownerId)) throw new Error("You can't bid on this shop.");
+      const top = roundBids(p)[0];
+      const min = top ? top.amountCents + bidStep(top.amountCents) : p.priceCents;
+      if (amountCents < min) throw new Error(`The lowest bid now is R${min / 100}.`);
+      if (amountCents > Math.max(min * 5, 100000)) throw new Error("That's far above the current bid. Check the amount.");
+      s.bids = [...(s.bids ?? []), { id: id(), productId: p.id, round: p.auctionRound ?? 0, bidderId: u.id, amountCents, at: new Date().toISOString() }];
+      if (new Date(p.auctionEndsAt).getTime() - Date.now() < 2 * 60e3) p.auctionEndsAt = new Date(Date.now() + 2 * 60e3).toISOString();
+      if (top && top.bidderId !== u.id) notify(top.bidderId, "You've been outbid", `${p.title} is now at R${amountCents / 100}. Bid again before it ends.`, `/i/${p.id}`);
+      notify(sh.ownerId, `New bid: R${amountCents / 100}`, p.title, `/i/${p.id}`);
+      save();
+      return auctionInfoFor(p);
+    },
+    async settleAuction(productId) {
+      const p = s.products.find((x) => x.id === productId);
+      if (p) settleAuction(p);
+    },
     async savedDelivery() {
       const u = s.users.find((x) => x.id === s.currentUserId);
       return (u && s.delivery?.[u.id]) || null;
@@ -836,11 +930,18 @@ export function createDemoApi(): Api {
       let message = live ? undefined : "Saved as a draft. It goes live once your ID and bank account are checked.";
       if (input.mode === "order_now" && sh.checks.certStatus !== "approved") { live = false; message = "Order now needs an approved Certificate of Acceptability."; }
       if (input.label === "authentic_designer") { live = false; message = "We check the proof before designer items go live. This usually takes a day."; }
+      if (input.mode === "auction") {
+        if (goodOrders(sh.id) < 5) throw new Error("Auctions unlock after 5 delivered orders with good ratings.");
+        if (input.reserveCents != null && (input.reserveCents < input.priceCents || input.reserveCents > input.priceCents * 10))
+          throw new Error("The reserve must be between the starting bid and 10 times it.");
+      }
       const pid = id();
       s.products.push({
         id: pid, shopId: sh.id, title: input.title, description: input.description, priceCents: input.priceCents, mode: input.mode, label: input.label,
         condition: input.condition, sizes: input.sizes, stock: input.stock, leadDays: input.leadDays, allergens: input.allergens,
         status: live ? "live" : "draft", proofStatus: proof ? "pending" : "not_started",
+        ...(input.mode === "auction" ? { stock: 1, reserveCents: input.reserveCents ?? null, auctionState: live ? "open" : null, auctionRound: 0,
+          auctionEndsAt: new Date(Date.now() + (input.auctionDays ?? 3) * 86400e3).toISOString() } : {}),
       });
       if (video && sh.status === "open") {
         s.posts.unshift({ id: id(), shopId: sh.id, productId: pid, caption: input.caption, createdAt: now().toISOString(),

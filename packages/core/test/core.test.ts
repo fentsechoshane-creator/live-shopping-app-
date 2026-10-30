@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   rand, formatRand, protectionFee, orderTotals, sellerFee, releasableAt, payoutDate, nextFriday, addWorkingDays,
   reserveFor, scoreFrom, tierFor, canUse, validateListing, canTransition, returnReasonsFor, shipBy,
-  liveStock, goLiveBlockers, MIN_LIVE_STOCK, isRude, looksOffApp,
+  liveStock, goLiveBlockers, MIN_LIVE_STOCK, isRude, looksOffApp, bidStep, nextMinBid, reserveProblem, timeLeft, maskHandle,
 } from "../src/index.ts";
 
 describe("money", () => {
@@ -184,5 +184,29 @@ describe("safety", () => {
     expect(looksOffApp("WhatsApp me on 082 123 4567")).toBe(true);
     expect(looksOffApp("I can do EFT if you want")).toBe(true);
     expect(looksOffApp("Does it come in M?")).toBe(false);
+  });
+});
+
+describe("auctions", () => {
+  it("raises in steps by price band", () => {
+    expect(bidStep(10_000)).toBe(1_000);
+    expect(bidStep(49_999)).toBe(1_000);
+    expect(bidStep(50_000)).toBe(2_000);
+    expect(bidStep(250_000)).toBe(5_000);
+  });
+  it("first bid can be the starting price, then a step above", () => {
+    expect(nextMinBid(20_000, null)).toBe(20_000);
+    expect(nextMinBid(20_000, 25_000)).toBe(26_000);
+  });
+  it("checks the reserve", () => {
+    expect(reserveProblem(20_000, null)).toBeNull();
+    expect(reserveProblem(20_000, 10_000)).toMatch(/lower/);
+    expect(reserveProblem(20_000, 300_000)).toMatch(/10 times/);
+  });
+  it("shows time left and masks bidders", () => {
+    expect(timeLeft(0)).toBe("Ended");
+    expect(timeLeft(90 * 1000)).toBe("1m 30s");
+    expect(timeLeft((26 * 3600 + 60) * 1000)).toBe("1d 2h");
+    expect(maskHandle("thandi.m")).toBe("t***m");
   });
 });

@@ -29,7 +29,7 @@ export interface ListingInput {
   label: ListingLabel;
   condition?: Condition;
   hasProof?: boolean;
-  mode: "buy_now" | "order_now";
+  mode: "buy_now" | "order_now" | "auction";
 }
 
 export const MIN_PRICE = rand(20);

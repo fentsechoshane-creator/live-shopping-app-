@@ -20,7 +20,8 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 | Sign in by code on the live project | Waiting for 2 Supabase settings [Ofentse] |
 | Mobile app (iPhone and Android) | Built with Capacitor. Android test build on GitHub; iPhone needs a Mac with Xcode |
 | Chat, offers, holds, comments | Done |
-| Live streams and auctions | Not started (shown as "coming next") |
+| Timed auctions | Built (migration 0016), live database needs it; checkout and run-due functions to deploy [Lehloma] |
+| Live streams | Not started (shown as "coming next") |
 | Error reports, share previews, welcome, saved delivery | Done (previews need the web host) |
 
 ## Run the current version
@@ -94,6 +95,16 @@ Debug as we go: anyone who finds or fixes a problem updates this list. Highest r
 Fixed in this round: Safari double back on the edge swipe (now only in the installed app), deleting an account now also deletes the person's photos and videos, React Router warnings.
 
 ## Log
+
+### 2026-10-30: Timed auctions
+- **Sellers** (after 5 good orders, as the rules already said): Create a listing, Price step, pick **Auction**: starting bid, optional reserve, 1, 3, 5 or 7 days, one size. Locked with the reason shown until unlocked.
+- **Buyers:** amber **Bid · R700** button and "Auction · 1d 2h left" chip in the feed. The bid sheet shows the top bid, a countdown, reserve met or not (never the amount), quick amounts and your own amount, and the last 5 bids with names masked (t***a).
+- **Rules** (database `place_bid`, migration 0016, same numbers in `packages/core/src/auction.ts`): steps of R10 under R500, R20 under R2,000, then R50. A bid in the last 2 minutes adds 2 minutes (no sniping). No bidding on your own item, from a blocked shop, before finishing your account, while under review, or after two unpaid wins in 90 days. Sellers can't change price, reserve or end time once people have bid.
+- **The end** (`settle_auction`, run by `run-due` every 15 minutes and also by the app when the clock hits zero): top bid at or above the reserve wins and gets 2 hours to pay through the normal escrow checkout at the winning bid; otherwise the item goes back to the seller's drafts. An unpaid win is cancelled, costs the winner trust points, and the seller can list it again. Outbid, won and sold notices are sent.
+- `/i/<item>` links for auctions open the item directly, so a winner can pay from the notice.
+- Demo: a sample auction (90s denim jacket, Luxe Resale, reserve R900). Demo data key is now `lsa-demo-v4` (demo data resets once).
+- Server functions changed: `checkout` (only the winner pays, at the winning bid) and `run-due` (closes auctions). Deploy both after `npm run check:functions`. [Lehloma]
+- Not yet: auctions inside a live stream, seller relisting button (an ended auction sits in drafts), auction history on the shop page.
 
 ### 2026-10-30: Proper accounts (like Instagram and TikTok)
 - **Create account** after the email code (`components/AccountSetup.tsx`): 1) birthday as an age check (18 and over; the date isn't saved, only that it was confirmed), 2) name and a unique @username, checked while typing with a green tick or the reason, plus free suggestions from the name, agreeing to the terms on the button, 3) profile photo (optional, cropped square on the phone). Whatever you tapped before signing in (buy, like, follow) carries on after.

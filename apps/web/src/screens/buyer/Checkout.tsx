@@ -12,9 +12,10 @@ export const SAMPLE_LOCKERS = ["Rondebosch, Main Road", "Claremont, Cavendish Sq
 const FOOD_SLOTS = ["10:00 to 12:00", "12:00 to 14:00", "14:00 to 16:00"];
 
 /** `offer`: a special price from the seller (one item or a bundle), sent in chat. */
-export function CheckoutSheet({ item, onClose, offer }: { item: FeedItem; onClose: () => void; offer?: Offer | null }) {
+/** `auctionPrice`: the winning bid, when the winner is paying for an auction. */
+export function CheckoutSheet({ item, onClose, offer, auctionPrice }: { item: FeedItem; onClose: () => void; offer?: Offer | null; auctionPrice?: number | null }) {
   const p = item.product;
-  const price = offer ? offer.priceCents : p.priceCents;
+  const price = auctionPrice ?? (offer ? offer.priceCents : p.priceCents);
   const extra = offer ? offer.productIds.length - 1 : 0;
   const food = p.mode === "order_now";
   const options = (Object.keys(DELIVERY_OPTIONS) as DeliveryOption[]).filter((d) => !!DELIVERY_OPTIONS[d].foodOnly === food);
@@ -80,13 +81,13 @@ export function CheckoutSheet({ item, onClose, offer }: { item: FeedItem; onClos
         <>
           <ErrorNote error={error} />
           <button className="btn green block big" onClick={pay} disabled={busy || !!missing}>{busy ? "Opening payment…" : missing ?? `Pay ${R(t.total)}`}</button>
-          <p className="small muted row" style={{ justifyContent: "center", margin: "8px 0 0", gap: 6 }}><Icon name="shield" size={15} />Held safely until your {food ? "check period" : "return window"} closes.</p>
+          <p className="small muted row" style={{ justifyContent: "center", margin: "8px 0 0", gap: 6 }}><Icon name="shield" size={15} />Held safely until your {food || auctionPrice ? "check period" : "return window"} closes.</p>
         </>
       }>
       <div className="item-row">
         <div className="thumb art" style={{ width: 48, height: 48 }}><ProductArt productId={p.id} fallback={swatch(p.id)} /></div>
         <div className="grow"><b>{extra ? `Bundle: ${p.title} + ${extra} more` : p.title}</b>
-          <div className="small muted">@{item.shop.handle}{offer ? " · special price" : ""}</div></div>
+          <div className="small muted">@{item.shop.handle}{offer ? " · special price" : auctionPrice ? " · your winning bid" : ""}</div></div>
         <span style={{ textAlign: "right" }}>
           {offer && offer.listedCents > offer.priceCents && <s className="small muted" style={{ display: "block" }}>{R(offer.listedCents)}</s>}
           <b style={{ fontSize: 17 }}>{R(price)}</b>

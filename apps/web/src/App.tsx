@@ -6,6 +6,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Welcome, hasSeenWelcome } from "./components/Welcome";
 import { AccountSetup } from "./components/AccountSetup";
 import { Avatar } from "./components/Avatar";
+import { Viewer } from "./components/PostGrid";
 import { api } from "./api";
 import { useLoad, useSession } from "./session";
 import { Icon } from "./components/Icon";
@@ -35,8 +36,11 @@ function ItemLink() {
   const { id = "" } = useParams();
   const nav = useNavigate();
   const [item, error] = useLoad(() => api.productItem(id), [id]);
-  useEffect(() => { if (item) nav(`/s/${item.shop.handle}?item=${id}`, { replace: true }); }, [item]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Auctions open on their own (a won auction is no longer listed in the shop, but the winner needs to pay).
+  const single = item && item.product.mode === "auction";
+  useEffect(() => { if (item && !single) nav(`/s/${item.shop.handle}?item=${id}`, { replace: true }); }, [item]); // eslint-disable-line react-hooks/exhaustive-deps
   if (error || item === null) return <div className="screen"><BackButton /><div className="empty">This item isn't available any more.</div></div>;
+  if (single) return <Viewer items={[item]} start={0} onClose={() => (window.history.length > 1 ? nav(-1) : nav("/"))} />;
   return <div className="screen"><Loading /></div>;
 }
 

@@ -423,3 +423,76 @@ select pg_temp.act_as_anon();
 do $$ begin assert (select avatar_path from people_cards(array['00000000-0000-0000-0000-00000000000d'::uuid])) like '%me.jpg', 'photos are public'; end $$;
 reset role;
 select 'account tests passed' as result;
+-- ===== Auctions =====
+reset role;
+insert into auth.users (id, email) values ('00000000-0000-0000-0000-0000000000f1', 'bidder1@test.co.za'), ('00000000-0000-0000-0000-0000000000f2', 'bidder2@test.co.za');
+select pg_temp.act_as_service();
+update shops set status = 'open' where handle = 'thrift.with.lebo'; -- test setup: reopen the shop banned above
+select pg_temp.act_as_service();
+insert into products (shop_id, title, price_cents, sizes, status, stock, mode, reserve_cents, auction_ends_at, auction_state)
+  values ((select id from shops where handle = 'thrift.with.lebo'), 'Vintage leather jacket', 20000, '{}', 'live', 1, 'auction', 30000, now() + interval '1 day', 'open'),
+         ((select id from shops where handle = 'thrift.with.lebo'), 'Retro sunglasses', 5000, '{}', 'live', 1, 'auction', null, now() + interval '1 day', 'open');
+reset role;
+select pg_temp.act_as('00000000-0000-0000-0000-0000000000f1');
+select pg_temp.expect_error($$select place_bid((select id from products where title = 'Vintage leather jacket'), 20000)$$, 'Finish setting up');
+select complete_account('Bidder One', 'bidder.one', true, true);
+select pg_temp.expect_error($$select place_bid((select id from products where title = 'Vintage leather jacket'), 15000)$$, 'lowest bid now is R200');
+select place_bid((select id from products where title = 'Vintage leather jacket'), 20000);
+reset role;
+select pg_temp.act_as('00000000-0000-0000-0000-0000000000f2');
+select complete_account('Bidder Two', 'bidder.two', true, true);
+select pg_temp.expect_error($$select place_bid((select id from products where title = 'Vintage leather jacket'), 20500)$$, 'lowest bid now is R210');
+select place_bid((select id from products where title = 'Vintage leather jacket'), 21000);
+do $$ declare i jsonb := auction_info((select id from products where title = 'Vintage leather jacket')); begin
+  assert (i->>'currentCents')::int = 21000 and (i->>'bidCount')::int = 2, 'two bids, top R210';
+  assert (i->>'minNextCents')::int = 22000, 'next bid is R220 (R10 steps under R500)';
+  assert (i->>'leaderIsMe')::boolean and not (i->>'reserveMet')::boolean, 'leader is me, reserve not met';
+  assert i->'recent'->1->>'who' = 'b***e', 'other bidders are masked';
+end $$;
+reset role;
+do $$ begin assert exists (select 1 from notifications where user_id = '00000000-0000-0000-0000-0000000000f1' and title = 'You''ve been outbid'), 'outbid notice'; end $$;
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000a');
+select pg_temp.expect_error($$select place_bid((select id from products where title = 'Vintage leather jacket'), 50000)$$, 'own item');
+select pg_temp.expect_error($$update products set reserve_cents = 25000 where title = 'Vintage leather jacket'$$, 'once people have bid');
+reset role;
+-- No sniping: a bid in the last 2 minutes adds 2 minutes.
+select pg_temp.act_as_service();
+update products set auction_ends_at = now() + interval '30 seconds' where title = 'Vintage leather jacket';
+reset role;
+select pg_temp.act_as('00000000-0000-0000-0000-0000000000f1');
+select place_bid((select id from products where title = 'Vintage leather jacket'), 22000);
+reset role;
+do $$ begin assert (select auction_ends_at from products where title = 'Vintage leather jacket') > now() + interval '100 seconds', 'late bid extends the end'; end $$;
+-- Ends below the reserve: not sold, back to the seller's drafts.
+select pg_temp.act_as_service();
+update products set auction_ends_at = now() - interval '1 second' where title = 'Vintage leather jacket';
+reset role;
+select pg_temp.act_as_anon();
+select settle_auction((select id from products where title = 'Vintage leather jacket'));
+reset role;
+do $$ begin assert (select auction_state = 'unsold' and status = 'draft' from products where title = 'Vintage leather jacket'), 'reserve not met: unsold'; end $$;
+-- No reserve: the top bid wins and has 2 hours to pay; if not paid, trust points are lost.
+select pg_temp.act_as('00000000-0000-0000-0000-0000000000f2');
+select place_bid((select id from products where title = 'Retro sunglasses'), 5000);
+reset role;
+select pg_temp.act_as_service();
+update products set auction_ends_at = now() - interval '1 second' where title = 'Retro sunglasses';
+select settle_due_auctions();
+reset role;
+do $$ begin
+  assert (select auction_state = 'won' and status = 'sold_out' and auction_winner = '00000000-0000-0000-0000-0000000000f2' and auction_price_cents = 5000
+          from products where title = 'Retro sunglasses'), 'top bid wins';
+  assert exists (select 1 from notifications where user_id = '00000000-0000-0000-0000-0000000000f2' and title like 'You won%'), 'winner told';
+end $$;
+select pg_temp.act_as('00000000-0000-0000-0000-0000000000f1');
+select pg_temp.expect_error($$select place_bid((select id from products where title = 'Retro sunglasses'), 9000)$$, 'ended');
+reset role;
+select pg_temp.act_as_service();
+update products set auction_pay_by = now() - interval '1 second' where title = 'Retro sunglasses';
+select settle_due_auctions();
+reset role;
+do $$ begin
+  assert (select auction_state = 'unpaid' and status = 'draft' from products where title = 'Retro sunglasses'), 'unpaid win goes back to the seller';
+  assert exists (select 1 from trust_events where user_id = '00000000-0000-0000-0000-0000000000f2' and kind = 'unpaid_auction_win'), 'unpaid win costs trust';
+end $$;
+select 'auction tests passed' as result;

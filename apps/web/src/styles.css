@@ -746,3 +746,28 @@ button.g3 { border: 0; padding: 0; display: block; width: 100%; }
   border: 0; border-radius: 999px; background: var(--ink); color: var(--bg); font: inherit; font-weight: 600; font-size: 14px;
   padding: 8px 14px; margin-right: 10px; cursor: pointer;
 }
+
+/* ===== Auctions ===== */
+.seg-choice { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 4px 0 14px; }
+.seg-choice button { border: 0; border-radius: var(--r); padding: 12px 14px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--hairline);
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; color: var(--ink); font: inherit; min-height: 58px; }
+.seg-choice button b { font-size: 15px; display: inline-flex; align-items: center; gap: 5px; }
+.seg-choice button span { font-size: 12.5px; color: var(--ink-3); }
+.seg-choice button[aria-checked="true"] { box-shadow: inset 0 0 0 2px var(--ink); }
+.seg-choice button:disabled { opacity: 0.55; }
+.wz-price.small input { font-size: 22px; }
+.btn.amber { background: #fbbf24; color: #451a03; }
+.auction-hero { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 8px; padding: 14px 16px; border-radius: var(--r); background: var(--surface); box-shadow: inset 0 0 0 1px var(--hairline); margin-bottom: 12px; }
+.auction-hero .lbl { font-size: 12px; color: var(--ink-3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.auction-hero .amt { font-size: 32px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; }
+.auction-hero .clock { text-align: right; font-variant-numeric: tabular-nums; }
+.auction-hero .clock b { font-size: 20px; display: block; }
+.auction-hero .clock.ending b { color: var(--red-text); }
+.auction-flags { display: flex; flex-wrap: wrap; gap: 6px; margin: -4px 0 12px; }
+.quick-bids { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
+.quick-bids button { border: 0; border-radius: 999px; min-height: 44px; font: inherit; font-weight: 700; background: var(--surface); box-shadow: inset 0 0 0 1px var(--hairline); color: var(--ink); }
+.quick-bids button[aria-pressed="true"] { background: var(--ink); color: var(--bg); box-shadow: none; }
+.bid-list { margin-top: 6px; }
+.bid-list .row { padding: 8px 2px; border-bottom: 0.5px solid var(--hairline); font-size: 14px; }
+.bid-list .row:last-child { border-bottom: 0; }
+.vchip.amber-solid { background: rgba(251, 191, 36, 0.92); color: #451a03; }

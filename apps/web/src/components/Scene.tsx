@@ -6,7 +6,7 @@ import { useId, type ReactNode } from "react";
  */
 export type SceneKind = "tee" | "denim" | "shirt" | "cake" | "runner";
 
-const BY_PRODUCT: Record<string, SceneKind> = { "p-tee": "tee", "p-denim": "denim", "p-shirt": "shirt", "p-cake": "cake", "p-runner": "runner" };
+const BY_PRODUCT: Record<string, SceneKind> = { "p-tee": "tee", "p-denim": "denim", "p-auction": "denim", "p-shirt": "shirt", "p-cake": "cake", "p-runner": "runner" };
 export const sceneFor = (productId: string): SceneKind | null => BY_PRODUCT[productId] ?? null;
 
 const ROOM: Record<SceneKind, { wall: [string, string]; floor: string; light: string }> = {

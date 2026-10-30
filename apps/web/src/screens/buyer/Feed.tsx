@@ -16,6 +16,9 @@ import { shareOrCopy, tap } from "../../native";
 import { useMessageShop } from "./Messages";
 import { rankFeed } from "../../lib/rank";
 import { Avatar } from "../../components/Avatar";
+import { AuctionSheet, auctionButton, useAuctions, useNow } from "../../components/Auction";
+import { timeLeft } from "@app/core";
+import type { AuctionInfo } from "../../api";
 
 type Tab = "for_you" | "following" | "live";
 
@@ -116,6 +119,9 @@ function FeedEmpty({ title, body, action }: { title: string; body: string; actio
 export function FeedList({ items, start = 0, onNearEnd }: { items: FeedItem[]; start?: number; onNearEnd?: () => void }) {
   const [browse, setBrowse] = useState<FeedItem | null>(null);
   const [buy, setBuy] = useState<FeedItem | null>(null);
+  // Auctions: live bid, time left and the bid sheet.
+  const [auctions, setAuction] = useAuctions(items.filter((it) => it.product.mode === "auction").map((it) => it.product.id));
+  const [bidding, setBidding] = useState<FeedItem | null>(null);
   const [index, setIndex] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
   const { withUser } = useSession();
@@ -145,12 +151,14 @@ export function FeedList({ items, start = 0, onNearEnd }: { items: FeedItem[]; s
   const messageShop = useMessageShop();
 
   const go = (d: number) => ref.current?.scrollTo({ top: (index + d) * ref.current.clientHeight, behavior: "smooth" });
-  const startBuy = (it: FeedItem) => withUser(() => { setBrowse(null); setBuy(it); }, "Sign in to buy");
+  const startBuy = (it: FeedItem) => it.product.mode === "auction"
+    ? withUser(() => { setBrowse(null); setBidding(it); }, "Sign in to bid")
+    : withUser(() => { setBrowse(null); setBuy(it); }, "Sign in to buy");
 
   return (
     <>
       <div className="feed" ref={ref} aria-label="Video feed">
-        {items.map((it) => <VideoCard key={it.postId} item={it} avatar={avatars[it.shop.id]} counts={counts[it.postId]} comments={commentCounts[it.postId] ?? 0}
+        {items.map((it) => <VideoCard key={it.postId} item={it} auction={auctions[it.product.id]} avatar={avatars[it.shop.id]} counts={counts[it.postId]} comments={commentCounts[it.postId] ?? 0}
           onBrowse={() => setBrowse(it)} onBuy={() => startBuy(it)} onComments={() => setCommenting(it)} onMore={() => setMore(it)} />)}
       </div>
       {items.length > 1 && (
@@ -163,11 +171,13 @@ export function FeedList({ items, start = 0, onNearEnd }: { items: FeedItem[]; s
         </div>
       )}
       {browse && (
-        <Sheet title={browse.product.title} onClose={() => setBrowse(null)} footer={<BuyButton item={browse} onClick={() => startBuy(browse)} block />}>
+        <Sheet title={browse.product.title} onClose={() => setBrowse(null)} footer={<BuyButton item={browse} auction={auctions[browse.product.id]} onClick={() => startBuy(browse)} block />}>
           <ProductDetails item={browse} />
         </Sheet>
       )}
-      {buy && <CheckoutSheet item={buy} onClose={() => setBuy(null)} />}
+      {buy && <CheckoutSheet item={buy} onClose={() => setBuy(null)} auctionPrice={buy.product.mode === "auction" ? auctions[buy.product.id]?.priceCents ?? null : null} />}
+      {bidding && <AuctionSheet item={bidding} info={auctions[bidding.product.id]} onInfo={setAuction} onClose={() => setBidding(null)}
+        onPay={() => { const it = bidding; setBidding(null); setBuy(it); }} />}
       {commenting && <CommentsSheet postId={commenting.postId} postOwnerShopHandle={commenting.shop.handle} onClose={() => setCommenting(null)}
         onCount={(n) => setCommentCounts((c) => ({ ...c, [commenting.postId]: n }))} />}
       {more && <MoreSheet kind="post" targetId={more.postId} shopId={more.shop.id} shopHandle={more.shop.handle} onClose={() => setMore(null)}
@@ -176,9 +186,18 @@ export function FeedList({ items, start = 0, onNearEnd }: { items: FeedItem[]; s
   );
 }
 
-function BuyButton({ item, onClick, block }: { item: FeedItem; onClick: () => void; block?: boolean }) {
+function BuyButton({ item, onClick, block, auction }: { item: FeedItem; onClick: () => void; block?: boolean; auction?: AuctionInfo }) {
   const p = item.product;
   const { user } = useSession();
+  const now = useNow(p.mode === "auction");
+  if (p.mode === "auction") {
+    const b = auctionButton(auction, now);
+    return (
+      <button className={`btn ${b.kind === "pay" ? "green" : "amber"} ${block ? "block big" : ""}`} onClick={onClick} disabled={b.kind === "ended"}>
+        <Icon name={b.kind === "pay" ? "bag" : "clock"} size={18} />{b.label}
+      </button>
+    );
+  }
   const sold = p.mode === "buy_now" && (p.stock < 1 || p.status === "sold_out");
   const held = !!p.heldFor && p.heldFor !== user?.id && !!p.heldUntil && new Date(p.heldUntil) > new Date();
   if (held && !sold) return <button className={`btn ${block ? "block big" : ""}`} disabled><Icon name="lock" size={18} />On hold</button>;
@@ -190,8 +209,14 @@ function BuyButton({ item, onClick, block }: { item: FeedItem; onClick: () => vo
 }
 
 /** One small status chip, only when it tells the buyer something useful. */
-function statusChip(it: FeedItem): { text: string; tone: "green" | "amber" } | null {
+function statusChip(it: FeedItem, a?: AuctionInfo, now = Date.now()): { text: string; tone: "green" | "amber" } | null {
   const p = it.product;
+  if (p.mode === "auction") {
+    if (!a?.endsAt) return { text: "Auction", tone: "amber" };
+    if (a.state === "won" && a.winnerIsMe) return { text: "You won · pay within 2 hours", tone: "green" };
+    const left = new Date(a.endsAt).getTime() - now;
+    return { text: left > 0 && a.state === "open" ? `Auction · ${timeLeft(left)} left` : "Auction ended", tone: "amber" };
+  }
   if (p.mode === "order_now") return { text: `Made to order · ${p.leadDays ?? 2} days ahead`, tone: "amber" };
   if (p.mode === "buy_now" && p.stock === 1) return { text: "Only 1 left", tone: "amber" };
   if (p.label === "authentic_designer") return { text: "Authenticity checked", tone: "green" };
@@ -202,8 +227,8 @@ function statusChip(it: FeedItem): { text: string; tone: "green" | "amber" } | n
 /** Short count like TikTok: 1234 shows as 1.2K. */
 const short = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1).replace(/\.0$/, "")}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1).replace(/\.0$/, "")}K` : String(n));
 
-function VideoCard({ item, avatar, counts, comments, onBrowse, onBuy, onComments, onMore }: {
-  item: FeedItem; avatar?: string; counts?: { likes: number; reposts: number }; comments: number; onBrowse: () => void; onBuy: () => void; onComments: () => void; onMore: () => void;
+function VideoCard({ item, auction, avatar, counts, comments, onBrowse, onBuy, onComments, onMore }: {
+  item: FeedItem; auction?: AuctionInfo; avatar?: string; counts?: { likes: number; reposts: number }; comments: number; onBrowse: () => void; onBuy: () => void; onComments: () => void; onMore: () => void;
 }) {
   const p = item.product;
   const { following, toggleFollow, liked, reposted, toggleReaction, toast, withUser } = useSession();
@@ -217,7 +242,9 @@ function VideoCard({ item, avatar, counts, comments, onBrowse, onBuy, onComments
   const swipe = useSwipe({ onLeft: () => nav(`/s/${item.shop.handle}`) });
   const react = (kind: "like" | "repost") => withUser(() => { tap(); toggleReaction(item.postId, kind); }, kind === "like" ? "Sign in to like" : "Sign in to repost");
   const nav = useNavigate();
-  const chip = statusChip(item);
+  const now = useNow(item.product.mode === "auction");
+  const chip = statusChip(item, auction, now);
+  const shownPrice = p.mode === "auction" ? (auction?.currentCents ?? auction?.startCents ?? p.priceCents) : p.priceCents;
   const isFollowing = following.has(item.shop.id);
   const share = async () => { if ((await shareOrCopy(`/i/${p.id}`, `${p.title}, ${R(p.priceCents)} on myHaul`)) === "copied") toast("Link copied"); };
   const sub = [
@@ -253,7 +280,7 @@ function VideoCard({ item, avatar, counts, comments, onBrowse, onBuy, onComments
             ? (item.video.kind === "image" ? <img src={item.video.url} alt="" /> : <video src={`${item.video.url}#t=0.1`} muted playsInline preload="metadata" />)
             : <ProductArt productId={p.id} fallback="#555" />}</span>
           <span className="grow"><span className="t" style={{ display: "block" }}>{p.title}</span><span className="s" style={{ display: "block" }}>{sub}</span></span>
-          <span className="p">{R(p.priceCents)}</span>
+          <span className="p">{R(shownPrice)}</span>
         </button>
           <button className={`react vglass ${isLiked ? "on like" : ""}`} onClick={() => react("like")} aria-pressed={isLiked} aria-label={`Like, ${likes}`}>
             <Icon name="heart" size={20} /><span>{short(likes)}</span>
@@ -266,7 +293,7 @@ function VideoCard({ item, avatar, counts, comments, onBrowse, onBuy, onComments
           </button>
         </div>
         <div className="actions">
-          <BuyButton item={item} onClick={onBuy} />
+          <BuyButton item={item} auction={auction} onClick={onBuy} />
           <button className="vround vglass" onClick={share} aria-label="Share"><Icon name="share" /></button>
         </div>
       </div>

@@ -17,20 +17,29 @@ Deno.serve(handler(async (req, body) => {
 
   const product = must(
     await db.from("products")
-      .select("id, title, price_cents, mode, sizes, stock, status, lead_days, shop_id, held_for, held_until, shops!inner(id, owner_id, status, name, founding_until, seller_checks(escrow_token))")
+      .select("id, title, price_cents, mode, sizes, stock, status, lead_days, shop_id, held_for, held_until, auction_state, auction_winner, auction_price_cents, auction_pay_by, shops!inner(id, owner_id, status, name, founding_until, seller_checks(escrow_token))")
       .eq("id", productId).single(),
     "load product",
   ) as any;
   const shop = product.shops;
-  if (product.status !== "live" || shop.status !== "open") throw new UserError("This item is no longer available.");
+  // Auctions: only the winner can pay, at the winning bid, within 2 hours of the end.
+  const auction = product.mode === "auction";
+  if (auction) {
+    await db.rpc("settle_auction", { p_product: product.id });
+    const fresh = must(await db.from("products").select("auction_state, auction_winner, auction_price_cents, auction_pay_by").eq("id", product.id).single(), "load auction") as any;
+    if (fresh.auction_state !== "won" || fresh.auction_winner !== uid) throw new UserError("Only the winner can pay for this auction.");
+    if (new Date(fresh.auction_pay_by) < new Date()) throw new UserError("The 2 hours to pay have passed.");
+    if (offerId) throw new UserError("Offers don't apply to auctions.");
+    product.auction_price_cents = fresh.auction_price_cents;
+  } else if (product.status !== "live") throw new UserError("This item is no longer available.");
+  if (shop.status !== "open") throw new UserError("This item is no longer available.");
   if (shop.owner_id === uid) throw new UserError("You cannot buy your own item.");
-  if (product.mode === "auction") throw new UserError("Auctions are not open yet.");
   if (product.mode === "buy_now" && product.stock < 1) throw new UserError("Sold out.");
-  if (product.held_for && product.held_for !== uid && new Date(product.held_until) > new Date())
+  if (!auction && product.held_for && product.held_for !== uid && new Date(product.held_until) > new Date())
     throw new UserError("The seller is holding this item for someone else right now.");
 
   // A special price from the seller in chat, for this item or a bundle.
-  let itemPrice = product.price_cents as number;
+  let itemPrice = (auction ? product.auction_price_cents : product.price_cents) as number;
   let bundleIds: string[] = [];
   let title = product.title as string;
   if (offerId) {

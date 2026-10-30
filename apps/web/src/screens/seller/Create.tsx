@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { LISTING_LABELS, rand, validateListing, type Condition, type ListingLabel } from "@app/core";
+import { AUCTION_DAYS, canUse, LISTING_LABELS, rand, reserveProblem, validateListing, type Condition, type ListingLabel } from "@app/core";
 import { api, type ListingSuggestion, type MyShop } from "../../api";
 import { clearDraft, loadDraft, loadDraftMedia, saveDraft, saveDraftMedia, snapshot, type DraftFields } from "../../lib/draft";
 import { useSession } from "../../session";
@@ -46,7 +46,14 @@ export function CreateListing({ shop, media, onMedia, onCamera, onStep, startAtD
 
   const priceCents = rand(Number(price) || 0);
   const fee = founding ? 0 : Math.round(priceCents * 0.06);
-  const mode = food ? "order_now" : "buy_now";
+  // How it sells: Buy now, or a timed auction once the shop has 5 good orders.
+  const [auction, setAuction] = useState(false);
+  const [auctionDays, setAuctionDays] = useState<number>(3);
+  const [reserve, setReserve] = useState("");
+  const reserveCents = reserve ? rand(Number(reserve) || 0) : null;
+  const auctionUnlock = canUse("timed_auction", { verified: shop.checks.idStatus === "approved" && shop.checks.bankStatus === "approved",
+    goodOrders: shop.goodOrders, trustScore: shop.trustScore, category: shop.category });
+  const mode = food ? "order_now" : auction ? "auction" : "buy_now";
   const cover = media[0] ?? null;
   const urls = useMemo(() => media.map((m) => URL.createObjectURL(m)), [media]);
   useEffect(() => () => urls.forEach((u) => URL.revokeObjectURL(u)), [urls]);
@@ -99,8 +106,12 @@ export function CreateListing({ shop, media, onMedia, onCamera, onStep, startAtD
       return validateListing({ title, description: "", price: 100, label, condition: condition ?? undefined, hasProof: !!proof, mode })
         .filter((e) => !/price/i.test(e));
     }
-    if (n === 2) return validateListing({ title, description, price: priceCents, label, condition: condition ?? undefined, hasProof: !!proof, mode })
-      .filter((e) => /price/i.test(e));
+    if (n === 2) {
+      const errs = validateListing({ title, description, price: priceCents, label, condition: condition ?? undefined, hasProof: !!proof, mode })
+        .filter((e) => /price/i.test(e));
+      const rp = auction ? reserveProblem(priceCents, reserveCents) : null;
+      return rp ? [...errs, rp] : errs;
+    }
     return [];
   };
   const next = () => {
@@ -113,7 +124,8 @@ export function CreateListing({ shop, media, onMedia, onCamera, onStep, startAtD
     if (errs.length) throw new Error(errs[0]);
     const res = await api.createListing({
       title: title.trim(), description: description.trim(), priceCents, mode, label: food ? "new" : label, condition,
-      sizes, stock: food ? 99 : stock, leadDays: food ? leadDays : null, allergens: food ? allergens.trim() || null : null,
+      sizes: auction ? sizes.slice(0, 1) : sizes, stock: food ? 99 : auction ? 1 : stock, leadDays: food ? leadDays : null, allergens: food ? allergens.trim() || null : null,
+      ...(auction ? { auctionDays, reserveCents } : {}),
       caption: caption.trim() || title.trim(),
     }, cover, proof, setProgress, media.slice(1));
     clearDraft(uid);
@@ -256,14 +268,42 @@ export function CreateListing({ shop, media, onMedia, onCamera, onStep, startAtD
 
         {step === 2 && (
           <>
-            <h1>{food ? "Price and allergens" : "Price and stock"}</h1>
-            <label className="wz-label" htmlFor="wz-price">Price</label>
+            <h1>{food ? "Price and allergens" : auction ? "Auction" : "Price and stock"}</h1>
+            {!food && (
+              <div className="seg-choice" role="radiogroup" aria-label="How it sells">
+                <button role="radio" aria-checked={!auction} onClick={() => setAuction(false)}><b>Buy now</b><span>Fixed price</span></button>
+                <button role="radio" aria-checked={auction} disabled={!auctionUnlock.ok} onClick={() => setAuction(true)}>
+                  <b>{auctionUnlock.ok ? "Auction" : <><Icon name="lock" size={13} /> Auction</>}</b><span>{auctionUnlock.ok ? "Buyers bid" : "After 5 good orders"}</span>
+                </button>
+              </div>
+            )}
+            {!food && !auctionUnlock.ok && <div className="wz-hint">{auctionUnlock.reason}</div>}
+            <label className="wz-label" htmlFor="wz-price">{auction ? "Starting bid" : "Price"}</label>
             <div className="wz-price">
               <span>R</span>
               <input id="wz-price" value={price} onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, ""))} inputMode="decimal" placeholder="0" autoFocus aria-label="Price (rand)" />
             </div>
-            <div className="wz-hint">{priceCents ? `You get ${R(priceCents - fee)} after the ${founding ? "0% founding" : "6%"} fee. Delivery is paid by the buyer.` : "Buyers also pay delivery and a small protection fee."}</div>
-            {!food ? (
+            <div className="wz-hint">{auction
+              ? "Bids go up in steps of R10 (R20 from R500, R50 from R2,000). The winner pays within 2 hours. 6% fee on the final price."
+              : priceCents ? `You get ${R(priceCents - fee)} after the ${founding ? "0% founding" : "6%"} fee. Delivery is paid by the buyer.` : "Buyers also pay delivery and a small protection fee."}</div>
+            {auction ? (
+              <>
+                <label className="wz-label" htmlFor="wz-reserve">Reserve <span className="muted">(optional)</span></label>
+                <div className="wz-price small">
+                  <span>R</span>
+                  <input id="wz-reserve" value={reserve} onChange={(e) => setReserve(e.target.value.replace(/[^\d.]/g, ""))} inputMode="decimal" placeholder="No reserve" aria-label="Reserve (rand)" />
+                </div>
+                <div className="wz-hint">The lowest price you'll sell for. Buyers see whether it's been met, never the amount.</div>
+                <div className="wz-label">How long?</div>
+                <div className="chips" role="radiogroup" aria-label="Auction length">
+                  {AUCTION_DAYS.map((d) => <button key={d} role="radio" className="chip" aria-checked={auctionDays === d} aria-pressed={auctionDays === d} onClick={() => setAuctionDays(d)}>{d} {d === 1 ? "day" : "days"}</button>)}
+                </div>
+                <div className="wz-label">Size <span className="muted">(optional)</span></div>
+                <div className="chips">
+                  {QUICK_SIZES.map((sz) => <button key={sz} className="chip" aria-pressed={sizes[0] === sz} onClick={() => setSizes(sizes[0] === sz ? [] : [sz])}>{sz}</button>)}
+                </div>
+              </>
+            ) : !food ? (
               <>
                 <div className="wz-label">How many do you have?</div>
                 <Stepper value={stock} min={1} max={999} onChange={setStock} label="Stock" />
@@ -305,7 +345,9 @@ export function CreateListing({ shop, media, onMedia, onCamera, onStep, startAtD
               <div className="group grow">
                 <ReviewRow t="Title" v={title} onEdit={() => setStep(1)} />
                 {!food && <ReviewRow t="Type" v={`${LISTING_LABELS[label].label}${condition && label === "pre_loved" ? `, ${CONDITIONS.find((c) => c.value === condition)?.label.toLowerCase()}` : ""}`} onEdit={() => setStep(1)} />}
-                <ReviewRow t="Price" v={`${R(priceCents)} (you get ${R(priceCents - fee)})`} onEdit={() => setStep(2)} />
+                {auction
+                ? <ReviewRow t="Auction" v={`Starts at ${R(priceCents)}${reserveCents ? `, reserve ${R(reserveCents)}` : ", no reserve"}, ${auctionDays} ${auctionDays === 1 ? "day" : "days"}`} onEdit={() => setStep(2)} />
+                : <ReviewRow t="Price" v={`${R(priceCents)} (you get ${R(priceCents - fee)})`} onEdit={() => setStep(2)} />}
                 {!food && <ReviewRow t="Stock" v={`${stock}${sizes.length ? ` · ${sizes.join(", ")}` : ""}`} onEdit={() => setStep(2)} />}
                 {food && <ReviewRow t="Notice" v={`${leadDays} days${allergens ? ` · ${allergens}` : ""}`} onEdit={() => setStep(1)} />}
                 <ReviewRow t="Caption" v={caption || title} onEdit={() => setStep(3)} />

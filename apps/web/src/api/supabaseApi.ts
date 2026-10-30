@@ -197,6 +197,17 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
     async updateProfile(displayName, bio) {
       check(await sb.from("profiles").update({ display_name: displayName.trim(), bio: bio.trim().slice(0, 150) }).eq("id", await uid()));
     },
+    async auctionInfo(ids) {
+      if (!ids.length) return {};
+      const rows = check(await sb.rpc("auctions_info", { p_products: [...new Set(ids)].slice(0, 50) })) as any[];
+      return Object.fromEntries(rows.map((r) => [r.productId, r]));
+    },
+    async placeBid(productId, amountCents) {
+      return check(await sb.rpc("place_bid", { p_product: productId, p_amount: amountCents })) as any;
+    },
+    async settleAuction(productId) {
+      await sb.rpc("settle_auction", { p_product: productId });
+    },
     async availableHandles(list) {
       return (check(await sb.rpc("available_handles", { p_handles: list.slice(0, 12).map((h) => h.toLowerCase()) })) as string[]) ?? [];
     },
@@ -494,6 +505,10 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
       const row = {
         shop_id: shopId, title: input.title, description: input.description, price_cents: input.priceCents, mode: input.mode,
         label: input.label, condition: input.condition, sizes: input.sizes, stock: input.stock, lead_days: input.leadDays, allergens: input.allergens,
+        ...(input.mode === "auction" ? {
+          stock: 1, reserve_cents: input.reserveCents ?? null,
+          auction_ends_at: new Date(Date.now() + (input.auctionDays ?? 3) * 86400e3).toISOString(),
+        } : {}),
       };
       // Try to go live. If a rule blocks it (for example, checks not done yet), save as a draft and say why.
       let live = true;

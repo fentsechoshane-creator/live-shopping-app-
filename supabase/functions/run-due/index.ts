@@ -3,7 +3,8 @@
 // 2. Close the return window on delivered orders with no claim (status completed).
 // 3. Schedule payouts for completed orders by the seller's trust tier.
 // 4. Release payouts that are due (escrow pays the seller).
-// 5. Cancel checkouts left unpaid for 24 hours, and accept change of mind returns the seller ignored for 3 days.
+// 5. Close ended auctions (winner has 2 hours to pay).
+// 6. Cancel checkouts left unpaid for 24 hours, and accept change of mind returns the seller ignored for 3 days.
 import { json } from "../_shared/http.ts";
 import { adminClient, must } from "../_shared/supabase.ts";
 import { escrow } from "../_shared/escrow.ts";
@@ -19,6 +20,10 @@ Deno.serve(async (req) => {
   const es = escrow();
   const done: Record<string, number> = { refunded: 0, completed: 0, scheduled: 0, released: 0, cancelled: 0, auto_accepted: 0, failed: 0 };
   const now = new Date();
+
+  // 0. Close auctions that ended, and cancel wins not paid within 2 hours.
+  const { data: settled } = await db.rpc("settle_due_auctions");
+  done.auctions_settled = (settled as number | null) ?? 0;
 
   const due = must(await db.from("due_orders").select("*").limit(200), "load due orders") as any[];
   for (const o of due) {

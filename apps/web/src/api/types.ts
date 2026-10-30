@@ -97,6 +97,25 @@ export interface ProductPublic {
   heldUntil?: string | null;
 }
 
+/** A timed auction as one person sees it. Bidders other than you are masked (t***a). */
+export interface AuctionInfo {
+  productId: string;
+  state: "open" | "won" | "unsold" | "unpaid" | "paid" | null;
+  endsAt: string | null;
+  startCents: Cents;
+  currentCents: Cents | null;
+  bidCount: number;
+  minNextCents: Cents;
+  reserveSet: boolean;
+  reserveMet: boolean;
+  leaderIsMe: boolean;
+  myTopCents: Cents | null;
+  winnerIsMe: boolean;
+  priceCents: Cents | null;
+  payBy: string | null;
+  recent: { who: string; amountCents: Cents; at: string }[];
+}
+
 export interface ShopPublic {
   id: string;
   name: string;
@@ -192,7 +211,10 @@ export interface ListingInput {
   title: string;
   description: string;
   priceCents: Cents;
-  mode: "buy_now" | "order_now";
+  mode: "buy_now" | "order_now" | "auction";
+  /** Auctions: how many days it runs (1, 3, 5 or 7) and an optional reserve. priceCents is the starting bid. */
+  auctionDays?: number;
+  reserveCents?: Cents | null;
   label: ListingLabel;
   condition: Condition | null;
   sizes: string[];
@@ -280,6 +302,11 @@ export interface Api {
   deleteAccount(): Promise<void>;
   /** Phone app: remember this device so we can send push notifications. */
   savePushToken(token: string, platform: string): Promise<void>;
+  /** Auctions, by product id. */
+  auctionInfo(productIds: string[]): Promise<Record<string, AuctionInfo>>;
+  placeBid(productId: string, amountCents: Cents): Promise<AuctionInfo>;
+  /** Close an auction whose time is up (safe to call any time). */
+  settleAuction(productId: string): Promise<void>;
   /** Delivery details from the last order, to fill in checkout. */
   savedDelivery(): Promise<SavedDelivery | null>;
   saveDelivery(d: SavedDelivery | null): Promise<void>;

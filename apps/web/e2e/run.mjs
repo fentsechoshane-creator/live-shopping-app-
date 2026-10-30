@@ -197,6 +197,43 @@ try {
   await page.getByRole("dialog", { name: "Edit profile" }).getByText(/You can change it again on/).waitFor();
   await page.keyboard.press("Escape");
 
+  // ===== Auctions: bid, reserve, the end, and the winner pays =====
+  await page.goto(BASE);
+  const jacket = page.getByRole("region", { name: /Vintage 90s denim jacket/ });
+  await jacket.scrollIntoViewIfNeeded();
+  await jacket.getByText(/Auction · 1d/).waitFor();
+  await jacket.getByRole("button", { name: /^Bid · R700/ }).click();
+  const bidSheet = page.getByRole("dialog", { name: /Vintage 90s denim jacket/ });
+  await bidSheet.getByText("Reserve not met yet").waitFor();
+  await bidSheet.getByText("l***o").first().waitFor(); // other bidders are masked
+  await shot("auction-sheet");
+  await bidSheet.getByLabel(/Or your own amount/).fill("705");
+  await check(bidSheet.getByRole("button", { name: "Bid R705" }).isDisabled(), "a bid under the step can't be placed");
+  await bidSheet.getByLabel(/Or your own amount/).fill("900");
+  await bidSheet.getByRole("button", { name: "Bid R900" }).click();
+  await page.getByText("You're the top bidder at R900").waitFor();
+  await bidSheet.getByText("Reserve met").waitFor();
+  await page.keyboard.press("Escape");
+  // Time's up (moved forward in the demo data): the top bidder wins and pays the winning bid.
+  await page.evaluate(() => {
+    const k = "lsa-demo-v4", st = JSON.parse(localStorage.getItem(k));
+    st.products.find((p) => p.id === "p-auction").auctionEndsAt = new Date(Date.now() - 1000).toISOString();
+    localStorage.setItem(k, JSON.stringify(st));
+  });
+  await page.goto(`${BASE}/activity`);
+  await page.getByText("You won: Vintage 90s denim jacket, rare wash").waitFor();
+  await page.getByRole("link", { name: /You won/ }).click();
+  await page.getByRole("button", { name: "Pay R900" }).first().click();
+  const payWin = page.getByRole("dialog", { name: "Checkout" });
+  await payWin.getByText("your winning bid").waitFor();
+  await payWin.getByRole("button", { name: /Free collection/ }).click();
+  await shot("auction-won-checkout");
+  await payWin.getByRole("button", { name: /^Pay R/ }).click();
+  await page.waitForURL(/mock-pay/);
+  await page.getByRole("button", { name: "Pay now" }).click();
+  await page.waitForURL(/\/orders\//);
+  await page.getByText("Order placed.").waitFor();
+
   // The wallet button explains the credit instead of jumping to the profile.
   await page.goto(BASE);
   await page.getByRole("button", { name: /^Wallet/ }).click();
@@ -385,6 +422,7 @@ try {
   await page.getByRole("button", { name: "Good", exact: true }).click();
   await shot("create-what");
   await page.getByRole("button", { name: "Next" }).click();
+  await check(page.getByRole("radio", { name: /Auction/ }).isDisabled(), "auctions locked until 5 good orders");
   await page.getByLabel("Price (rand)").fill("450");
   await page.getByText(/You get R450 after the 0% founding fee/).waitFor(); // founding sellers pay no fee
   await page.getByRole("button", { name: "M", exact: true }).click();
