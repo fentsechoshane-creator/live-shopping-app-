@@ -49,7 +49,7 @@ export function SignInForm({ onDone }: { onDone: () => void }) {
 
   return (
     <>
-      <p className="muted" style={{ marginTop: 0 }}>{sent ? `We sent a 6 digit code to ${contact}.` : "One account for buying and selling. No password needed: we send you a code."}</p>
+      <p className="muted" style={{ marginTop: 0 }}>{sent ? `Check ${contact}. Type the 6 digit code from the email, or tap the sign in link in it on this device.` : "One account for buying and selling. No password needed: we email you a code."}</p>
       {api.mode === "demo" && <div className="note amber" style={{ marginBottom: 14 }}>Demo: use any email and the code <b>123456</b>. An email starting with “admin” signs in as our team. To try the seller side of chats, use <b>lebo@shop.demo</b>.</div>}
       <ErrorNote error={error} />
       {usePassword ? (
