@@ -224,6 +224,10 @@ try {
   await page.getByText("You won: Vintage 90s denim jacket, rare wash").waitFor();
   await page.getByRole("link", { name: /You won/ }).click();
   await page.getByRole("button", { name: "Pay R900" }).first().click();
+  const wonSheet = page.getByRole("dialog", { name: /Vintage 90s denim jacket/ });
+  await wonSheet.getByText("You won").waitFor();
+  await shot("auction-won");
+  await wonSheet.getByRole("button", { name: "Pay R900" }).click();
   const payWin = page.getByRole("dialog", { name: "Checkout" });
   await payWin.getByText("your winning bid").waitFor();
   await payWin.getByRole("button", { name: /Free collection/ }).click();

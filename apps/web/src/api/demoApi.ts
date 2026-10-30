@@ -455,6 +455,7 @@ export function createDemoApi(): Api {
     },
     async notifications() {
       const u = me();
+      runDue(); // closes ended auctions, like the scheduled job on the server
       return s.notifications.filter((n) => n.userId === u.id);
     },
     async markAllRead() {
