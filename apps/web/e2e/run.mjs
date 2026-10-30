@@ -205,7 +205,7 @@ try {
   await jacket.getByRole("button", { name: /^Bid · R700/ }).click();
   const bidSheet = page.getByRole("dialog", { name: /Vintage 90s denim jacket/ });
   await bidSheet.getByText("Reserve not met yet").waitFor();
-  await bidSheet.getByText("l***o").first().waitFor(); // other bidders are masked
+  await bidSheet.getByText("l***m").first().waitFor(); // other bidders are masked
   await shot("auction-sheet");
   await bidSheet.getByLabel(/Or your own amount/).fill("705");
   await check(bidSheet.getByRole("button", { name: "Bid R705" }).isDisabled(), "a bid under the step can't be placed");
