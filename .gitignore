@@ -10,3 +10,4 @@ apps/web/e2e/shots/
 dist-artifact/
 .netlify
 apps/web/e2e/audit/
+apps/web/e2e/report/
