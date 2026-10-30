@@ -95,6 +95,12 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-10-30: Live web version on Netlify
+- Live app: https://myhaul-app.netlify.app (Netlify project `myhaul-app`, builds from `main` on every push, public Supabase URL and anon key set in Netlify). The site is set to Private in Netlify for now: only Ofentse's Netlify account can open it until "Make public" is clicked.
+- Supabase Site URL set to https://myhaul-app.netlify.app.
+- Supabase's built in email can't be edited without our own email sender (SMTP), so sign in emails carry a link, not a 6 digit code. The sign in screen now says to tap the link. It also only sends to people on the Supabase team, a few per hour. Before launch: set up an email sender such as Resend on myhaul.co.za and add `{{ .Token }}` to the Magic link email. [Ofentse]
+- Fixed: Netlify treated the preview helper's test file as a server function (moved to `apps/web/netlify/lib`). The For You feed shows "No videos yet" instead of a blank screen when there are no posts.
+
 ### 2026-10-30: Live database up to date
 - Migrations 0009 to 0014 applied to the live Supabase project. It now has comments, messages, reports, blocks, offers, holds, device tokens, saved delivery, interests, error reports and share previews.
 - The live project records them under the times they were applied (for example `20261030142734_flow`), not the file names in `supabase/migrations`. Before the next `supabase db push`, Lehloma runs `supabase migration repair` to mark 0009 to 0014 as applied, so they aren't run twice.
