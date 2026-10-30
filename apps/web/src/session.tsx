@@ -1,5 +1,6 @@
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
-import { api, type Reaction, type User } from "./api";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { api, type Category, type Reaction, type User } from "./api";
+import { keepInterests, savedInterests } from "./lib/rank";
 
 interface Session {
   user: User | null;
@@ -24,12 +25,21 @@ interface Session {
   /** Side menu with settings, opened from the profile. */
   menuOpen: boolean;
   setMenuOpen: (open: boolean) => void;
+  /** Run `action` now if signed in. Otherwise open the sign in sheet over the current screen and run it straight after. */
+  withUser: (action?: () => void, why?: string) => void;
+  /** Set while the sign in sheet is open: the reason shown at the top. */
+  signInAsk: string | null;
+  closeSignIn: () => void;
+  /** Categories picked on the welcome screens. Kept on this phone and on the account. */
+  interests: Category[];
+  setInterests: (list: Category[]) => void;
 }
 
 const Ctx = createContext<Session>({
   user: null, ready: false, toast: () => {}, following: new Set(), toggleFollow: async () => {},
   liked: new Set(), reposted: new Set(), toggleReaction: async () => {}, blockedShops: new Set(), refreshBlocks: () => {},
   dataSaver: false, setDataSaver: () => {}, soundOn: false, setSoundOn: () => {}, menuOpen: false, setMenuOpen: () => {},
+  withUser: () => {}, signInAsk: null, closeSignIn: () => {}, interests: [], setInterests: () => {},
 });
 
 const readPref = (k: string) => {
@@ -59,6 +69,32 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     api.currentUser().then((u) => { setUser(u); setReady(true); });
     return api.onAuthChange(setUser);
   }, []);
+
+  const [interests, setInterestsState] = useState<Category[]>(savedInterests());
+  const setInterests = useCallback((list: Category[]) => {
+    setInterestsState(list);
+    keepInterests(list);
+    api.saveInterests(list).catch(() => {});
+  }, []);
+  // Interests picked before signing in follow you onto the account.
+  useEffect(() => { if (user && interests.length) api.saveInterests(interests).catch(() => {}); }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Signing in from a sheet keeps you where you were, then finishes what you tapped (like, follow, buy, message).
+  const [signInAsk, setSignInAsk] = useState<string | null>(null);
+  const pending = useRef<(() => void) | null>(null);
+  const withUser = useCallback((action?: () => void, why?: string) => {
+    if (user) return action?.();
+    pending.current = action ?? null;
+    setSignInAsk(why ?? "Sign in to continue");
+  }, [user]);
+  const closeSignIn = useCallback(() => { pending.current = null; setSignInAsk(null); }, []);
+  useEffect(() => {
+    if (!user) return;
+    setSignInAsk(null);
+    const act = pending.current;
+    pending.current = null;
+    if (act) window.setTimeout(act, 50);
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!user) { setLiked(new Set()); setReposted(new Set()); setBlockedShops(new Set()); return setFollowing(new Set()); }
@@ -103,7 +139,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <Ctx.Provider value={{ user, ready, toast, following, toggleFollow, liked, reposted, toggleReaction, blockedShops, refreshBlocks, dataSaver, setDataSaver, soundOn, setSoundOn, menuOpen, setMenuOpen }}>
+    <Ctx.Provider value={{ user, ready, toast, following, toggleFollow, liked, reposted, toggleReaction, blockedShops, refreshBlocks, dataSaver, setDataSaver, soundOn, setSoundOn, menuOpen, setMenuOpen, withUser, signInAsk, closeSignIn, interests, setInterests }}>
       {children}
       {msg && <div className="toast" role="status">{msg}</div>}
     </Ctx.Provider>

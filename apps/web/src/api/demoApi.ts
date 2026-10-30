@@ -6,7 +6,7 @@ import {
 } from "@app/core";
 import type {
   Api, Category, ReportReason, ReportTarget, CheckoutInput, FeedItem, ListingInput, MyShop, Notification, Order, Payout, PendingReview, ProductPublic, ReviewStatus,
-  ShopPublic, User,
+  ShopPublic, User, SavedDelivery, AppError,
 } from "./types";
 
 interface DShop {
@@ -30,6 +30,9 @@ interface State {
   offers?: { id: string; conversationId: string; productIds: string[]; priceCents: number; expiresAt: string; status: "open" | "used" | "withdrawn" }[];
   blocks: { blockerId: string; blockedId: string }[];
   reports: { id: string; reporterId: string; targetKind: ReportTarget; targetId: string; reason: ReportReason; details: string; createdAt: string; status: "open" | "actioned" | "dismissed" }[];
+  delivery?: Record<string, SavedDelivery>;
+  interests?: Record<string, Category[]>;
+  errors?: AppError[];
 }
 
 const KEY = "lsa-demo-v3";
@@ -477,6 +480,33 @@ export function createDemoApi(): Api {
       });
     },
     async savePushToken() { /* demo: nothing to send to */ },
+    async savedDelivery() {
+      const u = s.users.find((x) => x.id === s.currentUserId);
+      return (u && s.delivery?.[u.id]) || null;
+    },
+    async saveDelivery(d) {
+      const u = me();
+      s.delivery = { ...(s.delivery ?? {}) };
+      if (d) s.delivery[u.id] = d; else delete s.delivery[u.id];
+      save();
+    },
+    async saveInterests(interests) {
+      const u = s.users.find((x) => x.id === s.currentUserId);
+      if (!u) return;
+      s.interests = { ...(s.interests ?? {}), [u.id]: interests };
+      save();
+    },
+    async reportError(e) {
+      try {
+        s.errors = [{ id: id(), message: e.message.slice(0, 500), stack: e.stack?.slice(0, 4000) ?? null, path: e.path ?? null, platform: e.platform ?? null,
+          version: e.version ?? null, createdAt: new Date().toISOString(), userId: s.currentUserId }, ...(s.errors ?? [])].slice(0, 50);
+        save();
+      } catch { /* never throw */ }
+    },
+    async recentErrors() {
+      if (!me().admin) throw new Error("Team only.");
+      return s.errors ?? [];
+    },
     async signInWithPassword(email, password) {
       if (password !== CODE) throw new Error("Wrong email or password. In the demo, the password is 123456.");
       return this.verifyCode(email, CODE);

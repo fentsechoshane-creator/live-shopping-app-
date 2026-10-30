@@ -19,6 +19,11 @@ Use these with docs/DESIGN.md on every new screen. They come from common practic
 13. **Hide what you don't need right now.** Bars and switches disappear on later steps so the task fills the screen.
 14. **Swipe where it's natural, tap still works.** Sheets drag down to close, the left edge swipes back, tabs swipe sideways, videos swipe left to the shop. Every swipe also has a button.
 15. **Plain words.** Short sentences, no jargon, no hyphens or em dashes in app text.
+16. **Never lose someone's place.** Signing in happens in a sheet over the current screen and then finishes what they tapped (`withUser` in `session.tsx`). Don't send people to a separate page mid task.
+17. **Remember, don't re ask.** Delivery details, interests and the last choices are filled in next time, shown as one line with Change.
+18. **Say what's missing on the button.** A main button that can't be pressed yet says why ("Pick a size"), instead of failing after the tap.
+19. **Ask for permissions at the moment they help.** Notifications after an order or message, camera when opening the camera. Never on first open.
+20. **Tap goes to the thing.** A tile or link opens the exact item, not a page you then have to search.
 
 ## Ideas for later
 

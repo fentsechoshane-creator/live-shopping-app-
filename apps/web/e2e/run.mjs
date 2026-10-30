@@ -66,8 +66,7 @@ async function signIn(email) {
   await page.goto(`${BASE}/signin`);
   await page.getByLabel("Email").fill(email);
   await page.getByRole("button", { name: "Send code" }).click();
-  await page.getByLabel("Code").fill("123456");
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByLabel("Code").fill("123456"); // signs in by itself once 6 digits are in
   await page.waitForURL((u) => !u.pathname.startsWith("/signin"));
 }
 
@@ -76,13 +75,37 @@ try {
   await page.goto(BASE);
   await page.evaluate(() => localStorage.clear());
   await page.goto(BASE);
+  // First open: three welcome screens (swipe or Next), then pick interests.
+  const welcome = page.getByRole("dialog", { name: "Welcome to myHaul" });
+  await welcome.getByText("Shop from short videos").waitFor();
+  await shot("welcome");
+  await swipe(".welcome", -150);
+  await welcome.getByText("Your money is held safely").waitFor();
+  await welcome.getByRole("button", { name: "Skip" }).click();
+  await welcome.getByRole("button", { name: /Bakes/ }).click();
+  await check(welcome.getByRole("button", { name: /Bakes/ }).getAttribute("aria-pressed").then((v) => v === "true"), "interest picked");
+  await shot("welcome-interests");
+  await welcome.getByRole("button", { name: "Start watching" }).click();
+  await welcome.waitFor({ state: "detached" });
+  // Picked Bakes, so the cake comes first in For You.
+  await check(page.locator(".video-card").first().getAttribute("aria-label").then((l) => /cake/i.test(l ?? "")), "picked interests come first");
+  await page.reload();
+  await check(page.getByRole("dialog", { name: "Welcome to myHaul" }).count().then((n) => n === 0), "welcome only shows once");
   await page.getByRole("region", { name: /Oversized tee/ }).waitFor();
   await shot("feed");
   await check(page.getByRole("button", { name: "Buy now" }).first().isVisible(), "Buy now visible");
 
+  // Signed out Buy now: sign in over the feed, then checkout opens by itself. No lost place.
   await page.getByRole("region", { name: /Oversized tee/ }).getByRole("button", { name: "Buy now" }).click();
-  await page.waitForURL(/signin/);
-  await signIn("buyer@test.co.za");
+  const signSheet = page.getByRole("dialog", { name: "Sign in to buy" });
+  await signSheet.getByLabel("Email").fill("buyer@test.co.za");
+  await signSheet.getByRole("button", { name: "Send code" }).click();
+  await signSheet.getByLabel("Code").fill("123456");
+  await page.getByRole("dialog", { name: "Checkout" }).waitFor();
+  await check(page.url() === BASE + "/", "still on the feed after signing in");
+  await shot("signin-then-checkout");
+  await page.keyboard.press("Escape");
+  await page.getByRole("dialog", { name: "Checkout" }).waitFor({ state: "detached" });
 
   const tee = page.getByRole("region", { name: /Oversized tee/ });
   await tee.getByRole("button", { name: /See details/ }).click();
@@ -103,6 +126,8 @@ try {
   await page.getByRole("button", { name: "Pay now" }).click();
   await page.waitForURL(/\/orders\//);
   await page.getByText("Paid, money held safely").waitFor();
+  await page.getByText("Order placed.").waitFor();
+  await page.getByRole("button", { name: /Message Lebo/ }).waitFor();
   await shot("order-paid");
 
   await page.getByRole("button", { name: "Ship and deliver" }).click();
@@ -111,6 +136,16 @@ try {
   await page.getByRole("button", { name: "Skip 8 days" }).click();
   await page.getByText("Complete", { exact: true }).waitFor();
   await check((await page.getByText("Something wrong?").count()) === 0, "return window closed after 8 days");
+
+  // A shared item link opens that item straight away.
+  await page.goto(`${BASE}/i/p-tee`);
+  await page.waitForURL(/\/s\/thrift\.with\.lebo\?item=p-tee/);
+  await page.getByRole("region", { name: /Oversized tee/ }).waitFor();
+  // The wallet button explains the credit instead of jumping to the profile.
+  await page.goto(BASE);
+  await page.getByRole("button", { name: /^Wallet/ }).click();
+  await page.getByRole("dialog", { name: "Wallet" }).waitFor();
+  await page.keyboard.press("Escape");
 
   await page.goto(`${BASE}/activity`);
   await page.getByText("Payment received").waitFor();

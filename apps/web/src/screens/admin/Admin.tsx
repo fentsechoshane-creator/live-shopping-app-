@@ -2,7 +2,7 @@ import { REPORT_REASONS } from "@app/core";
 import { Navigate } from "react-router-dom";
 import { api } from "../../api";
 import { useLoad, useSession } from "../../session";
-import { BackButton, ErrorNote, Loading, R, useAction } from "../../components/ui";
+import { BackButton, ErrorNote, Loading, R, timeAgo, useAction } from "../../components/ui";
 
 /** Our team: approve ID and food certificates, and decide disputed returns. */
 export function Admin() {
@@ -11,6 +11,7 @@ export function Admin() {
   const [disputes, err2, reload2] = useLoad(() => api.disputedOrders(), []);
   const [topups, , reload3] = useLoad(() => api.topUpsDue(), []);
   const [reports, , reload4] = useLoad(() => api.openReports(), []);
+  const [errors] = useLoad(() => api.recentErrors(), []);
   const { busy, error, run } = useAction();
   const { toast } = useSession();
   if (isAdmin === undefined) return <div className="screen"><Loading /></div>;
@@ -75,6 +76,20 @@ export function Admin() {
           </div>
         </div>
       ))}
+      <h2>App errors{errors && errors.length > 0 ? ` (${errors.length})` : ""}</h2>
+      <p className="small muted" style={{ marginTop: -4 }}>Crashes and errors from people's phones in the last 30 days. Newest first. Share these with Lehloma to fix.</p>
+      {errors?.length === 0 && <div className="empty">No errors reported.</div>}
+      {errors && errors.length > 0 && (
+        <div className="group">
+          {errors.slice(0, 20).map((e) => (
+            <details key={e.id} className="cell" style={{ display: "block" }}>
+              <summary style={{ cursor: "pointer" }}><b style={{ fontSize: 14 }}>{e.message}</b>
+                <div className="small muted">{e.path} · {e.platform} · {e.version} · {timeAgo(e.createdAt)}</div></summary>
+              {e.stack && <pre className="small" style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere", margin: "8px 0 0", maxHeight: 180, overflow: "auto" }}>{e.stack}</pre>}
+            </details>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

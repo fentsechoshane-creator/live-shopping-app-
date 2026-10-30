@@ -1,0 +1,23 @@
+# Web host for myhaul.co.za [CONFIRM host and domain]: the public pages (privacy, help, account deletion),
+# the web version of the app, shared link previews and the files that let links open the phone app.
+# In Netlify > Site settings > Environment variables, set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (public values only).
+[build]
+  command = "npm ci && npm run build:live"
+  publish = "apps/web/dist"
+  edge_functions = "apps/web/netlify/edge-functions"
+
+# Links open the phone app when it's installed (Apple and Android need these as JSON).
+[[headers]]
+  for = "/.well-known/apple-app-site-association"
+  [headers.values]
+    Content-Type = "application/json"
+[[headers]]
+  for = "/.well-known/assetlinks.json"
+  [headers.values]
+    Content-Type = "application/json"
+
+# Every app screen is served by the single page app.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

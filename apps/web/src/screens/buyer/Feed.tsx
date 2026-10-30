@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { LISTING_LABELS, WELCOME_CREDIT } from "@app/core";
 import { api, type FeedItem } from "../../api";
@@ -14,13 +14,28 @@ import { MoreSheet } from "../../components/Safety";
 import { useSwipe } from "../../components/gestures";
 import { shareOrCopy, tap } from "../../native";
 import { useMessageShop } from "./Messages";
+import { rankFeed } from "../../lib/rank";
 
 type Tab = "for_you" | "following" | "live";
 
 export function Feed() {
   const [tab, setTab] = useState<Tab>("for_you");
   const [items, error] = useLoad(() => api.feed(), []);
-  const { following, user, blockedShops } = useSession();
+  const { following, user, blockedShops, interests, withUser } = useSession();
+  const [wallet, setWallet] = useState(false);
+  // For You: ordered once when it loads (so nothing jumps while you scroll), then more posts as you near the end.
+  const ranked = useMemo(() => (items ? rankFeed(items, { interests, following }) : undefined), [items, interests]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [more, setMore] = useState<FeedItem[]>([]);
+  const [end, setEnd] = useState(false);
+  const loading = useRef(false);
+  const loadMore = () => {
+    if (loading.current || end || !items || items.length < 20) return;
+    loading.current = true;
+    api.feed(items.length + more.length).then((next) => {
+      if (next.length === 0) setEnd(true);
+      setMore((m) => [...m, ...next.filter((x) => !m.some((y) => y.postId === x.postId) && !items.some((y) => y.postId === x.postId))]);
+    }).catch(() => {}).finally(() => { loading.current = false; });
+  };
   const [credit] = useLoad(() => (user ? api.welcomeCreditAvailable() : Promise.resolve(false)), [user?.id]);
   const nav = useNavigate();
   const [reposts] = useLoad(() => (user && tab === "following" ? api.followingReposts() : Promise.resolve([] as FeedItem[])), [user?.id, tab, following.size]);
@@ -28,7 +43,7 @@ export function Feed() {
   const shown = tab === "following"
     ? [...(items ?? []).filter((it) => following.has(it.shop.id)), ...(reposts ?? [])]
         .filter((it, i, all) => all.findIndex((x) => x.postId === it.postId) === i)
-    : items ?? [];
+    : [...(ranked ?? []), ...more];
   const visibleItems = shown.filter((it) => !blockedShops.has(it.shop.id)); // blocked shops never show
 
   return (
@@ -42,7 +57,7 @@ export function Feed() {
         <FeedEmpty title="Follow sellers to see their drops here" body="Tap Follow on any video, or find shops in Explore."
           action={<button className="btn vglass" onClick={() => nav("/explore")}>Find sellers</button>} />
       )}
-      {items && tab !== "live" && visibleItems.length > 0 && <FeedList items={visibleItems} key={tab} />}
+      {items && tab !== "live" && visibleItems.length > 0 && <FeedList items={visibleItems} key={tab} onNearEnd={tab === "for_you" ? loadMore : undefined} />}
 
       <div className="top-bar">
         <Segmented<Tab> label="Feed" onVideo value={tab} onChange={setTab} options={[
@@ -51,14 +66,32 @@ export function Feed() {
           { value: "live", label: <><span className="dot-live" />Live</> },
         ]} />
         <div className="row" style={{ gap: 8 }}>
-          <button className="wallet-chip vglass" onClick={() => nav(user ? "/me" : "/signin")}
+          <button className="wallet-chip vglass" onClick={() => withUser(() => setWallet(true), "Sign in to see your credit")}
             aria-label={`Wallet, ${credit ? R(WELCOME_CREDIT) : "R0"} credit`}>
             <Icon name="wallet" /><span className="amt">{credit ? R(WELCOME_CREDIT) : "R0"}</span>
           </button>
-          <button className="wallet-chip vglass" onClick={() => nav("/explore")} aria-label="Search"><Icon name="search" /></button>
+          <button className="wallet-chip vglass" onClick={() => nav("/explore?search=1")} aria-label="Search"><Icon name="search" /></button>
         </div>
       </div>
+      {wallet && <WalletSheet credit={!!credit} onClose={() => setWallet(false)} />}
     </div>
+  );
+}
+
+/** What the wallet button shows: credit you have and how it gets used. */
+export function WalletSheet({ credit, onClose }: { credit: boolean; onClose: () => void }) {
+  const nav = useNavigate();
+  return (
+    <Sheet title="Wallet" onClose={onClose}>
+      <div className="wallet-hero">
+        <span className="small muted">Credit</span>
+        <b>{credit ? R(WELCOME_CREDIT) : "R0"}</b>
+      </div>
+      {credit
+        ? <div className="note" style={{ marginBottom: 12 }}>Your {R(WELCOME_CREDIT)} welcome credit comes off by itself at checkout on a first order of R200 or more.</div>
+        : <div className="note" style={{ marginBottom: 12 }}>No credit right now. Refunds and rewards will show here.</div>}
+      <button className="btn block" onClick={() => { onClose(); nav("/orders"); }}><Icon name="bag" size={18} />My orders</button>
+    </Sheet>
   );
 }
 
@@ -75,13 +108,12 @@ function FeedEmpty({ title, body, action }: { title: string; body: string; actio
 }
 
 /** Full screen video list with Browse and checkout sheets. Used by the feed and shop pages. */
-export function FeedList({ items, start = 0 }: { items: FeedItem[]; start?: number }) {
+export function FeedList({ items, start = 0, onNearEnd }: { items: FeedItem[]; start?: number; onNearEnd?: () => void }) {
   const [browse, setBrowse] = useState<FeedItem | null>(null);
   const [buy, setBuy] = useState<FeedItem | null>(null);
   const [index, setIndex] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
-  const { user } = useSession();
-  const nav = useNavigate();
+  const { withUser } = useSession();
 
   useEffect(() => {
     const el = ref.current;
@@ -95,6 +127,7 @@ export function FeedList({ items, start = 0 }: { items: FeedItem[]; start?: numb
     el.addEventListener("scroll", onScroll, { passive: true });
     return () => el.removeEventListener("scroll", onScroll);
   }, []);
+  useEffect(() => { if (onNearEnd && index >= items.length - 4) onNearEnd(); }, [index, items.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [counts, setCounts] = useState<Record<string, { likes: number; reposts: number }>>({});
   useEffect(() => { api.postCounts(items.map((it) => it.postId)).then(setCounts).catch(() => {}); }, [items]);
@@ -105,11 +138,7 @@ export function FeedList({ items, start = 0 }: { items: FeedItem[]; start?: numb
   const messageShop = useMessageShop();
 
   const go = (d: number) => ref.current?.scrollTo({ top: (index + d) * ref.current.clientHeight, behavior: "smooth" });
-  const startBuy = (it: FeedItem) => {
-    if (!user) return nav(`/signin?next=${encodeURIComponent("/")}`);
-    setBrowse(null);
-    setBuy(it);
-  };
+  const startBuy = (it: FeedItem) => withUser(() => { setBrowse(null); setBuy(it); }, "Sign in to buy");
 
   return (
     <>
@@ -170,7 +199,7 @@ function VideoCard({ item, counts, comments, onBrowse, onBuy, onComments, onMore
   item: FeedItem; counts?: { likes: number; reposts: number }; comments: number; onBrowse: () => void; onBuy: () => void; onComments: () => void; onMore: () => void;
 }) {
   const p = item.product;
-  const { following, toggleFollow, user, liked, reposted, toggleReaction, toast } = useSession();
+  const { following, toggleFollow, liked, reposted, toggleReaction, toast, withUser } = useSession();
   const isLiked = liked.has(item.postId);
   const isReposted = reposted.has(item.postId);
   // Counts from the server already include the user's own reaction when it was loaded; nudge them on taps since then.
@@ -179,11 +208,11 @@ function VideoCard({ item, counts, comments, onBrowse, onBuy, onComments, onMore
   const reposts = (counts?.reposts ?? 0) + (isReposted ? 1 : 0) - (start.reposted ? 1 : 0);
   // Swipe left on a video to open the shop, like TikTok.
   const swipe = useSwipe({ onLeft: () => nav(`/s/${item.shop.handle}`) });
-  const react = (kind: "like" | "repost") => { if (!user) return nav("/signin"); tap(); toggleReaction(item.postId, kind); };
+  const react = (kind: "like" | "repost") => withUser(() => { tap(); toggleReaction(item.postId, kind); }, kind === "like" ? "Sign in to like" : "Sign in to repost");
   const nav = useNavigate();
   const chip = statusChip(item);
   const isFollowing = following.has(item.shop.id);
-  const share = async () => { if ((await shareOrCopy(`/s/${item.shop.handle}?item=${p.id}`, p.title)) === "copied") toast("Link copied"); };
+  const share = async () => { if ((await shareOrCopy(`/i/${p.id}`, `${p.title}, ${R(p.priceCents)} on myHaul`)) === "copied") toast("Link copied"); };
   const sub = [
     p.sizes.length ? (p.sizes.length > 1 ? `Sizes ${p.sizes[0]} to ${p.sizes[p.sizes.length - 1]}` : `Size ${p.sizes[0]}`) : LISTING_LABELS[p.label].label,
     p.mode === "buy_now" && p.stock > 1 ? `${p.stock} left` : null,
@@ -205,7 +234,7 @@ function VideoCard({ item, counts, comments, onBrowse, onBuy, onComments, onMore
             <span className="avatar">{item.shop.name[0]}</span>
             <span className="handle">@{item.shop.handle}</span>
           </Link>
-          <button className="follow-btn vglass" onClick={() => (user ? toggleFollow(item.shop.id) : nav("/signin"))} aria-pressed={isFollowing}>
+          <button className="follow-btn vglass" onClick={() => withUser(() => toggleFollow(item.shop.id), "Sign in to follow")} aria-pressed={isFollowing}>
             {isFollowing ? "Following" : "Follow"}
           </button>
           <button className="more-btn" onClick={onMore} aria-label="More options"><Icon name="more" size={20} strokeWidth={3} /></button>

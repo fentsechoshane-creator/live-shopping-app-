@@ -1,4 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Icon } from "../../components/Icon";
+import { askForNotifications } from "../../lib/push";
+import { useMessageShop } from "./Messages";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { DELIVERY_OPTIONS, ORDER_STATUS_TEXT, returnReasonsFor, type ReturnReason } from "@app/core";
 import { api, type Order } from "../../api";
@@ -60,6 +63,10 @@ export function OrderDetail() {
   const [reason, setReason] = useState<ReturnReason | "">("");
   const [details, setDetails] = useState("");
   const [stars, setStars] = useState(0);
+  const [comment, setComment] = useState("");
+  const messageShop = useMessageShop();
+  // Right after paying is when "tell me when it ships" makes sense, so that's when we ask about notifications.
+  useEffect(() => { if (o?.status === "paid") askForNotifications(); }, [o?.status]);
 
   if (error) return <div className="screen"><ErrorNote error={error} /></div>;
   if (o === undefined) return <div className="screen"><Loading /></div>;
@@ -75,8 +82,15 @@ export function OrderDetail() {
       <div className="row between"><span className="muted small">from {o.shop.name}</span>{statusPill(o, "buyer")}</div>
       <ErrorNote error={actErr} />
 
+      {o.status === "paid" && (
+        <div className="note green-note" style={{ marginTop: 12 }}><b>Order placed.</b> Your money is held safely. We'll let you know when it ships.</div>
+      )}
+
       <h2>Where it is</h2>
       <Timeline o={o} />
+      {!["pending_payment", "cancelled"].includes(o.status) && (
+        <button className="btn block" style={{ marginTop: 12 }} onClick={() => messageShop(o.shop.id, o.product.id)}><Icon name="chat" size={18} />Message {o.shop.name}</button>
+      )}
 
       {o.status === "pending_payment" && (
         <div className="stack">
@@ -120,11 +134,15 @@ export function OrderDetail() {
 
       {["delivered", "completed"].includes(o.status) && !o.review && (
         <div className="card" style={{ marginTop: 16 }}>
-          <b>Rate this order</b>
-          <div className="chips" style={{ margin: "10px 0" }} role="group" aria-label="Stars">
-            {[1, 2, 3, 4, 5].map((n) => <button key={n} className="chip" aria-pressed={stars === n} onClick={() => setStars(n)}>{n} ★</button>)}
+          <b>How was it?</b>
+          <div className="stars" role="radiogroup" aria-label="Stars">
+            {[1, 2, 3, 4, 5].map((n) => (
+              <button key={n} type="button" role="radio" aria-checked={stars === n} aria-label={`${n} ${n === 1 ? "star" : "stars"}`}
+                className={n <= stars ? "on" : ""} onClick={() => setStars(n)}>★</button>
+            ))}
           </div>
-          <button className="btn dark block" disabled={!stars || busy} onClick={() => act(() => api.leaveReview(o.id, stars, ""), "Thanks for rating")}>Send rating</button>
+          {stars > 0 && <Field label="Anything to add? (optional)"><input value={comment} onChange={(e) => setComment(e.target.value)} maxLength={300} placeholder={stars >= 4 ? "Fast, well packed, as shown" : "What went wrong?"} /></Field>}
+          <button className="btn dark block" disabled={!stars || busy} onClick={() => act(() => api.leaveReview(o.id, stars, comment.trim()), "Thanks for rating")}>Send rating</button>
         </div>
       )}
 

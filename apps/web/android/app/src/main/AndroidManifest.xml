@@ -19,6 +19,15 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Shared myHaul links open the app. Verified by https://myhaul.co.za/.well-known/assetlinks.json [CONFIRM domain] -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="myhaul.co.za" android:pathPrefix="/i/" />
+                <data android:scheme="https" android:host="myhaul.co.za" android:pathPrefix="/s/" />
+                <data android:scheme="https" android:host="myhaul.co.za" android:pathPrefix="/orders/" />
+            </intent-filter>
         </activity>
 
         <provider

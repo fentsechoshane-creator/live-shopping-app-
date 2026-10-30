@@ -24,7 +24,13 @@ The web build (`apps/web/dist`) includes them. Host it on a domain, for example 
 - Account deletion (Google requires a web link): `/delete-account.html`
 - Support email: `help@myhaul.co.za` [CONFIRM: create the mailbox]
 
-Quick hosting: Netlify or Vercel, pointing at the `apps/web/dist` folder. The repo is private, so GitHub Pages would need a paid plan.
+Hosting: Netlify, using `netlify.toml` in the repo (connect the GitHub repo in Netlify; it builds by itself). Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in Netlify's environment variables (public values only). This also gives:
+
+- **WhatsApp and social previews** for shared items (`/i/<item>`) and shops (`/s/<shop>`), with picture, title and price.
+- **Links that open the app** when it's installed. Fill in two placeholders first:
+  - `apps/web/public/.well-known/apple-app-site-association`: replace `TEAMID` with the Apple Team ID (Apple Developer > Membership). [Lehloma]
+  - `apps/web/public/.well-known/assetlinks.json`: the SHA256 from Google Play Console > App integrity > App signing. [Lehloma]
+  - In Xcode, turn on **Associated Domains** and **Push Notifications** (the entitlements file is already there).
 
 ## Listing text
 
@@ -111,7 +117,7 @@ Apple and Google need a way to sign in. Our normal sign in sends a code, which r
 
 ## Still to do before submitting
 
-- [ ] Apply database migrations 0009 to 0013 and deploy the server functions on the live project
+- [ ] Paste `supabase/update-live-database.sql` (migrations 0009 to 0014) in the live SQL Editor and deploy the server functions
 - [ ] Domain, hosted web pages, support mailbox [Ofentse]
 - [ ] Company or owner details and Information Officer in the privacy pages; lawyer review [Ofentse]
 - [ ] Apple Developer account (R1,700 a year or so [CONFIRM current price]) and Google Play account (once off, about R450 [CONFIRM]) [Ofentse]
@@ -119,3 +125,4 @@ Apple and Google need a way to sign in. Our normal sign in sends a code, which r
 - [ ] TradeSafe live keys (real payments) or keep test mode for the first TestFlight round
 - [ ] Push notification keys (Apple APNs key and Firebase for Android) and the sending function [Lehloma]
 - [ ] Final icon design [Ofentse]
+- [ ] Netlify site on myhaul.co.za, Team ID and SHA256 in the `.well-known` files [Ofentse and Lehloma]

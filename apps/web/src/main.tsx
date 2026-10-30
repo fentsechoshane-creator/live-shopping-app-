@@ -4,6 +4,9 @@ import { BrowserRouter, MemoryRouter } from "react-router-dom";
 import { App } from "./App";
 import { SessionProvider } from "./session";
 import "./styles.css";
+import { startErrorReporting } from "./lib/report";
+
+startErrorReporting();
 
 // The shareable phone preview (npm run build:artifact) runs inside a frame where the address bar is not ours,
 // so it keeps routes in memory instead.

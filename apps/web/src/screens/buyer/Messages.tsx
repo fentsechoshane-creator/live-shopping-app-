@@ -8,19 +8,19 @@ import { Icon } from "../../components/Icon";
 import { ErrorNote, Loading, R, Sheet, swatch, timeAgo, useAction, useGoBack } from "../../components/ui";
 import { CheckoutSheet } from "./Checkout";
 import { ReportSheet } from "../../components/Safety";
+import { askForNotifications } from "../../lib/push";
 
 /** Opens (or starts) the chat with a shop. Signed out people go to sign in first. */
 export function useMessageShop() {
-  const { user, toast } = useSession();
+  const { toast, withUser } = useSession();
   const nav = useNavigate();
   /** `productId` attaches that item to the chat, so the seller knows what you're asking about. */
-  return async (shopId: string, productId?: string) => {
-    if (!user) return nav("/signin");
+  return (shopId: string, productId?: string) => withUser(async () => {
     try {
       const id = await api.openConversation(shopId);
       nav(`/messages/${id}${productId ? `?about=${productId}` : ""}`);
     } catch (e: any) { toast(e?.message ?? "Couldn't open the chat."); }
-  };
+  }, "Sign in to message the seller");
 }
 
 /** List of chats, used in Activity > Messages. */
@@ -103,6 +103,7 @@ export function Thread() {
     if (body && isRude(body)) return setError("Please keep it friendly. That message has words we don't allow.");
     run(async () => {
       await api.sendMessage(id, body, about, image);
+      askForNotifications(); // so you hear back when they reply
       setText("");
       if (about) setParams({}, { replace: true });
       reload();

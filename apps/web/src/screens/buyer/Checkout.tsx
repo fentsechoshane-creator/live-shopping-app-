@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { DELIVERY_OPTIONS, orderTotals, type DeliveryOption } from "@app/core";
 import { api, type FeedItem, type Offer } from "../../api";
+import { useSession } from "../../session";
 import { Icon } from "../../components/Icon";
 import { ProductArt } from "../../components/Scene";
 import { Choice, ErrorNote, Field, R, Sheet, swatch, useAction } from "../../components/ui";
@@ -30,11 +31,39 @@ export function CheckoutSheet({ item, onClose, offer }: { item: FeedItem; onClos
   const [credit, setCredit] = useState(false);
   const { busy, error, run } = useAction();
   const nav = useNavigate();
+  const { user } = useSession();
+  // Saved from the last order: shown as one line with Change, so a repeat order is a couple of taps.
+  const [remember, setRemember] = useState(true);
+  const [editing, setEditing] = useState(true);
 
   useEffect(() => { api.welcomeCreditAvailable().then(setCredit).catch(() => {}); }, []);
+  useEffect(() => {
+    if (user?.displayName) setName((n) => n || user.displayName);
+    api.savedDelivery().then((d) => {
+      if (!d) return;
+      if (d.delivery && options.includes(d.delivery as DeliveryOption)) setDelivery(d.delivery as DeliveryOption);
+      if (d.locker) setLocker(d.locker);
+      if (d.name) setName(d.name);
+      if (d.phone) setPhone(d.phone);
+      if (d.address) setAddress(d.address);
+      if ((d.name && d.phone && d.address) || d.locker) setEditing(false);
+    }).catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const needsAddress = delivery === "courier" || delivery === "baker_delivers";
+  const phoneOk = phone.replace(/\D/g, "").length >= 9;
+  // The Pay button says what's still missing instead of failing after the tap.
+  const missing = p.sizes.length > 0 && !size ? "Pick a size"
+    : delivery === "pudo_locker" && !locker ? "Pick a locker"
+    : needsAddress && (!name.trim() || !phoneOk || address.trim().length < 8) ? "Add delivery details"
+    : null;
+  const addressShown = needsAddress && (editing || !name || !phoneOk || !address);
   const t = useMemo(() => orderTotals({ itemPrice: price, delivery, welcomeCreditAvailable: credit }), [price, delivery, credit]);
 
   const pay = () => run(async () => {
+    if (remember) {
+      api.saveDelivery({ delivery, locker: locker || undefined, name: name.trim() || undefined, phone: phone.trim() || undefined, address: address.trim() || undefined }).catch(() => {});
+    }
     const res = await api.checkout({
       productId: p.id, size: size || undefined, delivery,
       deliveryDetails: delivery === "pudo_locker" ? { locker } : delivery === "courier" || delivery === "baker_delivers" ? { name, phone, address } : {},
@@ -50,7 +79,7 @@ export function CheckoutSheet({ item, onClose, offer }: { item: FeedItem; onClos
       footer={
         <>
           <ErrorNote error={error} />
-          <button className="btn green block big" onClick={pay} disabled={busy}>{busy ? "Opening payment…" : `Pay ${R(t.total)}`}</button>
+          <button className="btn green block big" onClick={pay} disabled={busy || !!missing}>{busy ? "Opening payment…" : missing ?? `Pay ${R(t.total)}`}</button>
           <p className="small muted row" style={{ justifyContent: "center", margin: "8px 0 0", gap: 6 }}><Icon name="shield" size={15} />Held safely until your {food ? "check period" : "return window"} closes.</p>
         </>
       }>
@@ -94,19 +123,32 @@ export function CheckoutSheet({ item, onClose, offer }: { item: FeedItem; onClos
           right={DELIVERY_OPTIONS[d].fee ? R(DELIVERY_OPTIONS[d].fee) : "Free"} />
       ))}
       {delivery === "pudo_locker" && (
-        <Field label="Locker">
+        <Field label="Locker" hint={locker && !editing ? "From your last order" : undefined}>
           <select value={locker} onChange={(e) => setLocker(e.target.value)}>
             <option value="">Pick a locker</option>
             {SAMPLE_LOCKERS.map((l) => <option key={l}>{l}</option>)}
           </select>
         </Field>
       )}
-      {(delivery === "courier" || delivery === "baker_delivers") && (
+      {needsAddress && !addressShown && (
+        <div className="saved-address">
+          <Icon name="pin" size={18} />
+          <span className="grow"><b>{name}</b> · {phone}<span className="small muted" style={{ display: "block" }}>{address}</span></span>
+          <button className="link" onClick={() => setEditing(true)}>Change</button>
+        </div>
+      )}
+      {addressShown && (
         <>
-          <Field label="Name"><input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" /></Field>
-          <Field label="Cell number"><input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" autoComplete="tel" /></Field>
-          <Field label="Address"><textarea value={address} onChange={(e) => setAddress(e.target.value)} autoComplete="street-address" /></Field>
+          <Field label="Name"><input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" enterKeyHint="next" /></Field>
+          <Field label="Cell number"><input value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" inputMode="tel" autoComplete="tel" placeholder="082 123 4567" enterKeyHint="next" /></Field>
+          <Field label="Address" hint="Street, suburb, city and postal code"><textarea value={address} onChange={(e) => setAddress(e.target.value)} autoComplete="street-address" rows={3} /></Field>
         </>
+      )}
+      {(needsAddress || delivery === "pudo_locker") && (
+        <label className="check-row">
+          <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+          <span>Save these details for next time</span>
+        </label>
       )}
       {delivery === "collect_cpt" && <div className="note" style={{ marginBottom: 14 }}>We send you a collection code when it is ready at our Cape Town pickup point.</div>}
 

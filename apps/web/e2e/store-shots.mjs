@@ -22,9 +22,9 @@ try {
     await page.goto(`${BASE}/signin`);
     await page.getByLabel("Email").fill("thandi@example.com");
     await page.getByRole("button", { name: "Send code" }).click();
-    await page.getByLabel("Code").fill("123456");
-    await page.getByRole("button", { name: "Sign in" }).click();
+    await page.getByLabel("Code").fill("123456"); // signs in by itself
     await page.waitForURL((u) => !u.pathname.startsWith("/signin"));
+    await page.evaluate(() => localStorage.setItem("lsa-welcomed", "1")); // skip the first open welcome
     await page.goto(BASE);
     await page.getByRole("region", { name: /Designer silk shirt/ }).waitFor();
     await shot("1-feed");

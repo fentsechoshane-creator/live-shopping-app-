@@ -360,3 +360,38 @@ reset role;
 select forget_user('00000000-0000-0000-0000-00000000000d');
 do $$ begin assert (select count(*) from device_tokens where user_id = '00000000-0000-0000-0000-00000000000d') = 0, 'devices forgotten'; end $$;
 select 'device token tests passed' as result;
+-- Saved delivery details: only your own; error reports: anyone sends, only the team reads.
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000e');
+insert into delivery_details (user_id, delivery, name, phone, address) values ('00000000-0000-0000-0000-00000000000e', 'courier', 'Ayesha', '0821234567', '1 Main Road');
+select pg_temp.expect_error($$insert into delivery_details (user_id, name) values ('00000000-0000-0000-0000-00000000000a', 'Someone')$$, 'row-level security');
+update profiles set interests = array['beauty', 'food'] where id = '00000000-0000-0000-0000-00000000000e';
+select pg_temp.expect_error($$update profiles set interests = array['cars'] where id = '00000000-0000-0000-0000-00000000000e'$$, 'check');
+insert into app_errors (message, path) values ('Test error', '/');
+do $$ begin assert (select count(*) from app_errors) = 0, 'normal users cannot read error reports'; end $$;
+reset role;
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000a');
+do $$ begin assert (select count(*) from delivery_details) = 0, 'others cannot see delivery details'; end $$;
+reset role;
+select pg_temp.act_as_anon();
+insert into app_errors (message, path) values ('Signed out error', '/');
+reset role;
+select forget_user('00000000-0000-0000-0000-00000000000e');
+do $$ begin
+  assert (select count(*) from delivery_details where user_id = '00000000-0000-0000-0000-00000000000e') = 0, 'delivery details forgotten';
+  assert (select cardinality(interests) from profiles where id = '00000000-0000-0000-0000-00000000000e') = 0, 'interests forgotten';
+  assert (select count(*) from app_errors) = 2, 'error reports saved';
+end $$;
+select 'delivery, interests and error report tests passed' as result;
+-- Link previews only show items on sale from open shops.
+select pg_temp.act_as_anon();
+do $$ begin
+  assert (select count(*) from share_card((select id from products where title = 'Satin scarf'))) = 0, 'no card once the shop is paused (account deleted above)';
+  assert (select count(*) from share_card('00000000-0000-0000-0000-000000000000')) = 0, 'no card for a missing item';
+end $$;
+reset role;
+update shops set status = 'open' where handle = 'other.shop';
+update products set status = 'live' where title = 'Satin scarf';
+select pg_temp.act_as_anon();
+do $$ begin assert (select count(*) from share_card((select id from products where title = 'Satin scarf'))) = 1, 'share card for a live item'; end $$;
+reset role;
+select 'share card tests passed' as result;

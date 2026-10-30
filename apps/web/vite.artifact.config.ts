@@ -6,6 +6,7 @@ import { viteSingleFile } from "vite-plugin-singlefile";
 export default defineConfig({
   plugins: [react(), viteSingleFile()],
   define: {
+    __APP_VERSION__: JSON.stringify("preview"),
     "import.meta.env.VITE_ROUTER": JSON.stringify("memory"),
     "import.meta.env.VITE_SUPABASE_URL": JSON.stringify(""),
     "import.meta.env.VITE_SUPABASE_ANON_KEY": JSON.stringify(""),

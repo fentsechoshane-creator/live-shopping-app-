@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { isRude } from "@app/core";
 import { api, type Comment } from "../api";
 import { useLoad, useSession } from "../session";
@@ -15,16 +15,15 @@ export function CommentsSheet({ postId, postOwnerShopHandle, onClose, onCount }:
   const [text, setText] = useState("");
   const [menu, setMenu] = useState<Comment | null>(null);
   const [report, setReport] = useState<Comment | null>(null);
-  const { user, toast } = useSession();
+  const { user, toast, withUser } = useSession();
   const { busy, error: sendError, run, setError } = useAction();
-  const nav = useNavigate();
   const myShop = useLoad(() => (user ? api.myShop() : Promise.resolve(null)), [user?.id])[0];
   const ownPost = !!myShop && myShop.handle === postOwnerShopHandle;
 
   if (report) return <ReportSheet kind="comment" targetId={report.id} what="this comment" onClose={() => setReport(null)} />;
 
   const send = () => {
-    if (!user) return nav("/signin");
+    if (!user) return withUser(undefined, "Sign in to comment");
     if (isRude(text)) return setError("Please keep it friendly. That message has words we don't allow.");
     run(async () => { await api.addComment(postId, text); setText(""); reload(); });
   };
@@ -34,7 +33,7 @@ export function CommentsSheet({ postId, postOwnerShopHandle, onClose, onCount }:
       footer={
         <form className="compose" onSubmit={(e) => { e.preventDefault(); send(); }}>
           <input value={text} onChange={(e) => setText(e.target.value)} maxLength={300} placeholder={user ? "Add a comment" : "Sign in to comment"}
-            aria-label="Add a comment" onFocus={() => !user && nav("/signin")} />
+            aria-label="Add a comment" onFocus={(e) => { if (!user) { e.currentTarget.blur(); withUser(undefined, "Sign in to comment"); } }} />
           <button className="send" disabled={!text.trim() || busy} aria-label="Post comment"><Icon name="send" size={18} /></button>
         </form>
       }>

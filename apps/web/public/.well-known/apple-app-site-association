@@ -1,0 +1,14 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["TEAMID.za.co.myhaul.app"],
+        "components": [
+          { "/": "/i/*", "comment": "Shared items" },
+          { "/": "/s/*", "comment": "Shops" },
+          { "/": "/orders/*", "comment": "Order links in emails" }
+        ]
+      }
+    ]
+  }
+}

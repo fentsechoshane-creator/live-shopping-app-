@@ -1,7 +1,9 @@
-import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useSwipe } from "./components/gestures";
-import { isNative, registerPush, startNative, statusBarFor } from "./native";
+import { isNative, registerPush, setNavigator, startNative, statusBarFor } from "./native";
+import { ErrorBoundary } from "./components/ErrorBoundary";
+import { Welcome, hasSeenWelcome } from "./components/Welcome";
 import { api } from "./api";
 import { useLoad, useSession } from "./session";
 import { Icon } from "./components/Icon";
@@ -9,7 +11,7 @@ import { BackButton, Loading } from "./components/ui";
 import { Feed } from "./screens/buyer/Feed";
 import { Explore } from "./screens/buyer/Explore";
 import { MockPay, OrderDetail, Orders } from "./screens/buyer/Orders";
-import { Activity, ShopPage, SignIn } from "./screens/buyer/Account";
+import { Activity, ShopPage, SignIn, SignInSheet } from "./screens/buyer/Account";
 import { Profile } from "./screens/buyer/Profile";
 import { Onboarding } from "./screens/seller/Onboarding";
 import { Payouts, SellerOrderDetail, SellerOrders } from "./screens/seller/Selling";
@@ -22,8 +24,18 @@ function RequireUser({ children }: { children: ReactNode }) {
   const { user, ready } = useSession();
   const loc = useLocation();
   if (!ready) return <Loading />;
-  if (!user) return <Navigate to={`/signin?next=${encodeURIComponent(loc.pathname)}`} replace />;
+  if (!user) return <Navigate to={`/signin?next=${encodeURIComponent(loc.pathname + loc.search)}`} replace />;
   return <>{children}</>;
+}
+
+/** A shared item link (/i/<item>): open that item on its shop page. */
+function ItemLink() {
+  const { id = "" } = useParams();
+  const nav = useNavigate();
+  const [item, error] = useLoad(() => api.productItem(id), [id]);
+  useEffect(() => { if (item) nav(`/s/${item.shop.handle}?item=${id}`, { replace: true }); }, [item]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (error || item === null) return <div className="screen"><BackButton /><div className="empty">This item isn't available any more.</div></div>;
+  return <div className="screen"><Loading /></div>;
 }
 
 /** Floating glass tab bar. It turns dark over the video feed. */
@@ -161,8 +173,12 @@ export function App() {
   // Only in the installed app: Safari and Chrome already swipe back from the edge, and doing it too would go back two screens.
   const standalone = isNative || (typeof window !== "undefined" && (window.matchMedia?.("(display-mode: standalone)").matches || (navigator as any).standalone === true));
   const { user } = useSession();
-  useEffect(() => { startNative(() => (window.history.length > 1 ? nav(-1) : nav("/"))); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { statusBarFor(loc.pathname === "/" || loc.pathname.startsWith("/post")); }, [loc.pathname]);
+  // First open: the welcome screens, but not when someone arrives on a shared link (show it later, on the feed).
+  const [welcome, setWelcome] = useState(() => !hasSeenWelcome() && loc.pathname === "/");
+  useEffect(() => { if (loc.pathname === "/" && !hasSeenWelcome()) setWelcome(true); }, [loc.pathname]);
+  useEffect(() => { setNavigator((path) => nav(path)); startNative(() => (window.history.length > 1 ? nav(-1) : nav("/"))); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { statusBarFor(welcome || loc.pathname === "/" || loc.pathname.startsWith("/post")); }, [loc.pathname, welcome]);
+  // Only re-registers if notifications were already allowed. The question itself comes after an order or a first message.
   useEffect(() => { if (user) registerPush((token, platform) => api.savePushToken(token, platform)); }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const edgeBack = {
     onTouchStart: (e: React.TouchEvent) => { const t = e.touches[0]; edgeStart.current = standalone && t.clientX < 24 && !isTabRoot ? { x: t.clientX, y: t.clientY } : null; },
@@ -176,11 +192,13 @@ export function App() {
   return (
     <div className="phone">
       <div className="content" {...edgeBack}>
+        <ErrorBoundary resetKey={loc.pathname} onHome={() => nav("/")}>
         <Routes>
           <Route path="/" element={<Feed />} />
           <Route path="/explore" element={<Explore />} />
           <Route path="/signin" element={<SignIn />} />
           <Route path="/s/:handle" element={<ShopPage />} />
+          <Route path="/i/:id" element={<ItemLink />} />
           <Route path="/help" element={<Help />} />
           <Route path="/orders" element={guard(<Orders />)} />
           <Route path="/orders/:id" element={guard(<OrderDetail />)} />
@@ -200,8 +218,11 @@ export function App() {
           <Route path="/privacy" element={<Privacy />} />
           <Route path="*" element={<div className="screen"><BackButton /><div className="empty">Page not found.</div></div>} />
         </Routes>
+        </ErrorBoundary>
         {!loc.pathname.startsWith("/post") && <Tabs />}
         <SideMenu />
+        <SignInSheet />
+        {welcome && <Welcome onDone={() => setWelcome(false)} />}
       </div>
     </div>
   );

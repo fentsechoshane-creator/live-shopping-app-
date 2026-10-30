@@ -263,6 +263,39 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
       const res = await sb.from("device_tokens").upsert({ token, user_id: await uid(), platform, last_seen_at: new Date().toISOString() }, { onConflict: "token" });
       if (res.error) throw new Error(res.error.message);
     },
+    async savedDelivery() {
+      const { data: auth } = await sb.auth.getUser();
+      if (!auth.user) return null;
+      const { data } = await sb.from("delivery_details").select("delivery, locker, name, phone, address").eq("user_id", auth.user.id).maybeSingle();
+      if (!data) return null;
+      const d = data as any;
+      return { delivery: d.delivery ?? undefined, locker: d.locker ?? undefined, name: d.name ?? undefined, phone: d.phone ?? undefined, address: d.address ?? undefined };
+    },
+    async saveDelivery(d) {
+      const me = await uid();
+      if (!d) { check(await sb.from("delivery_details").delete().eq("user_id", me)); return; }
+      check(await sb.from("delivery_details").upsert({
+        user_id: me, delivery: d.delivery ?? null, locker: d.locker ?? null, name: d.name ?? null, phone: d.phone ?? null, address: d.address ?? null,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "user_id" }));
+    },
+    async saveInterests(interests) {
+      const { data: auth } = await sb.auth.getUser();
+      if (!auth.user) return;
+      check(await sb.from("profiles").update({ interests }).eq("id", auth.user.id));
+    },
+    async reportError(e) {
+      try {
+        await sb.from("app_errors").insert({
+          message: e.message.slice(0, 500) || "Unknown error", stack: e.stack?.slice(0, 4000) ?? null, path: e.path?.slice(0, 200) ?? null,
+          platform: e.platform ?? null, version: e.version?.slice(0, 40) ?? null,
+        });
+      } catch { /* never throw */ }
+    },
+    async recentErrors() {
+      const rows = check(await sb.from("app_errors").select("*").order("created_at", { ascending: false }).limit(50)) as any[];
+      return rows.map((r) => ({ id: String(r.id), message: r.message, stack: r.stack, path: r.path, platform: r.platform, version: r.version, createdAt: r.created_at, userId: r.user_id }));
+    },
     async signInWithPassword(email, password) {
       const { data, error } = await sb.auth.signInWithPassword({ email: email.trim(), password });
       if (error || !data.user) throw new Error("Wrong email or password.");

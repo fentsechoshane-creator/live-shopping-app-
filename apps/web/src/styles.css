@@ -656,3 +656,38 @@ button.g3 { border: 0; padding: 0; display: block; width: 100%; }
 .tick-box { width: 22px; height: 22px; border-radius: 7px; border: 2px solid var(--hairline); display: grid; place-items: center; flex-shrink: 0; color: #fff; }
 .tick-box.round { border-radius: 50%; }
 .tick-box.on { background: var(--green); border-color: var(--green); }
+
+/* ===== First open welcome ===== */
+.welcome { position: absolute; inset: 0; z-index: 60; display: flex; flex-direction: column; color: #fff;
+  background: radial-gradient(120% 70% at 50% 20%, #23402f 0%, #101613 55%, #0b0b0d 100%);
+  padding: calc(env(safe-area-inset-top, 0px) + 14px) 20px calc(env(safe-area-inset-bottom, 0px) + 18px); }
+.welcome-top { display: flex; align-items: center; justify-content: space-between; min-height: 32px; }
+.welcome-dots { display: flex; gap: 6px; }
+.welcome-dots span { width: 6px; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.35); transition: width 0.2s ease; }
+.welcome-dots span.on { width: 18px; background: #fff; }
+.link.on-dark { color: rgba(255, 255, 255, 0.8); }
+.welcome-body { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 12px; animation: welcome-in 0.25s ease; }
+.welcome-body h1 { font-size: 28px; line-height: 1.15; margin: 8px 0 0; letter-spacing: -0.02em; }
+.welcome-body p { margin: 0; font-size: 16px; line-height: 1.5; color: rgba(255, 255, 255, 0.78); max-width: 330px; }
+.welcome-icon { width: 64px; height: 64px; border-radius: 20px; display: grid; place-items: center; color: #fff; }
+.interest-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+.interest { position: relative; text-align: left; border: 0; border-radius: var(--r); padding: 14px; min-height: 84px; color: #fff;
+  display: flex; flex-direction: column; justify-content: flex-end; gap: 2px; font: inherit; }
+.interest b { font-size: 15px; }
+.interest span { font-size: 12.5px; color: rgba(255, 255, 255, 0.7); }
+.interest[aria-pressed="true"] { background: rgba(34, 197, 94, 0.28); box-shadow: inset 0 0 0 1.5px var(--green); }
+.interest .tick { position: absolute; top: 10px; right: 10px; width: 22px; height: 22px; border-radius: 11px; background: var(--green); color: var(--green-ink);
+  display: grid; place-items: center; }
+.welcome-foot { padding-top: 12px; }
+@keyframes welcome-in { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .welcome-body { animation: none; } }
+.wallet-hero { display: flex; flex-direction: column; align-items: center; padding: 8px 0 18px; }
+.wallet-hero b { font-size: 34px; letter-spacing: -0.02em; }
+.saved-address { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border-radius: var(--r); background: var(--surface-2, rgba(118, 118, 128, 0.12)); margin-bottom: 12px; font-size: 14px; }
+.saved-address .link { flex-shrink: 0; }
+.check-row { display: flex; align-items: center; gap: 10px; font-size: 14px; margin: 0 0 14px; }
+.check-row input { width: 20px; height: 20px; accent-color: var(--green); flex-shrink: 0; }
+.stars { display: flex; gap: 4px; margin: 8px 0 12px; }
+.stars button { border: 0; background: none; font-size: 34px; line-height: 1; padding: 4px; color: var(--ink-3); cursor: pointer; }
+.stars button.on { color: #f5b301; }
+.note.green-note { background: var(--green-soft); color: var(--ink); }

@@ -13,6 +13,17 @@ export async function shareOrCopy(path: string, title?: string): Promise<"shared
 }
 export const platform = Capacitor.getPlatform(); // "ios", "android" or "web"
 
+// Opens a screen inside the app without reloading it (set by App once the router is ready).
+let goTo: (path: string) => void = (path) => window.location.assign(path);
+export function setNavigator(fn: (path: string) => void) { goTo = fn; }
+/** Only our own screens: a path like /s/lebo?item=1, never another website. */
+const appPath = (link: string) => {
+  try {
+    const u = new URL(link, PUBLIC_URL);
+    return u.origin === new URL(PUBLIC_URL).origin && u.pathname.startsWith("/") ? u.pathname + u.search : null;
+  } catch { return null; }
+};
+
 /** Runs once when the app starts: splash, status bar, Android back button. */
 export async function startNative(goBack: () => void) {
   if (!isNative) return;
@@ -21,6 +32,8 @@ export async function startNative(goBack: () => void) {
   ]);
   StatusBar.setStyle({ style: Style.Dark }).catch(() => {});
   SplashScreen.hide().catch(() => {});
+  // A shared myHaul link opened on a phone with the app installed: go straight to that item or shop.
+  App.addListener("appUrlOpen", ({ url }) => { const path = appPath(url); if (path) goTo(path); });
   // Android back button: close an open sheet or menu first, then go back, then leave the app.
   App.addListener("backButton", ({ canGoBack }) => {
     if (document.querySelector(".sheet-backdrop, .drawer-backdrop, .viewer")) {
@@ -57,19 +70,24 @@ export async function tap() {
   Haptics.impact({ style: ImpactStyle.Light }).catch(() => {});
 }
 
-/** Ask for notification permission and hand the device token to `save`. Phone app only. */
-export async function registerPush(save: (token: string, platform: string) => Promise<void>) {
+/**
+ * Notifications. `ask: false` (on start) only registers if the person already said yes.
+ * `ask: true` shows the phone's question: we only do that at a moment it clearly helps, like right after an order
+ * or a first message, so people understand why and are more likely to say yes (Apple's advice too).
+ */
+export async function registerPush(save: (token: string, platform: string) => Promise<void>, ask = false) {
   if (!isNative) return;
   const { PushNotifications } = await import("@capacitor/push-notifications");
   const perm = await PushNotifications.checkPermissions();
-  const granted = perm.receive === "granted" || (await PushNotifications.requestPermissions()).receive === "granted";
+  const granted = perm.receive === "granted" || (ask && perm.receive !== "denied" && (await PushNotifications.requestPermissions()).receive === "granted");
   if (!granted) return;
   await PushNotifications.removeAllListeners();
   PushNotifications.addListener("registration", (t) => { save(t.value, platform).catch(() => {}); });
   // Tapping a notification opens the screen it points to.
   PushNotifications.addListener("pushNotificationActionPerformed", (a) => {
     const link = a.notification.data?.link;
-    if (typeof link === "string" && link.startsWith("/")) window.location.assign(link);
+    const path = typeof link === "string" ? appPath(link) : null;
+    if (path) goTo(path);
   });
   await PushNotifications.register();
 }

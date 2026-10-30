@@ -13,26 +13,47 @@ import { MoreSheet } from "../../components/Safety";
 import { OrderList } from "./Orders";
 
 export function SignIn() {
+  const [params] = useSearchParams();
+  const nav = useNavigate();
+  const next = params.get("next") || "/";
+  return (
+    <div className="screen">
+      <BackButton />
+      <h1 className="large-title" style={{ margin: "8px 0 6px" }}>Sign in</h1>
+      <SignInForm onDone={() => nav(next, { replace: true })} />
+    </div>
+  );
+}
+
+/** Sign in over the current screen, so you don't lose your place. Opened by `withUser`. */
+export function SignInSheet() {
+  const { signInAsk, closeSignIn } = useSession();
+  if (!signInAsk) return null;
+  return (
+    <Sheet title={signInAsk} onClose={closeSignIn}>
+      <SignInForm onDone={() => {}} />
+    </Sheet>
+  );
+}
+
+/** Email (or phone) and a 6 digit code. New and returning people use the same steps. */
+export function SignInForm({ onDone }: { onDone: () => void }) {
   const [contact, setContact] = useState("");
   const [code, setCode] = useState("");
   const [sent, setSent] = useState(false);
   const [usePassword, setUsePassword] = useState(false); // for the app store reviewers' test account
   const [password, setPassword] = useState("");
   const { busy, error, run } = useAction();
-  const [params] = useSearchParams();
-  const nav = useNavigate();
-  const next = params.get("next") || "/";
   const phone = authMethod === "phone";
+  const verify = (c: string) => run(async () => { await api.verifyCode(contact, c); onDone(); });
 
   return (
-    <div className="screen">
-      <BackButton />
-      <h1 className="large-title" style={{ margin: "8px 0 6px" }}>Sign in</h1>
-      <p className="muted" style={{ marginTop: 0 }}>One account for buying and selling. We send you a 6 digit code.</p>
+    <>
+      <p className="muted" style={{ marginTop: 0 }}>{sent ? `We sent a 6 digit code to ${contact}.` : "One account for buying and selling. No password needed: we send you a code."}</p>
       {api.mode === "demo" && <div className="note amber" style={{ marginBottom: 14 }}>Demo: use any email and the code <b>123456</b>. An email starting with “admin” signs in as our team. To try the seller side of chats, use <b>lebo@shop.demo</b>.</div>}
       <ErrorNote error={error} />
       {usePassword ? (
-        <form onSubmit={(e) => { e.preventDefault(); run(async () => { await api.signInWithPassword(contact, password); nav(next, { replace: true }); }); }}>
+        <form onSubmit={(e) => { e.preventDefault(); run(async () => { await api.signInWithPassword(contact, password); onDone(); }); }}>
           <Field label="Email"><input value={contact} onChange={(e) => setContact(e.target.value)} type="email" inputMode="email" autoComplete="email" required /></Field>
           <Field label="Password"><input value={password} onChange={(e) => setPassword(e.target.value)} type="password" autoComplete="current-password" required /></Field>
           <button className="btn green block big" disabled={busy}>{busy ? "Signing in…" : "Sign in"}</button>
@@ -42,21 +63,26 @@ export function SignIn() {
         <form onSubmit={(e) => { e.preventDefault(); run(async () => { await api.sendCode(contact); setSent(true); }); }}>
           <Field label={phone ? "Cell number" : "Email"}>
             <input value={contact} onChange={(e) => setContact(e.target.value)} type={phone ? "tel" : "email"} inputMode={phone ? "tel" : "email"}
-              autoComplete={phone ? "tel" : "email"} placeholder={phone ? "082 123 4567" : "you@example.com"} required />
+              autoComplete={phone ? "tel" : "email"} placeholder={phone ? "082 123 4567" : "you@example.com"} required autoFocus />
           </Field>
-          <button className="btn green block big" disabled={busy}>{busy ? "Sending…" : "Send code"}</button>
+          <button className="btn green block big" disabled={busy || !contact.trim()}>{busy ? "Sending…" : "Send code"}</button>
           <button type="button" className="link" style={{ marginTop: 14 }} onClick={() => setUsePassword(true)}>Sign in with a password</button>
         </form>
       ) : (
-        <form onSubmit={(e) => { e.preventDefault(); run(async () => { await api.verifyCode(contact, code); nav(next, { replace: true }); }); }}>
-          <Field label="Code" hint={`Sent to ${contact}`}>
-            <input value={code} onChange={(e) => setCode(e.target.value)} inputMode="numeric" autoComplete="one-time-code" maxLength={6} required />
+        <form onSubmit={(e) => { e.preventDefault(); verify(code); }}>
+          <Field label="Code">
+            {/* Signs in by itself once all 6 digits are in (including when the phone fills the code from the message). */}
+            <input value={code} onChange={(e) => { const v = e.target.value.replace(/\D/g, "").slice(0, 6); setCode(v); if (v.length === 6 && !busy) verify(v); }}
+              inputMode="numeric" autoComplete="one-time-code" maxLength={6} required autoFocus />
           </Field>
-          <button className="btn green block big" disabled={busy}>{busy ? "Checking…" : "Sign in"}</button>
-          <button type="button" className="link" style={{ marginTop: 14 }} onClick={() => setSent(false)}>Use a different {phone ? "number" : "email"}</button>
+          <button className="btn green block big" disabled={busy || code.length < 6}>{busy ? "Checking…" : "Sign in"}</button>
+          <div className="row between" style={{ marginTop: 14 }}>
+            <button type="button" className="link" onClick={() => { setSent(false); setCode(""); }}>Use a different {phone ? "number" : "email"}</button>
+            <button type="button" className="link" disabled={busy} onClick={() => run(async () => { await api.sendCode(contact); setCode(""); })}>Send again</button>
+          </div>
         </form>
       )}
-    </div>
+    </>
   );
 }
 
@@ -114,7 +140,7 @@ export function Activity() {
 export function ShopPage() {
   const { handle = "" } = useParams();
   const [data, error] = useLoad(() => api.shop(handle), [handle]);
-  const { following, toggleFollow, user, toast } = useSession();
+  const { following, toggleFollow, toast, withUser } = useSession();
   const [tab, setTab] = useState<"posts" | "likes" | "reposts">("posts");
   const [more, setMore] = useState(false);
   const goBack = useGoBack("/explore");
@@ -123,7 +149,6 @@ export function ShopPage() {
   const [replyMin] = useLoad(() => (data ? api.shopReplyMinutes(data.shop.id) : Promise.resolve(null)), [data?.shop.id]);
   const swipeShopTabs = useTabSwipe(["posts", "likes", "reposts"] as const, tab, setTab);
   const [reacted] = useLoad(() => (data && tab !== "posts" ? api.reactedPosts(tab === "likes" ? "like" : "repost", data.shop.id) : Promise.resolve([])), [data?.shop.id, tab]);
-  const nav = useNavigate();
   if (error) return <div className="screen"><ErrorNote error={error} /></div>;
   if (data === undefined) return <div className="screen"><Loading /></div>;
   if (!data) return <div className="screen"><BackButton /><div className="empty">Shop not found.</div></div>;
@@ -156,7 +181,7 @@ export function ShopPage() {
       {replyText(replyMin) && <p className="pnote muted" style={{ marginTop: 4 }}><Icon name="chat" size={12} /> {replyText(replyMin)}</p>}
       <div className="row" style={{ marginTop: 12, gap: 8 }}>
         <button className={`btn grow ${isFollowing ? "" : "dark"}`} style={{ minHeight: 40 }}
-          onClick={() => (user ? toggleFollow(shop.id) : nav("/signin"))}>{isFollowing ? "Following" : "Follow"}</button>
+          onClick={() => withUser(() => toggleFollow(shop.id), "Sign in to follow")}>{isFollowing ? "Following" : "Follow"}</button>
         <button className="btn grow" style={{ minHeight: 40 }} onClick={() => messageShop(shop.id)}><Icon name="chat" size={16} />Message</button>
       </div>
       {more && <MoreSheet kind="shop" targetId={shop.id} shopId={shop.id} shopHandle={shop.handle} onClose={() => setMore(false)} />}

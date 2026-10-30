@@ -8,3 +8,4 @@ supabase/.temp/
 supabase/.branches/
 apps/web/e2e/shots/
 dist-artifact/
+.netlify

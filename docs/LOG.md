@@ -11,15 +11,17 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 | Area | Status |
 | --- | --- |
 | Business rules (fees, credit, returns, payouts, trust) | Done and tested |
-| Database, security rules, server functions | Done, live on Supabase |
+| Database, security rules, server functions | Done. Live project is behind: paste `supabase/update-live-database.sql` (0009 to 0014) |
 | Seller side (sign up, checks, listings, orders, payouts) | Done in the web app |
 | Buyer side (feed, Explore, checkout, orders, returns) | Done in the web app |
 | Design (Liquid Glass, iPhone first, TikTok style profile) | Done, keeps improving |
 | Real payments (TradeSafe escrow) | Built, waiting for sandbox keys [Lehloma] |
 | Real video (Mux) | Built, waiting for keys [Lehloma] |
 | Sign in by code on the live project | Waiting for 2 Supabase settings [Ofentse] |
-| Mobile app (iPhone and Android) | Not started. Platform is Lehloma's choice |
-| Live streams, auctions, chat, wallet | Not started (shown as "coming next") |
+| Mobile app (iPhone and Android) | Built with Capacitor. Android test build on GitHub; iPhone needs a Mac with Xcode |
+| Chat, offers, holds, comments | Done |
+| Live streams and auctions | Not started (shown as "coming next") |
+| Error reports, share previews, welcome, saved delivery | Done (previews need the web host) |
 
 ## Run the current version
 
@@ -48,25 +50,23 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 
 ## Current state
 
-- Buyer: feed (For you, Following, Live), Explore, product sheet, checkout, orders with returns, activity.
-- Profile: one TikTok style page (`apps/web/src/screens/buyer/Profile.tsx`): photo with Posts, Sales, Following beside it, name with rating bubble, standing pill, bio, then Seller and Buyer tabs.
-- Seller: 5 step onboarding, listing with counterfeit checks, orders to ship, payouts with credit top ups.
-- Team (admin): checks, returns, top ups to pay.
-- Demo media: drawn product shots (`apps/web/src/components/Scene.tsx`) stand in for seller videos, because this workspace cannot download stock media. Real sellers upload video through Mux.
+- Buyer: welcome screens with interests on first open, feed (For you ranked by interests, loads more as you scroll; Following; Live), Explore with word search, item sheet, checkout that remembers delivery details, orders with returns and ratings, activity, chats with offers and holds.
+- Signing in happens in a sheet over the current screen and then finishes what you tapped (like, follow, buy, message). The code signs in by itself once 6 digits are in.
+- Profile: TikTok style page with Posts, Likes and Reposts.
+- Seller: onboarding, Create in steps with drafts and photo suggestions, Camera, Live (locked until ready), orders to ship (most urgent first, copy address), payouts.
+- Team (admin): reports, checks, returns, top ups, app errors.
+- Phone apps: Capacitor in `apps/web/ios` and `apps/web/android`. Links to items and shops open the app once the domain is set up.
+- Ranking: `apps/web/src/lib/rank.ts` is where Lehloma's engine plugs in.
 - Tests: `npm test` (core), `npm run test:db` (security rules on local Postgres), `npm run test:e2e` (full journey, iPhone size, screenshots in `apps/web/e2e/shots`).
 
 ## Next up
 
-- Store must haves are built. Still needed: real company details and support email in the privacy page, a lawyer's review, and apply migrations 0009 to 0012 plus deploy `delete-account`, `suggest-listing` and the updated `checkout` on the live project.
-- Set up Apple and Google developer accounts now (D-U-N-S first for a company account) and start Google's 12 tester, 14 day closed test early. [Ofentse and Lehloma]
-
-- Apply migrations 0009 (public likes and reposts) and 0010 (listing photos) to the live Supabase project, and deploy the `suggest-listing` function.
-- Add the `ANTHROPIC_API_KEY` secret in Supabase (Edge Functions, Secrets) so photo suggestions work. Never paste it in chat or git. [Lehloma]
-
-- Real seller video clips for the demo (Ofentse to send short clips, or allow Pexels in Claude settings).
-- Supabase dashboard: set Site URL and add `{{ .Token }}` to the magic link email so the 6 digit sign in code works. [Ofentse]
-- TradeSafe sandbox keys and Mux keys as server secrets, then test a real escrow payment. [Lehloma]
-- Live streams with auctions are shown as "coming next". Comments and messages are built.
+- **Live database:** paste `supabase/update-live-database.sql` into Supabase > SQL Editor and run it (migrations 0009 to 0014; tested on a copy at 0008). Then deploy `delete-account`, `suggest-listing` and `checkout` after `npm run check:functions`. [Ofentse or Lehloma]
+- **Web host and domain:** connect the repo to Netlify (`netlify.toml` is ready), set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` there, point myhaul.co.za at it. This gives the privacy and help pages, WhatsApp previews and links that open the app. [Ofentse]
+- **Links open the app:** put the Apple Team ID in `public/.well-known/apple-app-site-association` and the Play signing SHA256 in `assetlinks.json`; turn on Associated Domains and Push in Xcode. [Lehloma]
+- Developer accounts, Google's 12 tester 14 day closed test, reviewer test account. [Ofentse]
+- Push sending function (Apple and Firebase keys), PUDO and Courier Guy accounts for real lockers and tracking. [Lehloma]
+- Then: shop reviews on shop pages, search filters (size, price, area), video cover and trim, seller stats, invite a friend, live selling.
 
 ## Known issues and risks
 
@@ -74,23 +74,38 @@ Debug as we go: anyone who finds or fixes a problem updates this list. Highest r
 
 | # | Issue | Risk | Fix / owner |
 | --- | --- | --- | --- |
-| 1 | The live Supabase project is behind the code: migrations 0009 to 0012 not applied; `delete-account`, `suggest-listing` and the updated `checkout` not deployed. The real app would error on likes lists, comments, messages, extra photos, offers. | High | Approve the Supabase prompt, then a live smoke test. [Ofentse] |
+| 1 | The live Supabase project is behind the code: migrations 0009 to 0014 not applied; `delete-account`, `suggest-listing` and the updated `checkout` not deployed. The real app would error on likes lists, comments, messages, extra photos, offers, saved delivery and error reports. | High | Paste `supabase/update-live-database.sql` in the SQL Editor, then a live smoke test. [Ofentse] |
 | 2 | The live (Supabase) side of the app has never been run end to end. Tests run in demo mode; this workspace can't reach supabase.co. | High | After 1, click through every flow on the live project with two accounts. [Lehloma] |
 | 3 | Server functions can't be type checked here (no Deno). | Medium | `npm run check:functions` on Lehloma's machine before deploying. [Lehloma] |
 | 4 | Only tested in Chrome's engine. Safari (iPhone) not automated. | Medium | Test on Ofentse's iPhone every round; add WebKit to the tests on a machine that has it. |
 | 5 | iPhone videos are often HEVC (.mov): fine on iPhone, may not play on Android or Chrome until Mux converts them. | Medium | Add Mux keys; all uploads then play everywhere. [Lehloma] |
 | 6 | Chats refresh every 3 seconds instead of live updates; typing indicator only works in the demo. | Low now, cost at scale | Supabase Realtime for messages and typing. |
-| 7 | "Liked", "Reposted", "Following reposts" and chat cards only find items in the first 50 of the feed (live). | Low now | Server function that returns posts by id. |
+| 7 | "Liked", "Reposted", "Following reposts" and chat cards only find items in the first 50 of the feed (live). The For You feed itself now loads more as you scroll. | Low now | Server function that returns posts by id. |
 | 8 | Bundles: a return refunds the whole bundle (no partial returns yet). | Medium for sellers | Decide the rule, then build partial returns. [CONFIRM] |
 | 9 | Rude word filter may block innocent Afrikaans words ("naai" also means sew, "moer" a nut). | Low | Review the list with a native speaker. [CONFIRM] |
 | 10 | Saved replies are stored on the phone, not the account. | Low | Move to the database later. |
 | 11 | Sound starts after the first tap in a browser (browser rule). | Low | Native app plays with sound straight away. |
-| 12 | Push notifications not built. | Medium for launch | Native app. [Lehloma] |
+| 12 | Push: phones register and we ask after a first order or message, but nothing sends yet. | Medium for launch | Sending function with Apple and Firebase keys. [Lehloma] |
 | 13 | Privacy page has placeholders (company, support email, Information Officer). | High for store review | Fill in, lawyer review. [Ofentse] |
+| 14 | Share previews and "open in app" links only work once the site is on myhaul.co.za with the Team ID and SHA256 filled in. Until then links open the web version. | Medium | See Next up. [CONFIRM domain] |
+| 15 | Ranking by interests is simple (picked categories first, mixed with others). | Low | Lehloma's engine replaces `rankFeed` in `lib/rank.ts`. |
+| 16 | The PUDO locker list is sample data. | High for launch | PUDO API account. [Ofentse] |
 
 Fixed in this round: Safari double back on the edge swipe (now only in the installed app), deleting an account now also deletes the person's photos and videos, React Router warnings.
 
 ## Log
+
+### 2026-10-30: Faster flow, error reports, share previews, welcome, saved delivery
+- **Sign in without losing your place:** Like, Follow, Buy, Comment, Message and Wallet open a sign in sheet over the screen, then finish the action (Buy now goes straight to checkout). The code signs in by itself at 6 digits; "Send again" added. `withUser()` in `session.tsx`.
+- **Welcome on first open** (`components/Welcome.tsx`): three short screens (swipe or Next, Skip) and an interest picker (Thrift, Designer, Hair and beauty, Bakes). Interests are saved on the phone and the account (`profiles.interests`) and order For You via `lib/rank.ts`, the seam for Lehloma's engine. Not shown when someone arrives on a shared link.
+- **Checkout:** remembers delivery details (private `delivery_details` table) and shows them as one line with Change; "Save for next time"; the Pay button says what's missing ("Pick a size", "Pick a locker", "Add delivery details") instead of failing.
+- **Error reports** (`lib/report.ts`, `components/ErrorBoundary.tsx`): crashes show "Something went wrong on this screen" with Try again and Go home, and are logged to `app_errors` (no personal details; kept 30 days). Team > App errors lists them.
+- **Share previews:** items share as `/i/<item>`. On the web host, a Netlify edge function (`apps/web/netlify/edge-functions/share.ts`) answers WhatsApp and other apps with the item's picture, title and price (`share_card` function in the database). Default preview image `public/og.png`.
+- **Links open the app:** `.well-known` files, Android intent filter, iOS entitlements, `appUrlOpen` handling. Notification taps now open the screen without reloading. Placeholders: Apple Team ID, Play SHA256, domain [CONFIRM].
+- **Notifications** are asked for after a first paid order or message, not at sign in (more people say yes; Apple's advice).
+- **Smaller fixes:** Explore items open the item (not the shop); search matches every word, descriptions and sizes; the feed search button opens search ready to type; wallet button shows a Wallet sheet; For You loads more as you scroll; order page has "Order placed", Message the seller, and star rating with an optional comment; sellers see orders to ship first with the ship by time, and can copy the address or locker.
+- Migration 0014 (`delivery_details`, `profiles.interests`, `app_errors`, `share_card`, account deletion clears them) with tests. `supabase/update-live-database.sql` combines 0009 to 0014 for pasting into the live project.
+- Tests: core, database and end to end (now with welcome, sign in sheet to checkout, shared item link, wallet) all pass.
 
 ### 2026-10-30: myHaul phone apps (Capacitor) and store readiness
 - Decisions (Ofentse): wrap the current app with **Capacitor** for iPhone and Android; app name **myHaul**; **personal** developer accounts for now. Lehloma is focused on the ranking algorithm.

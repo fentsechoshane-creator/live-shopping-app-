@@ -218,6 +218,10 @@ export interface PendingReview {
   files: { label: string; url: string }[];
 }
 
+/** Delivery details remembered for the next checkout. Private to the user. */
+export interface SavedDelivery { delivery?: string; locker?: string; name?: string; phone?: string; address?: string }
+export interface AppError { id: string; message: string; stack?: string | null; path?: string | null; platform?: string | null; version?: string | null; createdAt: string; userId?: string | null }
+
 export interface Api {
   mode: "demo" | "live";
   // Auth
@@ -259,6 +263,15 @@ export interface Api {
   deleteAccount(): Promise<void>;
   /** Phone app: remember this device so we can send push notifications. */
   savePushToken(token: string, platform: string): Promise<void>;
+  /** Delivery details from the last order, to fill in checkout. */
+  savedDelivery(): Promise<SavedDelivery | null>;
+  saveDelivery(d: SavedDelivery | null): Promise<void>;
+  /** What the user picked on the welcome screens. Shapes the first For You feed. */
+  saveInterests(interests: Category[]): Promise<void>;
+  /** Send a crash or error report. Never throws. */
+  reportError(e: { message: string; stack?: string; path?: string; platform?: string; version?: string }): Promise<void>;
+  /** Team only: the latest error reports. */
+  recentErrors(): Promise<AppError[]>;
   /** Email and password sign in (used for the app store reviewers' test account). */
   signInWithPassword(email: string, password: string): Promise<User>;
   openReports(): Promise<OpenReport[]>;

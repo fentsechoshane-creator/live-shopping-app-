@@ -35,11 +35,13 @@ export function SellerOrders() {
       <ErrorNote error={error} />
       {!orders && !error && <Loading />}
       {orders?.length === 0 && <div className="empty">No orders yet. Post videos to get your first sale.</div>}
-      {orders?.map((o) => (
+      {/* Orders to ship come first, the most urgent at the top. */}
+      {orders && [...orders].sort((a, b) => (a.status === "paid" ? 0 : 1) - (b.status === "paid" ? 0 : 1)
+        || (a.status === "paid" ? new Date(a.shipBy ?? 0).getTime() - new Date(b.shipBy ?? 0).getTime() : 0)).map((o) => (
         <Link key={o.id} to={`/sell/orders/${o.id}`} className="list-item">
           <div className="grow">
             <b>{o.product.title}</b>{o.size && <span className="small muted"> · size {o.size}</span>}
-            <div className="small muted">{DELIVERY_OPTIONS[o.delivery].label} · {dateText(o.createdAt)}</div>
+            <div className="small muted">{DELIVERY_OPTIONS[o.delivery].label} · {o.status === "paid" && o.shipBy ? `ship by ${dateTimeText(o.shipBy)}` : dateText(o.createdAt)}</div>
             <div style={{ marginTop: 4 }}>{statusPill(o, "seller")}</div>
           </div>
           <b>{R(o.totals.sellerPayout)}</b>
@@ -56,6 +58,7 @@ export function SellerOrderDetail() {
   const [packing, setPacking] = useState<File | null>(null);
   const { busy, error: actErr, run } = useAction();
   const { toast } = useSession();
+  const copy = (text: string) => navigator.clipboard?.writeText(text).then(() => toast("Copied"), () => toast("Couldn't copy"));
   if (error) return <div className="screen"><ErrorNote error={error} /></div>;
   if (o === undefined) return <div className="screen"><Loading /></div>;
   if (!o) return <div className="screen"><div className="empty">Order not found.</div></div>;
@@ -73,13 +76,23 @@ export function SellerOrderDetail() {
         <div className="card" style={{ marginTop: 14 }}>
           <b>Ship by {dateTimeText(o.shipBy)}</b>
           <p className="small muted">If it is not shipped in time, the buyer is refunded automatically and you lose 5 trust points.</p>
-          {o.deliveryDetails.locker && <div className="note" style={{ marginBottom: 12 }}>Send to PUDO locker: <b>{o.deliveryDetails.locker}</b></div>}
-          {o.deliveryDetails.address && <div className="note" style={{ marginBottom: 12 }}>Send to {o.deliveryDetails.name}, {o.deliveryDetails.phone}<br />{o.deliveryDetails.address}</div>}
+          {o.deliveryDetails.locker && (
+            <div className="note row between" style={{ marginBottom: 12, alignItems: "flex-start" }}>
+              <span>Send to PUDO locker: <b>{o.deliveryDetails.locker}</b></span>
+              <button className="link" onClick={() => copy(o.deliveryDetails.locker)}>Copy</button>
+            </div>
+          )}
+          {o.deliveryDetails.address && (
+            <div className="note row between" style={{ marginBottom: 12, alignItems: "flex-start" }}>
+              <span>Send to {o.deliveryDetails.name}, {o.deliveryDetails.phone}<br />{o.deliveryDetails.address}</span>
+              <button className="link" onClick={() => copy(`${o.deliveryDetails.name}\n${o.deliveryDetails.phone}\n${o.deliveryDetails.address}`)}>Copy</button>
+            </div>
+          )}
           {o.foodDate && <div className="note" style={{ marginBottom: 12 }}>For {o.foodDate}, {o.foodSlot}</div>}
           <Field label="Packing video" hint="Earns a trust point when you ship within 2 days, and protects you in a dispute.">
             <input type="file" accept="video/*" capture="environment" onChange={(e) => setPacking(e.target.files?.[0] ?? null)} />
           </Field>
-          {needsTracking && <Field label="Tracking number"><input value={tracking} onChange={(e) => setTracking(e.target.value)} /></Field>}
+          {needsTracking && <Field label="Tracking number"><input value={tracking} onChange={(e) => setTracking(e.target.value.toUpperCase())} autoCapitalize="characters" autoCorrect="off" spellCheck={false} /></Field>}
           <button className="btn green block" disabled={busy || (needsTracking && !tracking)} onClick={() => act(() => api.shipOrder(o.id, tracking, packing), "Marked as shipped")}>
             {o.mode === "order_now" ? "Ready, handed over" : "Mark as shipped"}
           </button>
