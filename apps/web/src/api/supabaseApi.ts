@@ -667,12 +667,10 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
       await call("order-action", { orderId, action: "decide_return", uphold });
     },
     async topUpsDue() {
-      const rows = check(await sb.from("payouts").select("id, topup_cents, pay_on, shops(name, seller_checks(bank_name, bank_last4))")
-        .gt("topup_cents", 0).is("topup_paid_at", null).neq("status", "cancelled").order("pay_on")) as any[];
-      return rows.map((r) => ({
-        payoutId: r.id, shopName: r.shops?.name ?? "", amountCents: r.topup_cents, payOn: r.pay_on,
-        bank: r.shops?.seller_checks ? `${r.shops.seller_checks.bank_name} ending ${r.shops.seller_checks.bank_last4}` : "",
-      }));
+      // Includes warning signs (new buyer, same phone as the seller, collected in person, many credit orders).
+      const rows = check(await sb.rpc("admin_topups")) as any[];
+      return rows.map((r) => ({ payoutId: r.payoutId, shopName: r.shopName, bank: r.bank, amountCents: r.amountCents, payOn: r.payOn,
+        buyer: r.buyer, buyerId: r.buyerId, sellerId: r.sellerId, flags: r.flags ?? [] }));
     },
     async markTopUpPaid(payoutId) {
       check(await sb.rpc("admin_mark_topup_paid", { p_payout: payoutId }));

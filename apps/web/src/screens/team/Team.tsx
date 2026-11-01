@@ -660,15 +660,19 @@ function Money() {
       )}
       <section className="team-card">
         <h2>Welcome credit top ups to pay</h2>
-        <p className="small muted">When the R50 credit is more than our cut, we EFT the seller the difference from our account, on the payout date. Mark it paid once the EFT has gone through.</p>
+        <p className="small muted">When the R50 credit is more than our cut, we EFT the seller the difference from our account, on the payout date. Check the warning signs first: sellers can make fake buyer accounts to collect top ups. Only pay once the order is finished, and mark it paid once the EFT has gone through.</p>
         <ErrorNote error={error ?? err} />
         {rows?.length === 0 && <Empty>Nothing to pay.</Empty>}
         {rows && rows.length > 0 && (
           <table className="tt">
-            <thead><tr><th>Shop</th><th>Bank</th><th>Amount</th><th>Pay by</th><th aria-label="Actions" /></tr></thead>
+            <thead><tr><th>Shop</th><th>Buyer</th><th>Bank</th><th>Amount</th><th>Pay by</th><th>Check first</th><th aria-label="Actions" /></tr></thead>
             <tbody>{rows.map((t) => (
-              <tr key={t.payoutId}><td data-l="Shop"><b>{t.shopName}</b></td><td data-l="Bank">{t.bank}</td><td data-l="Amount"><b>{R(t.amountCents)}</b></td>
+              <tr key={t.payoutId}><td data-l="Shop">{t.sellerId ? <Link to={`/team/accounts/${t.sellerId}`}>{t.shopName}</Link> : <b>{t.shopName}</b>}</td>
+                <td data-l="Buyer">{t.buyerId ? <Link to={`/team/accounts/${t.buyerId}`}>@{t.buyer}</Link> : "—"}</td>
+                <td data-l="Bank">{t.bank}</td><td data-l="Amount"><b>{R(t.amountCents)}</b></td>
                 <td data-l="Pay by">{t.payOn ? dateText(t.payOn) : "Payout held"}</td>
+                <td data-l="Check first"><div className="team-flags">{(t.flags ?? []).length === 0 ? <span className="pill green">Looks fine</span>
+                  : t.flags!.map((f) => <span key={f} className="pill amber">{f}</span>)}</div></td>
                 <td data-l=""><button className="btn dark small" disabled={busy} onClick={() => act(() => api.markTopUpPaid(t.payoutId), "Marked as paid")}>Mark paid</button></td></tr>
             ))}</tbody>
           </table>

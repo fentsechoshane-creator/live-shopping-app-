@@ -1,7 +1,7 @@
 // Escrow provider. TradeSafe in live mode, a fake in mock mode so the whole order flow can be tested without keys.
 // [CONFIRM] every GraphQL shape below against the TradeSafe schema playground before going live:
 // https://docs.tradesafe.co.za and https://developer.tradesafe.co.za/api-spec/
-import { env } from "./http.ts";
+import { env, UserError } from "./http.ts";
 
 export interface PartyInput {
   givenName: string;
@@ -37,6 +37,8 @@ export interface Escrow {
   release(allocationId: string): Promise<void>;
   /** Refund the buyer in full from held funds. */
   refund(transactionId: string): Promise<void>;
+  /** The provider's own record of a transaction, so a callback can't be faked. */
+  transactionState(transactionId: string): Promise<{ state: string; reference: string | null } | null>;
 }
 
 class MockEscrow implements Escrow {
@@ -53,6 +55,7 @@ class MockEscrow implements Escrow {
   async startDelivery() {}
   async release() {}
   async refund() {}
+  async transactionState() { return null; }
 }
 
 class TradeSafe implements Escrow {
@@ -152,14 +155,29 @@ class TradeSafe implements Escrow {
     await this.gql(`mutation a($id: ID!) { allocationAcceptDelivery(id: $id) { id state } }`, { id: allocationId });
   }
 
+  async transactionState(transactionId: string) {
+    // [CONFIRM] field names in TradeSafe's GraphQL schema playground.
+    const d = await this.gql<{ transaction: { state: string; reference: string | null } | null }>(
+      `query ($id: ID!) { transaction(id: $id) { state reference } }`, { id: transactionId });
+    return d.transaction ?? null;
+  }
+
   async refund(transactionId: string) {
     // transactionCancel refunds the buyer's deposit. [CONFIRM] it works after delivery has started, or use a dispute.
     await this.gql(`mutation x($id: ID!) { transactionCancel(id: $id) { id state } }`, { id: transactionId });
   }
 }
 
+/**
+ * Live money needs TRADESAFE_MODE=live. Test mode (no real money, a "pay" button that just marks orders paid)
+ * only runs when TRADESAFE_MODE=mock is set on purpose. If the setting is missing, payments are refused,
+ * so a forgotten setting can never let people "pay" for real goods with nothing.
+ */
 export function escrow(): Escrow {
-  return (Deno.env.get("TRADESAFE_MODE") ?? "mock") === "live" ? new TradeSafe() : new MockEscrow();
+  const mode = Deno.env.get("TRADESAFE_MODE");
+  if (mode === "live") return new TradeSafe();
+  if (mode === "mock") return new MockEscrow();
+  throw new UserError("Payments aren't switched on yet. Please try again later.", 503);
 }
 
 /** Days we give TradeSafe for delivery and inspection, so its own auto release never beats our return window. */

@@ -239,6 +239,8 @@ export interface TopUp {
   bank: string;
   amountCents: Cents;
   payOn: string | null;
+  /** Who bought, and warning signs for the team to check before paying (fake buyer accounts farming credit). */
+  buyer?: string; buyerId?: string; sellerId?: string; flags?: string[];
 }
 
 export interface PendingReview {

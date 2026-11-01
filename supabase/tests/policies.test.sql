@@ -212,11 +212,14 @@ update products set status = 'live' where title = 'Chunky white runner'; -- bann
 reset role;
 do $$ begin assert (select status from products where title = 'Chunky white runner') = 'removed', 'still removed'; end $$;
 -- Welcome credit top up: R349 tee, R50 credit, buyer pays R311, we top the seller up R17.06.
+-- A new buyer with a finished account (the credit needs one, and only one credit per person).
+insert into auth.users (id, email) values ('00000000-0000-0000-0000-0000000000a1', 'credit@test.co.za');
+update profiles set handle = 'credit.buyer', adult_confirmed_at = now() where id = '00000000-0000-0000-0000-0000000000a1';
 select pg_temp.act_as_service();
 select pg_temp.expect_error($$insert into orders (buyer_id, shop_id, product_id, mode, item_price_cents, delivery, delivery_fee_cents, protection_fee_cents, credit_cents, total_cents, seller_fee_cents, seller_payout_cents)
-  values ('00000000-0000-0000-0000-00000000000b', (select id from shops where handle = 'other.shop'), (select id from products limit 1), 'buy_now', 34900, 'collect_cpt', 0, 1200, 5000, 31100, 2094, 32806)$$, 'orders_topup_exact');
+  values ('00000000-0000-0000-0000-0000000000a1', (select id from shops where handle = 'other.shop'), (select id from products limit 1), 'buy_now', 34900, 'collect_cpt', 0, 1200, 5000, 31100, 2094, 32806)$$, 'orders_topup_exact');
 insert into orders (buyer_id, shop_id, product_id, mode, item_price_cents, delivery, delivery_fee_cents, protection_fee_cents, credit_cents, total_cents, seller_fee_cents, seller_payout_cents, credit_topup_cents)
-  values ('00000000-0000-0000-0000-00000000000b', (select id from shops where handle = 'other.shop'), (select id from products limit 1), 'buy_now', 34900, 'collect_cpt', 0, 1200, 5000, 31100, 2094, 32806, 1706);
+  values ('00000000-0000-0000-0000-0000000000a1', (select id from shops where handle = 'other.shop'), (select id from products limit 1), 'buy_now', 34900, 'collect_cpt', 0, 1200, 5000, 31100, 2094, 32806, 1706);
 reset role;
 select 'all policy tests passed' as result;
 -- Scheduler secret: only the service role can check it, and only the right value passes.
@@ -559,3 +562,61 @@ do $$ begin
 end $$;
 reset role;
 select 'team dashboard tests passed' as result;
+
+-- ===== Security hardening (docs/SECURITY.md) =====
+-- 1.2 One welcome credit per person, even with several checkouts open at once.
+select pg_temp.act_as_service();
+select pg_temp.expect_error($$insert into orders (buyer_id, shop_id, product_id, mode, item_price_cents, delivery, delivery_fee_cents, protection_fee_cents, credit_cents, total_cents, seller_fee_cents, seller_payout_cents, credit_topup_cents)
+  values ('00000000-0000-0000-0000-0000000000a1', (select id from shops where handle = 'other.shop'), (select id from products limit 1), 'buy_now', 34900, 'collect_cpt', 0, 1200, 5000, 31100, 2094, 32806, 1706)$$, 'credit');
+-- 1.4 A buyer without a finished account can't use it.
+reset role;
+insert into auth.users (id, email) values ('00000000-0000-0000-0000-0000000000a2', 'fresh@test.co.za');
+select pg_temp.act_as_service();
+select pg_temp.expect_error($$insert into orders (buyer_id, shop_id, product_id, mode, item_price_cents, delivery, delivery_fee_cents, protection_fee_cents, credit_cents, total_cents, seller_fee_cents, seller_payout_cents, credit_topup_cents)
+  values ('00000000-0000-0000-0000-0000000000a2', (select id from shops where handle = 'other.shop'), (select id from products limit 1), 'buy_now', 34900, 'collect_cpt', 0, 1200, 5000, 31100, 2094, 32806, 1706)$$, 'credit');
+-- 1.5 Nobody buys from their own shop, even through the server.
+select pg_temp.expect_error($$insert into orders (buyer_id, shop_id, product_id, mode, item_price_cents, delivery, delivery_fee_cents, protection_fee_cents, total_cents, seller_fee_cents, seller_payout_cents)
+  values ((select owner_id from shops where handle = 'other.shop'), (select id from shops where handle = 'other.shop'), (select id from products limit 1), 'buy_now', 35000, 'collect_cpt', 0, 1200, 36200, 2100, 32900)$$, 'your own');
+-- Order amounts can't change once made.
+select pg_temp.expect_error($$update orders set credit_cents = 0, total_cents = 36100 where buyer_id = '00000000-0000-0000-0000-0000000000a1'$$, 'cannot be changed');
+-- 1.3 The budget: with only R40 left, no more credit. (Limits are changed by us in the database, not by any app role.)
+reset role;
+update app_limits set value = (select sum(credit_cents) from orders where credit_cents > 0 and status <> 'cancelled') + 4000 where key = 'welcome_credit_budget_cents';
+update profiles set handle = 'fresh.buyer', adult_confirmed_at = now() where id = '00000000-0000-0000-0000-0000000000a2';
+do $$ begin assert not welcome_credit_ok('00000000-0000-0000-0000-0000000000a2', (select id from shops where handle = 'other.shop')), 'budget used up'; end $$;
+update app_limits set value = 1500000 where key = 'welcome_credit_budget_cents';
+do $$ begin assert welcome_credit_ok('00000000-0000-0000-0000-0000000000a2', (select id from shops where handle = 'other.shop')), 'credit ok for a new buyer'; end $$;
+select pg_temp.act_as_service();
+-- 1.9 Changing a bank account needs our team again.
+update seller_checks set escrow_token = 'tok_first', bank_status = 'approved' where shop_id = (select id from shops where handle = 'other.shop');
+update seller_checks set escrow_token = 'tok_changed', bank_status = 'approved' where shop_id = (select id from shops where handle = 'other.shop');
+do $$ begin assert (select bank_status from seller_checks where shop_id = (select id from shops where handle = 'other.shop')) = 'pending', 'bank change waits for the team'; end $$;
+reset role;
+-- 2.2 to 2.6 Rights.
+select pg_temp.act_as_anon();
+select pg_temp.expect_error($$delete from reserved_handles$$, 'permission denied');
+select pg_temp.expect_error($$insert into comments (post_id, user_id, body) values (gen_random_uuid(), gen_random_uuid(), 'x')$$, 'permission denied');
+select pg_temp.expect_error($$select place_bid(gen_random_uuid(), 100)$$, 'permission denied');
+select pg_temp.expect_error($$select prune_app_errors()$$, 'permission denied');
+reset role;
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000b');
+select pg_temp.expect_error($$update messages set body = 'fake'$$, 'permission denied');
+select pg_temp.expect_error($$truncate bids$$, 'permission denied');
+select pg_temp.expect_error($$select * from app_limits$$, 'permission denied');
+select pg_temp.expect_error($$select take_usage(auth.uid(), 'x', 100, '1 day')$$, 'permission denied');
+select pg_temp.expect_error($$select admin_topups()$$, 'team');
+do $$ begin assert (select count(*) from reserved_handles) >= 0; exception when insufficient_privilege then null; end $$;
+-- 7.1 Flood limits: at most 20 reports a day.
+select pg_temp.expect_error($q$do $x$ begin for i in 1..21 loop insert into reports (reporter_id, target_kind, target_id, reason) values (auth.uid(), 'user', gen_random_uuid(), 'spam'); end loop; end $x$$q$, 'slow down');
+reset role;
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000c');
+do $$ begin assert (select count(*) from admin_topups()) >= 0, 'team sees top ups'; end $$;
+reset role;
+-- 6.3 Paid service limits.
+select pg_temp.act_as_service();
+do $$ begin
+  assert take_usage('00000000-0000-0000-0000-00000000000b', 'suggest', 2, '1 day') and take_usage('00000000-0000-0000-0000-00000000000b', 'suggest', 2, '1 day'), 'two allowed';
+  assert not take_usage('00000000-0000-0000-0000-00000000000b', 'suggest', 2, '1 day'), 'third refused';
+end $$;
+reset role;
+select 'security tests passed' as result;

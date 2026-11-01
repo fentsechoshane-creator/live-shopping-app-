@@ -15,3 +15,7 @@ Read docs/LOG.md (shared project memory), README.md, docs/ARCHITECTURE.md and do
 - Keep the demo adapter (`apps/web/src/api/demoApi.ts`) working: it must implement every method in `Api` (`apps/web/src/api/types.ts`).
 - Copy in the app is plain English for South African users. No hyphens or em dashes in user facing text.
 - Before saying a change is done: `npm test`, `npm run typecheck`, `npm run build`, and `npm run test:e2e` if screens changed.
+
+## Security (every change)
+
+Read `docs/SECURITY.md` before adding anything. Follow its "Rules for every new feature", add rows for what you add, and add a test that tries to cheat it. Since migration 0018 new tables and functions are locked by default: grant exactly what is needed.

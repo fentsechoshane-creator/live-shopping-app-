@@ -71,19 +71,18 @@ Deno.serve(handler(async (req, body) => {
   const sellerToken = shop.seller_checks?.escrow_token;
   if (!sellerToken) throw new UserError("This seller cannot take payments yet.");
 
-  // Welcome credit: first paid order only.
-  const profile = must(await db.from("profiles").select("welcome_credit_used").eq("id", uid).single(), "load profile") as any;
-  const { count: paidBefore } = await db.from("orders").select("id", { count: "exact", head: true })
-    .eq("buyer_id", uid).not("status", "in", "(pending_payment,cancelled)");
+  // Welcome credit: one per person, finished accounts only, within the budget and the per seller limit.
+  // The database checks the same rules again when the order is saved, so this can't be raced or skipped.
+  const { data: creditOk } = await db.rpc("welcome_credit_ok", { p_buyer: uid, p_shop: shop.id });
 
   const t = orderTotals({
     itemPrice,
     delivery,
-    welcomeCreditAvailable: !profile.welcome_credit_used && (paidBefore ?? 0) === 0,
+    welcomeCreditAvailable: creditOk === true,
     foundingUntil: shop.founding_until ? new Date(shop.founding_until) : null,
   });
 
-  const es = escrow();
+  const es = escrow(); // refuses if payments aren't switched on
   // Buyer's escrow token, created once.
   let buyerToken = (await db.from("escrow_parties").select("token").eq("user_id", uid).maybeSingle()).data?.token as string | undefined;
   if (!buyerToken) {

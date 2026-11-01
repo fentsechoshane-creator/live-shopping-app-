@@ -35,3 +35,12 @@ export function env(name: string, fallback?: string): string {
   if (v === undefined) throw new Error(`Missing environment variable ${name}`);
   return v;
 }
+
+/** Compares two secrets without leaking how much of them matched (timing attacks). */
+export function sameSecret(given: string | null | undefined, expected: string | null | undefined): boolean {
+  if (!given || !expected) return false;
+  const a = new TextEncoder().encode(given), b = new TextEncoder().encode(expected);
+  let diff = a.length ^ b.length;
+  for (let i = 0; i < Math.max(a.length, b.length); i++) diff |= (a[i] ?? 0) ^ (b[i] ?? 0);
+  return diff === 0;
+}

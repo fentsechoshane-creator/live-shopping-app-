@@ -4,7 +4,7 @@ import { WELCOME_CREDIT } from "@app/core";
 import { api, authMethod } from "../../api";
 import { useLoad, useSession } from "../../session";
 import { Icon } from "../../components/Icon";
-import { useGoBack, BackButton, ErrorNote, Field, Loading, R, Segmented, Sheet, TierPill, timeAgo, useAction } from "../../components/ui";
+import { safePath, useGoBack, BackButton, ErrorNote, Field, Loading, R, Segmented, Sheet, TierPill, timeAgo, useAction } from "../../components/ui";
 import { PostGrid } from "../../components/PostGrid";
 import { shareOrCopy } from "../../native";
 import { useTabSwipe } from "../../components/gestures";
@@ -16,7 +16,7 @@ import { Avatar } from "../../components/Avatar";
 export function SignIn() {
   const [params] = useSearchParams();
   const nav = useNavigate();
-  const next = params.get("next") || "/";
+  const next = safePath(params.get("next"));
   return (
     <div className="screen">
       <BackButton />
@@ -120,7 +120,7 @@ export function Activity() {
             {items && items.length > 0 && (
               <div className="group">
                 {items.map((n) => (
-                  <Link key={n.id} to={n.link ?? "#"} className="cell" style={{ alignItems: "flex-start", background: n.readAt ? undefined : "var(--green-soft)" }}>
+                  <Link key={n.id} to={n.link ? safePath(n.link) : "#"} className="cell" style={{ alignItems: "flex-start", background: n.readAt ? undefined : "var(--green-soft)" }}>
                     <span className="icon-btn" style={{ width: 38, height: 38 }}><Icon name={iconFor(n.title)} size={18} /></span>
                     <span className="grow"><span className="t" style={{ display: "block" }}>{n.title}</span><span className="s" style={{ display: "block" }}>{n.body}</span></span>
                     <span className="small muted">{timeAgo(n.createdAt)}</span>

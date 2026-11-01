@@ -4,6 +4,9 @@ import { formatRand, type Cents, type SellerTier, TIER_INFO } from "@app/core";
 import { Icon } from "./Icon";
 
 export const R = (c: Cents) => formatRand(c);
+/** Only a page inside myHaul ("/orders/1"), never another website ("//evil.com", "https://..."). Anything else goes home. */
+export const safePath = (p: string | null | undefined) =>
+  typeof p === "string" && /^\/(?!\/)/.test(p) && !/[\\\u0000-\u001f]/.test(p) ? p : "/"; // no backslashes at all (React Router open redirect advisory)
 
 /** Bottom sheet in frosted glass. Escape and tapping outside close it. */
 export function Sheet({ title, onClose, children, footer }: { title: string; onClose: () => void; children: ReactNode; footer?: ReactNode }) {

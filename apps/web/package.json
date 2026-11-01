@@ -27,11 +27,11 @@
     "@capacitor/share": "^8.0.3",
     "@capacitor/splash-screen": "^8.0.2",
     "@capacitor/status-bar": "^8.0.4",
-    "@supabase/supabase-js": "2.45.4",
+    "@supabase/supabase-js": "2.118.0",
     "hls.js": "1.5.17",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "react-router-dom": "6.28.0"
+    "react-router-dom": "6.30.6"
   },
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",

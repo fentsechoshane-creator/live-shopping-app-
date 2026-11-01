@@ -16,6 +16,19 @@
   [headers.values]
     Content-Type = "application/json"
 
+# Security headers on every page (docs/SECURITY.md, section 4). The Content Security Policy lists the only places
+# the app may load code, styles, pictures, video and data from. Add a new service here before the app uses it.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(self), microphone=(self), geolocation=(), payment=(), usb=(), interest-cohort=()"
+    Cross-Origin-Opener-Policy = "same-origin"
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://*.supabase.co https://image.mux.com; media-src 'self' blob: https://*.supabase.co https://*.mux.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.mux.com https://storage.googleapis.com; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests"
+
 # Every app screen is served by the single page app.
 [[redirects]]
   from = "/*"

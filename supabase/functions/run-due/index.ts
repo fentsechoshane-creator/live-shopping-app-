@@ -5,7 +5,7 @@
 // 4. Release payouts that are due (escrow pays the seller).
 // 5. Close ended auctions (winner has 2 hours to pay).
 // 6. Cancel checkouts left unpaid for 24 hours, and accept change of mind returns the seller ignored for 3 days.
-import { json } from "../_shared/http.ts";
+import { json, sameSecret } from "../_shared/http.ts";
 import { adminClient, must } from "../_shared/supabase.ts";
 import { escrow } from "../_shared/escrow.ts";
 import { payoutDate, tierFor } from "../_shared/core/index.ts";
@@ -15,9 +15,10 @@ Deno.serve(async (req) => {
   // The secret lives in Supabase Vault (see migration 6). CRON_SECRET can override it, for local runs.
   const given = req.headers.get("x-cron-secret") ?? "";
   const fixed = Deno.env.get("CRON_SECRET");
-  const ok = fixed ? given === fixed : given.length > 0 && (await db.rpc("cron_secret_ok", { p_secret: given })).data === true;
+  const ok = fixed ? sameSecret(given, fixed) : given.length > 0 && (await db.rpc("cron_secret_ok", { p_secret: given })).data === true;
   if (!ok) return json({ error: "forbidden" }, 403);
-  const es = escrow();
+  let es;
+  try { es = escrow(); } catch { return json({ error: "payments are not switched on (set TRADESAFE_MODE)" }, 503); }
   const done: Record<string, number> = { refunded: 0, completed: 0, scheduled: 0, released: 0, cancelled: 0, auto_accepted: 0, failed: 0 };
   const now = new Date();
 

@@ -23,6 +23,7 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 | Timed auctions | Built (migration 0016), live database needs it; checkout and run-due functions to deploy [Lehloma] |
 | Live streams | Not started (shown as "coming next") |
 | Error reports, share previews, welcome, saved delivery | Done (previews need the web host) |
+| Security (docs/SECURITY.md) | Full review done (migration 0018 plus server and app fixes). Live database needs 0017 and 0018 [Ofentse to approve]. Next: two step sign in for the team, CAPTCHA at sign up |
 | Team dashboard (/team) | Built (migration 0017): accounts, suspensions, checks, reports, returns, orders, listings, money, errors, activity log. Live database needs 0017 [Ofentse to approve] |
 
 ## Run the current version
@@ -63,6 +64,7 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 
 ## Next up
 
+- **Security:** apply 0018 live with 0017; set `TRADESAFE_MODE=mock` in Supabase secrets while testing (payments are refused without it); deploy the changed functions (checkout, escrow-webhook, run-due, suggest-listing). Then the open items in docs/SECURITY.md: team two step sign in, CAPTCHA at sign up, backups. [Lehloma, Ofentse]
 - **Team dashboard live:** apply migration 0017 to the live database and make Ofentse's account (@shups) a team member. [Ofentse to approve]
 - **Server functions:** deploy `delete-account`, `suggest-listing` and `checkout` after `npm run check:functions`. The live database is up to date. [Lehloma]
 - **Web host and domain:** connect the repo to Netlify (`netlify.toml` is ready), set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` there, point myhaul.co.za at it. This gives the privacy and help pages, WhatsApp previews and links that open the app. [Ofentse]
@@ -79,7 +81,7 @@ Debug as we go: anyone who finds or fixes a problem updates this list. Highest r
 | --- | --- | --- | --- |
 | 1 | Live server functions `delete-account`, `suggest-listing` and the updated `checkout` are not deployed yet (the database is up to date). Delete account, photo suggestions and offer checkout won't work live until then. | High | `npm run check:functions`, then deploy. [Lehloma] |
 | 2 | The live (Supabase) side of the app has never been run end to end. Tests run in demo mode; this workspace can't reach supabase.co. | High | After 1, click through every flow on the live project with two accounts. [Lehloma] |
-| 3 | Server functions can't be type checked here (no Deno). | Medium | `npm run check:functions` on Lehloma's machine before deploying. [Lehloma] |
+| 3 | Server functions type check needs Deno. | Low | Works here with `npx deno@2.1.4`; all pass as of 2026-11-01. |
 | 4 | Only tested in Chrome's engine. Safari (iPhone) not automated. | Medium | Test on Ofentse's iPhone every round; add WebKit to the tests on a machine that has it. |
 | 5 | iPhone videos are often HEVC (.mov): fine on iPhone, may not play on Android or Chrome until Mux converts them. | Medium | Add Mux keys; all uploads then play everywhere. [Lehloma] |
 | 6 | Chats refresh every 3 seconds instead of live updates; typing indicator only works in the demo. | Low now, cost at scale | Supabase Realtime for messages and typing. |
@@ -97,6 +99,24 @@ Debug as we go: anyone who finds or fixes a problem updates this list. Highest r
 Fixed in this round: Safari double back on the edge swipe (now only in the installed app), deleting an account now also deletes the person's photos and videos, React Router warnings.
 
 ## Log
+
+### 2026-11-01: Security review and hardening
+
+- New `docs/SECURITY.md`: every risk we know of, what stops it, and its status. Rules for every new feature. AGENTS.md points to it.
+- Found and fixed (migration 0018 `security`):
+  - Welcome credit could be claimed many times by opening several checkouts before paying. Now one credit per account (unique index, can't be raced), finished accounts only, a R15,000 budget and at most 5 credit orders per seller in 30 days, all in the database (`app_limits`, `welcome_credit_ok`, `orders_money_guard`).
+  - Buying from your own shop is now blocked in the database too.
+  - Newer tables gave signed out visitors full write rights (Supabase default). All removed; truncate, triggers and references removed for everyone; each table grants only what the app uses. New tables and functions are now locked by default.
+  - Reserved usernames could be deleted by anyone. Locked.
+  - People could edit messages sent to them. Now only "read" can change.
+  - Changing a bank account after it is set needs our team again, and the seller is told (account takeover protection).
+  - Flood limits on messages, comments, reports, new chats, bids, offers and error reports. AI suggestions limited to 30 a day per seller.
+  - Upload size and type limits on every bucket.
+  - Team Money page shows warning signs on each top up (new buyer, same phone as seller, collected in person, seller near the limit, order not finished).
+- Server: payments refuse to run unless `TRADESAFE_MODE` is set (test mode can't be left on by accident); the payment callback compares its secret safely and asks TradeSafe for the real state before marking anything paid [CONFIRM TradeSafe query fields]; safe secret compare in the scheduler.
+- App: redirects after sign in and notification links only go to pages inside myHaul. Security headers and a Content Security Policy in netlify.toml (tested: nothing the app needs is blocked). Supabase client and React Router updated (high severity advisories fixed).
+- Tests: database tests try each cheat (double credit, budget, self buy, rights, message edits, floods, usage limits, bank change); all pass. Server functions type checked with Deno for the first time; all pass. End to end test passes.
+- Open (see SECURITY.md): two step sign in for the team, CAPTCHA at sign up, backups (Pro plan), alerts for unusual credit use.
 
 ### 2026-11-01: Team dashboard
 

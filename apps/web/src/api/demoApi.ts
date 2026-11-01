@@ -1261,7 +1261,13 @@ export function createDemoApi(): Api {
     async topUpsDue() {
       return s.payouts.filter((p) => p.topUpCents > 0 && !p.topUpPaid).map((p) => {
         const sh = shopOf(p.shopId);
-        return { payoutId: p.id, shopName: sh.name, bank: `${sh.checks.bankName} ending ${sh.checks.bankLast4}`, amountCents: p.topUpCents, payOn: p.payOn };
+        const o = s.orders.find((x) => x.id === p.orderId); const buyer = o && s.users.find((u) => u.id === o.buyerId);
+        const flags: string[] = [];
+        if (o && buyer?.createdAt && new Date(o.createdAt).getTime() - new Date(buyer.createdAt).getTime() < 48 * 3600e3) flags.push("Buyer account under 2 days old");
+        if (o && (o.delivery === "collect_cpt" || o.delivery === "collect_baker")) flags.push("Collected in person (no courier proof)");
+        if (o && o.status !== "completed") flags.push("Order not finished yet");
+        return { payoutId: p.id, shopName: sh.name, bank: `${sh.checks.bankName} ending ${sh.checks.bankLast4}`, amountCents: p.topUpCents, payOn: p.payOn,
+          buyer: buyer?.handle ?? buyer?.displayName, buyerId: buyer?.id, sellerId: sh.ownerId, flags };
       });
     },
     async markTopUpPaid(payoutId) {

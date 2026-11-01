@@ -15,6 +15,9 @@ Deno.serve(handler(async (req, body) => {
   const uid = await requireUser(req, db);
   const { data: shop } = await db.from("shops").select("status, category").eq("owner_id", uid).single();
   if (!shop || shop.status !== "open") throw new UserError("Only open shops can use suggestions.", 403);
+  // Each suggestion costs us money: at most 30 a day per seller.
+  const { data: allowed } = await db.rpc("take_usage", { p_user: uid, p_kind: "suggest_listing", p_max: 30, p_window: "1 day" });
+  if (allowed !== true) throw new UserError("You've used today's suggestions. Fill it in yourself, or try again tomorrow.", 429);
 
   const image = String(body.image ?? "");
   const m = image.match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
