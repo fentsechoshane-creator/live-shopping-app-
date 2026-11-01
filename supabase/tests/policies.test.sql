@@ -496,3 +496,66 @@ do $$ begin
   assert exists (select 1 from trust_events where user_id = '00000000-0000-0000-0000-0000000000f2' and kind = 'unpaid_auction_win'), 'unpaid win costs trust';
 end $$;
 select 'auction tests passed' as result;
+
+-- ===== Team dashboard =====
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000b');
+select pg_temp.expect_error($$select admin_overview()$$, 'team');
+select pg_temp.expect_error($$select admin_people('', 'all', 10, 0)$$, 'team');
+select pg_temp.expect_error($$select admin_suspend('00000000-0000-0000-0000-00000000000d', 'Spam')$$, 'team');
+select pg_temp.expect_error($$select admin_set_role('00000000-0000-0000-0000-00000000000b', 'admin')$$, 'team');
+do $$ begin assert (select count(*) from admin_actions) = 0, 'action log is team only'; end $$;
+reset role;
+
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000c');
+do $$ declare o jsonb := admin_overview(); begin
+  assert (o ->> 'people')::int >= 4, 'overview counts people';
+  assert jsonb_array_length(o -> 'daily') = 14, 'overview has 14 days';
+end $$;
+do $$ begin
+  assert (select count(*) from admin_people('buyer@test', 'all', 10, 0)) = 1, 'search by email';
+  assert (select x ->> 'email' from admin_people('buyer@test', 'all', 10, 0) x) = 'buyer@test.co.za', 'team sees the email';
+  assert (select count(*) from admin_people('', 'team', 10, 0)) = 1, 'team filter';
+  assert (select count(*) from admin_people('', 'sellers', 50, 0)) >= 1, 'sellers filter';
+  assert (admin_person('00000000-0000-0000-0000-00000000000a') ->> 'shop') is not null, 'person shows their shop';
+  assert jsonb_typeof(admin_person('00000000-0000-0000-0000-00000000000b') -> 'orders') = 'array', 'person shows orders';
+  assert (select count(*) from admin_orders('', 'all', 50, 0)) >= 0, 'orders list runs';
+  assert (select count(*) from admin_listings('', 'live', 50, 0)) >= 0, 'listings list runs';
+end $$;
+select pg_temp.expect_error($$select admin_suspend('00000000-0000-0000-0000-00000000000c', 'Test')$$, 'your own');
+select pg_temp.expect_error($$select admin_suspend('00000000-0000-0000-0000-00000000000d', '  ')$$, 'reason');
+select pg_temp.expect_error($$select admin_set_role('00000000-0000-0000-0000-00000000000c', 'user')$$, 'someone else');
+select admin_suspend('00000000-0000-0000-0000-00000000000d', 'Spam in comments.');
+select pg_temp.expect_error($$select admin_suspend('00000000-0000-0000-0000-00000000000d', 'Again')$$, 'already');
+reset role;
+
+-- A suspended person can't comment, start chats or bid, and only they (and the team) see why.
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000d');
+select pg_temp.expect_error($$insert into comments (post_id, user_id, body) values (gen_random_uuid(), auth.uid(), 'hello')$$, 'suspended');
+select pg_temp.expect_error($$insert into conversations (buyer_id, shop_id) values (auth.uid(), gen_random_uuid())$$, 'suspended');
+do $$ begin
+  assert (select reason from suspensions) = 'Spam in comments.', 'you see your own suspension';
+  assert exists (select 1 from notifications where title = 'Your account is suspended'), 'told about the suspension';
+end $$;
+reset role;
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000b');
+do $$ begin assert (select count(*) from suspensions) = 0, 'others can''t see suspensions'; end $$;
+select pg_temp.expect_error($$select admin_suspend('00000000-0000-0000-0000-00000000000c', 'x')$$, 'team');
+reset role;
+
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000c');
+select pg_temp.expect_error($$select admin_set_role('00000000-0000-0000-0000-00000000000d', 'admin')$$, 'suspension');
+select admin_unsuspend('00000000-0000-0000-0000-00000000000d');
+select admin_set_role('00000000-0000-0000-0000-00000000000d', 'admin');
+select admin_set_role('00000000-0000-0000-0000-00000000000d', 'user');
+-- Shops: pause needs a reason; opening needs approved checks.
+select pg_temp.expect_error($$select admin_set_shop_status((select id from shops where handle = 'thrift.with.lebo'), 'paused', '')$$, 'reason');
+select admin_set_shop_status((select id from shops where handle = 'thrift.with.lebo'), 'paused', 'Checking a report.');
+select admin_set_shop_status((select id from shops where handle = 'thrift.with.lebo'), 'open', null);
+do $$ begin
+  assert (select status from shops where handle = 'thrift.with.lebo') = 'open', 'shop reopened';
+  assert (select count(*) from admin_log(100) x where x ->> 'action' in ('Suspended account', 'Lifted suspension', 'Added to the team', 'Removed from the team', 'Paused shop', 'Opened shop')) = 6, 'team actions are logged';
+  assert exists (select 1 from admin_log(100) x where x ->> 'action' = 'Approved ID check'), 'existing check approvals are logged';
+  assert (select x ->> 'by' from admin_log(1) x) is not null, 'log says who did it';
+end $$;
+reset role;
+select 'team dashboard tests passed' as result;

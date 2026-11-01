@@ -510,18 +510,48 @@ try {
   await page.mouse.click(box.x + box.width * 0.2, box.y + box.height * 0.35);
   await clipCard.locator(".seek-flash.back").waitFor();
 
-  // ===== Team =====
+  // ===== Team dashboard =====
   await signOut();
   await signIn("admin@test.co.za");
-  await page.goto(`${BASE}/admin`);
-  await page.getByRole("heading", { name: "Checks waiting" }).waitFor();
-  // The R349 tee bought with the welcome credit leaves a R17.06 top up for us to pay Lebo's Thrift.
-  await page.getByText("R17.06").waitFor();
-  await shot("admin");
-  // The report from the buyer is waiting; the team removes the post.
+  await page.goto(`${BASE}/team`);
+  await page.getByRole("heading", { name: "Overview" }).waitFor();
+  await page.getByText("Needs you").waitFor();
+  await shot("team-overview");
+  // Money: the R349 tee bought with the welcome credit leaves a R17.06 top up for us to pay Lebo's Thrift.
+  await page.goto(`${BASE}/team/money`);
+  await page.getByText("R17.06").first().waitFor();
+  // Reports: the reported posts are removed.
+  await page.goto(`${BASE}/team/reports`);
   await page.getByText("Fake or counterfeit").first().waitFor();
-  await page.getByRole("button", { name: "Remove" }).first().click();
+  for (let i = 0; i < 5 && (await page.getByRole("button", { name: "Remove it" }).count()); i++) {
+    await page.getByRole("button", { name: "Remove it" }).first().click();
+    await page.waitForTimeout(400);
+  }
   await page.getByText("No open reports.").waitFor();
+  // Accounts: approve a new seller's ID, then suspend someone.
+  await page.goto(`${BASE}/team/accounts?f=waiting`);
+  await page.getByRole("row", { name: /Zola/ }).click();
+  await page.getByRole("heading", { name: "Zola" }).waitFor();
+  await page.getByRole("button", { name: "Approve" }).click();
+  await page.getByText("Approved", { exact: true }).first().waitFor();
+  await page.goto(`${BASE}/team/accounts`);
+  await page.getByPlaceholder(/Search name/).fill("thabo");
+  await page.getByRole("row", { name: /Thabo/ }).click();
+  await page.getByRole("button", { name: "Suspend account" }).click();
+  const why = page.getByRole("dialog", { name: /Suspend/ });
+  await why.getByLabel(/Reason/).fill("Fake reports against sellers.");
+  await why.getByRole("button", { name: "Suspend" }).click();
+  await page.locator(".team-banner").waitFor();
+  await shot("team-person");
+  await page.goto(`${BASE}/team/log`);
+  await page.getByText("Suspended account").first().waitFor();
+  await page.getByText("Approved ID check").first().waitFor();
+  await shot("team-log");
+  // The suspended person is told why and can't buy.
+  await signOut();
+  await signIn("thabo@example.com");
+  await page.goto(`${BASE}/me`);
+  await page.getByText("Your account is suspended.").waitFor();
 
   // Delete my account (store rule): type DELETE, then you're signed out for good.
   await signOut();

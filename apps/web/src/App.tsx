@@ -19,7 +19,7 @@ import { Profile } from "./screens/buyer/Profile";
 import { Onboarding } from "./screens/seller/Onboarding";
 import { Payouts, SellerOrderDetail, SellerOrders } from "./screens/seller/Selling";
 import { Post, SellerGate } from "./screens/seller/Post";
-import { Admin } from "./screens/admin/Admin";
+import { TeamApp } from "./screens/team/Team";
 import { Thread } from "./screens/buyer/Messages";
 import { BlockedAccounts, DeleteAccountSheet, Privacy } from "./screens/Settings";
 
@@ -119,7 +119,7 @@ function SideMenu() {
           {shop && shop.status !== "onboarding" && <MenuRow icon="payout" t="Payouts" s="Paid once the return window closes" onClick={() => go("/sell/payouts")} />}
           <MenuRow icon="bell" t="Notifications" s="Orders, returns and shop updates" onClick={() => go("/activity")} />
           <MenuRow icon="help" t="Returns and help" s="7 day returns on Buy now, buyer protection" onClick={() => go("/help")} />
-          {admin && <MenuRow icon="team" t="Team" s="Reports, checks, returns and top ups" onClick={() => go("/admin")} />}
+          {admin && <MenuRow icon="team" t="Team dashboard" s="Accounts, checks, reports, orders and money" onClick={() => go("/team")} />}
         </div>
         <div className="group" style={{ marginTop: 14 }}>
           <MenuRow icon="chat" t="Messages" s="Chats with buyers and sellers" onClick={() => go("/activity?tab=messages")} />
@@ -195,6 +195,8 @@ export function App() {
       if (t.clientX - s.x > 70 && Math.abs(t.clientY - s.y) < 60) (loc.key !== "default" ? nav(-1) : nav("/"));
     },
   };
+  // The team dashboard is a full width page for laptops, outside the phone layout.
+  if (loc.pathname === "/team" || loc.pathname.startsWith("/team/")) return <TeamApp />;
   return (
     <div className="phone">
       <div className="content" {...edgeBack}>
@@ -218,7 +220,7 @@ export function App() {
           <Route path="/sell/orders" element={guard(<SellerOrders />)} />
           <Route path="/sell/orders/:id" element={guard(<SellerOrderDetail />)} />
           <Route path="/sell/payouts" element={guard(<Payouts />)} />
-          <Route path="/admin" element={guard(<Admin />)} />
+          <Route path="/admin" element={<Navigate to="/team" replace />} />
           <Route path="/messages/:id" element={guard(<Thread />)} />
           <Route path="/settings/blocked" element={guard(<BlockedAccounts />)} />
           <Route path="/privacy" element={<Privacy />} />

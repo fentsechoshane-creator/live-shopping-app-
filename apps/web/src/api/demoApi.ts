@@ -7,7 +7,7 @@ import {
 import { handleProblem } from "../lib/handle";
 import type {
   Api, Category, ReportReason, ReportTarget, CheckoutInput, FeedItem, ListingInput, MyShop, Notification, Order, Payout, PendingReview, ProductPublic, ReviewStatus,
-  ShopPublic, User, SavedDelivery, AppError, AuctionInfo,
+  ShopPublic, User, SavedDelivery, AppError, AuctionInfo, TeamOverview, TeamPerson, TeamPersonDetail, TeamOrder, TeamListing, TeamLogEntry,
 } from "./types";
 
 interface DShop {
@@ -38,6 +38,9 @@ interface State {
   interests?: Record<string, Category[]>;
   errors?: AppError[];
   bids?: { id: string; productId: string; round: number; bidderId: string; amountCents: number; at: string }[];
+  suspensions?: Record<string, { reason: string; at: string }>;
+  teamLog?: TeamLogEntry[];
+  trustLog?: { userId: string; kind: string; points: number; at: string }[];
 }
 
 const KEY = "lsa-demo-v4"; // v4: adds a sample auction
@@ -57,11 +60,18 @@ function seed(): State {
     { id: "u-lebo", displayName: "Lebo", handle: "lebo.m", adult: true, terms: true, trust: 78, welcomeUsed: true, admin: false },
     { id: "u-luxe", displayName: "Kamva", handle: "kamva.luxe", adult: true, terms: true, trust: 92, welcomeUsed: true, admin: false },
     { id: "u-sweet", displayName: "Ayesha", handle: "ayesha.bakes", adult: true, terms: true, trust: 66, welcomeUsed: true, admin: false },
+    { id: "u-thabo", displayName: "Thabo", handle: "thabo.k", email: "thabo@example.com", adult: true, terms: true, trust: 50, welcomeUsed: false, admin: false,
+      createdAt: new Date(Date.now() - 2 * 86400e3).toISOString() },
+    { id: "u-zola", displayName: "Zola", handle: "zola.vintage", email: "zola@example.com", adult: true, terms: true, trust: 50, welcomeUsed: false, admin: false,
+      createdAt: new Date(Date.now() - 86400e3).toISOString() },
   ];
   const shops: DShop[] = [
     { id: "s-lebo", ownerId: "u-lebo", name: "Lebo's Thrift", handle: "thrift.with.lebo", category: "clothes", bio: "Thrift and new basics. Cape Town.", status: "open", foundingUntil: null, checks: approvedChecks() },
     { id: "s-luxe", ownerId: "u-luxe", name: "Luxe Resale CT", handle: "luxe.resale.ct", category: "designer", bio: "Checked designer pre loved.", status: "open", foundingUntil: null, checks: approvedChecks() },
     { id: "s-sweet", ownerId: "u-sweet", name: "Sweet Crumbs", handle: "sweetcrumbs.ct", category: "food", bio: "Celebration cakes, Gardens.", status: "open", foundingUntil: null, checks: approvedChecks() },
+    // A new seller waiting for our team to check her ID (shows on the team dashboard).
+    { id: "s-zola", ownerId: "u-zola", name: "Zola Vintage", handle: "zola.vintage", category: "clothes", bio: "", status: "open", foundingUntil: null,
+      checks: { phone: "0831234567", idStatus: "pending", bankStatus: "approved", bankName: "FNB", bankLast4: "4421", certStatus: "not_started", rulesAccepted: true } },
   ];
   const p = (x: Partial<DProduct> & Pick<DProduct, "id" | "shopId" | "title" | "priceCents">): DProduct => ({
     description: "", mode: "buy_now", label: "new", condition: null, sizes: [], stock: 3, leadDays: null, allergens: null,
@@ -100,7 +110,9 @@ function seed(): State {
       { id: "c-2", postId: "po-1", userId: "u-lebo", body: "No shrinking, it's pre washed heavy cotton.", createdAt: new Date(now - 2800e3).toISOString() },
       { id: "c-3", postId: "po-3", userId: "u-luxe", body: "Ordered one for Friday, can't wait!", createdAt: new Date(now - 6000e3).toISOString() },
     ],
-    conversations: [], messages: [], blocks: [], reports: [],
+    conversations: [], messages: [], blocks: [],
+    reports: [{ id: "r-1", reporterId: "u-thabo", targetKind: "post", targetId: "po-5", reason: "counterfeit", details: "Looks like a copy of a big brand runner.",
+      createdAt: new Date(now - 4 * 3600e3).toISOString(), status: "open" }],
     reactions: [{ userId: "u-lebo", postId: "po-3", kind: "repost", at: new Date(now - 1800e3).toISOString() }, { userId: "u-lebo", postId: "po-2", kind: "like", at: new Date(now - 1800e3).toISOString() }] };
 }
 
@@ -169,6 +181,32 @@ export function createDemoApi(): Api {
   const trust = (userId: string, kind: TrustEventKind) => {
     const u = s.users.find((x) => x.id === userId);
     if (u) u.trust = Math.max(0, Math.min(100, u.trust + TRUST_POINTS[kind]));
+    s.trustLog = [{ userId, kind, points: TRUST_POINTS[kind], at: now().toISOString() }, ...(s.trustLog ?? [])].slice(0, 300);
+  };
+  const isTeam = () => !!s.users.find((u) => u.id === s.currentUserId)?.admin;
+  const teamOnly = () => { if (!isTeam()) throw new Error("Only our team can do this."); };
+  const logTeam = (action: string, targetKind: string, targetId: string | null, note: string | null = null) => {
+    const u = me();
+    s.teamLog = [{ id: id(), action, targetKind, targetId, target: null, note, at: now().toISOString(), by: u.handle ?? u.displayName ?? "Team" }, ...(s.teamLog ?? [])].slice(0, 300);
+  };
+  const targetsOf = (uid: string) => {
+    const sh = s.shops.find((x) => x.ownerId === uid);
+    return [uid, ...(sh ? [sh.id, ...s.posts.filter((p) => p.shopId === sh.id).map((p) => p.id)] : []), ...s.comments.filter((c) => c.userId === uid).map((c) => c.id)];
+  };
+  const personRow = (u: DUser): TeamPerson => {
+    const sh = s.shops.find((x) => x.ownerId === u.id); const sus = s.suspensions?.[u.id]; const targets = targetsOf(u.id);
+    return {
+      id: u.id, name: u.displayName, handle: u.handle ?? null, email: u.email ?? null, role: u.admin ? "admin" : "user", trust: u.trust, tier: tierFor(u.trust),
+      createdAt: u.createdAt ?? "2026-10-01T08:00:00.000Z", avatarUrl: mediaUrl(u.avatar), setUp: !!(u.handle && u.adult && u.terms),
+      suspendedAt: sus?.at ?? null, suspendedReason: sus?.reason ?? null,
+      shop: sh ? { id: sh.id, name: sh.name, handle: sh.handle, status: sh.status, category: sh.category, idStatus: sh.checks.idStatus, bankStatus: sh.checks.bankStatus, certStatus: sh.checks.certStatus } : null,
+      ordersBought: s.orders.filter((o) => o.buyerId === u.id && o.status !== "pending_payment").length,
+      ordersSold: s.orders.filter((o) => o.shopOwnerId === u.id && o.status !== "pending_payment").length,
+      reportsAgainst: s.reports.filter((r) => r.status === "open" && targets.includes(r.targetId)).length,
+    };
+  };
+  const notSuspended = () => {
+    if (s.currentUserId && s.suspensions?.[s.currentUserId]) throw new Error("This account is suspended. Email support if you think this is a mistake.");
   };
   const goodOrders = (shopId: string) => s.orders.filter((o) => o.shop.id === shopId && o.status === "completed" && (!o.review || o.review.stars >= 4)).length;
   const publicShop = (sh: DShop): ShopPublic => {
@@ -357,6 +395,7 @@ export function createDemoApi(): Api {
       return { shop: publicShop(sh), items: s.posts.filter((p) => p.shopId === sh.id && visible(p)).map(toFeed) };
     },
     async checkout(input: CheckoutInput) {
+      notSuspended();
       await wait();
       const u = me();
       const p = s.products.find((x) => x.id === input.productId);
@@ -597,6 +636,7 @@ export function createDemoApi(): Api {
       return out;
     },
     async placeBid(productId, amountCents) {
+      notSuspended();
       await wait(200);
       const u = me();
       const p = s.products.find((x) => x.id === productId);
@@ -690,8 +730,10 @@ export function createDemoApi(): Api {
         if (r.targetKind === "post") s.posts = s.posts.filter((p) => p.id !== r.targetId);
         if (r.targetKind === "comment") s.comments.forEach((c) => { if (c.id === r.targetId) c.hidden = true; });
         if (r.targetKind === "shop") s.shops.forEach((x) => { if (x.id === r.targetId) x.status = "banned"; });
+        if (r.targetKind === "post") { const po = s.posts.find((p) => p.id === r.targetId); if (po) s.products.forEach((p) => { if (p.id === po.productId) p.status = "removed"; }); }
       }
       r.status = action === "remove" ? "actioned" : "dismissed";
+      logTeam(action === "remove" ? "Acted on report" : "Dismissed report", "report", r.id, `${r.reason} on a ${r.targetKind}`);
       save();
     },
 
@@ -708,6 +750,7 @@ export function createDemoApi(): Api {
         });
     },
     async addComment(postId, body) {
+      notSuspended();
       const u = me();
       const text = body.trim();
       if (!text) throw new Error("Write something first.");
@@ -763,6 +806,7 @@ export function createDemoApi(): Api {
       return post ? toFeed(post) : { postId: p.id, caption: p.title, product: p, shop: publicShop(shopOf(p.shopId)), video: {} };
     },
     async makeOffer(cid, productIds, priceCents, hours) {
+      notSuspended();
       const u = me();
       const c = s.conversations.find((x) => x.id === cid);
       if (!c || shopOf(c.shopId).ownerId !== u.id) throw new Error("Only the shop in this chat can make an offer.");
@@ -797,6 +841,7 @@ export function createDemoApi(): Api {
       return times.length ? Math.round(times[Math.floor(times.length / 2)]) : null;
     },
     async sendMessage(cid, body, productId, image) {
+      notSuspended();
       const u = me();
       const text = body.trim();
       const c = s.conversations.find((x) => x.id === cid);
@@ -921,6 +966,7 @@ export function createDemoApi(): Api {
       save();
     },
     async createListing(input: ListingInput, video, proof, onProgress, photos = []) {
+      notSuspended();
       const sh = myShopRow();
       if (!sh) throw new Error("Start your shop first.");
       const errors = validateListing({ title: input.title, description: input.description, price: input.priceCents, label: input.label,
@@ -994,6 +1040,190 @@ export function createDemoApi(): Api {
       return sh ? s.payouts.filter((p) => p.shopId === sh.id) : [];
     },
 
+    // ===== Team dashboard (demo) =====
+    async teamOverview() {
+      teamOnly(); runDue();
+      const t0 = now();
+      const paid = s.orders.filter((o) => o.paidAt && !["cancelled", "refunded"].includes(o.status));
+      const within = (iso: string | null, days: number) => !!iso && t0.getTime() - new Date(iso).getTime() < days * 86400e3;
+      const dayKey = (d: Date) => d.toLocaleDateString("en-CA", { timeZone: "Africa/Johannesburg" });
+      const daily = Array.from({ length: 14 }, (_, i) => {
+        const d = new Date(t0.getTime() - (13 - i) * 86400e3); const k = dayKey(d);
+        const os = paid.filter((o) => dayKey(new Date(o.paidAt!)) === k);
+        return { day: k, orders: os.length, salesCents: os.reduce((a, o) => a + o.totals.total, 0) };
+      });
+      const byStatus: TeamOverview["byStatus"] = {};
+      s.orders.forEach((o) => { byStatus[o.status] = (byStatus[o.status] ?? 0) + 1; });
+      const due = s.payouts.filter((p) => p.topUpCents > 0 && !p.topUpPaid);
+      const last30 = paid.filter((o) => within(o.paidAt, 30));
+      const out: TeamOverview = {
+        people: s.users.length, peopleNew7: s.users.filter((u) => within(u.createdAt ?? null, 7)).length, suspended: Object.keys(s.suspensions ?? {}).length,
+        shopsOpen: s.shops.filter((x) => x.status === "open").length, shopsOnboarding: s.shops.filter((x) => x.status === "onboarding").length,
+        shopsClosed: s.shops.filter((x) => x.status === "paused" || x.status === "banned").length,
+        checksWaiting: s.shops.filter((x) => x.checks.idStatus === "pending").length + s.shops.filter((x) => x.checks.certStatus === "pending").length,
+        reportsOpen: s.reports.filter((r) => r.status === "open").length, returnsWaiting: s.orders.filter((o) => o.status === "return_requested").length,
+        topUpsDue: due.length, topUpsDueCents: due.reduce((a, p) => a + p.topUpCents, 0),
+        errors7: (s.errors ?? []).filter((e) => within(e.createdAt, 7)).length,
+        liveListings: s.products.filter((p) => p.status === "live").length, auctionsOpen: s.products.filter((p) => p.mode === "auction" && p.auctionState === "open").length,
+        ordersToday: paid.filter((o) => dayKey(new Date(o.paidAt!)) === dayKey(t0)).length, orders30: last30.length,
+        sales30Cents: last30.reduce((a, o) => a + o.totals.total, 0), fees30Cents: last30.reduce((a, o) => a + o.totals.sellerFee + o.totals.protectionFee, 0),
+        credit30Cents: last30.reduce((a, o) => a + o.totals.creditUsed, 0),
+        toShip: s.orders.filter((o) => o.status === "paid").length, late: s.orders.filter((o) => o.status === "paid" && o.shipBy && new Date(o.shipBy) < t0).length,
+        byStatus, daily,
+      };
+      return out;
+    },
+    async teamPeople(q, filter, offset = 0) {
+      teamOnly();
+      const needle = q.trim().toLowerCase();
+      return s.users.map(personRow).filter((p) => {
+        const hay = [p.name, p.handle, p.email, p.shop?.name, p.shop?.handle].filter(Boolean).join(" ").toLowerCase();
+        if (needle && !hay.includes(needle)) return false;
+        switch (filter) {
+          case "sellers": return !!p.shop;
+          case "buyers": return !p.shop;
+          case "waiting": return p.shop?.idStatus === "pending" || p.shop?.certStatus === "pending";
+          case "suspended": return !!p.suspendedAt;
+          case "team": return p.role === "admin";
+          default: return true;
+        }
+      }).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(offset, offset + 50);
+    },
+    async teamPerson(uid) {
+      teamOnly();
+      const u = s.users.find((x) => x.id === uid);
+      if (!u) throw new Error("Account not found.");
+      const row = personRow(u);
+      const sh = s.shops.find((x) => x.ownerId === u.id);
+      const targets = targetsOf(u.id);
+      const out: TeamPersonDetail = {
+        ...row, bio: u.bio ?? "", city: "Cape Town", adultConfirmedAt: u.adult ? row.createdAt : null, termsAcceptedAt: u.terms ? row.createdAt : null,
+        phone: sh?.checks.phone ?? null, bank: sh?.checks.bankName ? `${sh.checks.bankName} ending ${sh.checks.bankLast4}` : null,
+        files: [], liveListings: sh ? s.products.filter((p) => p.shopId === sh.id && p.status === "live").length : 0,
+        orders: s.orders.filter((o) => o.buyerId === u.id || o.shopOwnerId === u.id).slice(-20).reverse().map((o) => ({
+          id: o.id, createdAt: o.createdAt, status: o.status, title: o.product.title, totalCents: o.totals.total,
+          side: o.buyerId === u.id ? "bought" as const : "sold" as const,
+          other: o.buyerId === u.id ? o.shop.name : (s.users.find((x) => x.id === o.buyerId)?.handle ?? "buyer") })),
+        trustEvents: (s.trustLog ?? []).filter((e) => e.userId === u.id).slice(0, 20).map((e) => ({ kind: e.kind, points: e.points, note: null, at: e.at })),
+        reports: s.reports.filter((r) => targets.includes(r.targetId)).map((r) => ({ id: r.id, reason: r.reason, targetKind: r.targetKind, details: r.details, status: r.status, createdAt: r.createdAt })),
+        actions: (s.teamLog ?? []).filter((a) => a.targetId === u.id || (sh && a.targetId === sh.id)).map((a) => ({ action: a.action, note: a.note, at: a.at, by: a.by })),
+      };
+      return out;
+    },
+    async suspendAccount(uid, reason) {
+      teamOnly();
+      if (uid === s.currentUserId) throw new Error("You can't suspend your own account.");
+      const u = s.users.find((x) => x.id === uid);
+      if (!u) throw new Error("Account not found.");
+      if (u.admin) throw new Error("Remove them from the team first.");
+      if (!reason.trim()) throw new Error("Add a reason. The person sees it.");
+      s.suspensions = s.suspensions ?? {};
+      if (s.suspensions[uid]) throw new Error("This account is already suspended.");
+      s.suspensions[uid] = { reason: reason.trim(), at: now().toISOString() };
+      s.shops.forEach((x) => { if (x.ownerId === uid && x.status === "open") x.status = "paused"; });
+      notify(uid, "Your account is suspended", `${reason.trim()} You can still see your orders. Email support if you think this is a mistake.`);
+      logTeam("Suspended account", "user", uid, reason.trim());
+      save();
+    },
+    async unsuspendAccount(uid) {
+      teamOnly();
+      if (!s.suspensions?.[uid]) throw new Error("This account isn't suspended.");
+      delete s.suspensions[uid];
+      s.shops.forEach((x) => { if (x.ownerId === uid && x.status === "paused") x.status = "open"; });
+      notify(uid, "Your account is active again", "You can buy, sell and chat again.");
+      logTeam("Lifted suspension", "user", uid);
+      save();
+    },
+    async setShopStatus(shopId, status, reason) {
+      teamOnly();
+      const sh = shopOf(shopId);
+      if (!sh) throw new Error("Shop not found.");
+      if (status === "open" && !(sh.checks.idStatus === "approved" && sh.checks.bankStatus === "approved")) throw new Error("Approve the ID and bank checks first.");
+      if (status === "open" && s.suspensions?.[sh.ownerId]) throw new Error("Lift the owner's suspension first.");
+      if (status !== "open" && !reason?.trim()) throw new Error("Add a reason. The seller sees it.");
+      sh.status = status;
+      if (status === "banned") s.products.forEach((p) => { if (p.shopId === shopId && p.status === "live") p.status = "removed"; });
+      notify(sh.ownerId, status === "open" ? "Your shop is open" : status === "paused" ? "Your shop is paused" : "Your shop is closed", reason?.trim() || "You can sell again.", "/me?tab=selling");
+      logTeam(status === "open" ? "Opened shop" : status === "paused" ? "Paused shop" : "Closed shop", "shop", shopId, reason?.trim() || null);
+      save();
+    },
+    async setTeamRole(uid, role) {
+      teamOnly();
+      if (uid === s.currentUserId) throw new Error("Someone else on the team has to change your role.");
+      const u = s.users.find((x) => x.id === uid);
+      if (!u) throw new Error("Account not found.");
+      if (role === "admin" && s.suspensions?.[uid]) throw new Error("Lift the suspension first.");
+      if (u.admin === (role === "admin")) return;
+      u.admin = role === "admin";
+      logTeam(role === "admin" ? "Added to the team" : "Removed from the team", "user", uid);
+      save();
+    },
+    async teamOrders(q, filter, offset = 0) {
+      teamOnly(); runDue();
+      const needle = q.trim().toLowerCase(); const t0 = now();
+      return s.orders.filter((o) => {
+        const hay = `${o.product.title} ${o.shop.name} ${s.users.find((u) => u.id === o.buyerId)?.handle ?? ""} ${o.id}`.toLowerCase();
+        if (needle && !hay.includes(needle)) return false;
+        const late = o.status === "paid" && !!o.shipBy && new Date(o.shipBy) < t0;
+        switch (filter) {
+          case "to_ship": return o.status === "paid";
+          case "late": return late;
+          case "returns": return o.status === "return_requested" || o.status === "return_in_transit";
+          case "open": return ["paid", "shipped", "delivered", "return_requested", "return_in_transit"].includes(o.status);
+          case "done": return ["completed", "refunded", "cancelled"].includes(o.status);
+          default: return o.status !== "pending_payment";
+        }
+      }).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(offset, offset + 50).map((o): TeamOrder => {
+        const p = s.payouts.find((x) => x.orderId === o.id); const buyer = s.users.find((u) => u.id === o.buyerId);
+        return { id: o.id, createdAt: o.createdAt, paidAt: o.paidAt, status: o.status, mode: o.mode, title: o.product.title, shopName: o.shop.name, shopHandle: o.shop.handle,
+          sellerId: o.shopOwnerId, buyerId: o.buyerId, buyer: buyer?.handle ?? buyer?.displayName ?? "buyer", totalCents: o.totals.total,
+          feeCents: o.totals.sellerFee + o.totals.protectionFee, creditCents: o.totals.creditUsed, payoutCents: o.totals.sellerPayout,
+          shipBy: o.shipBy, late: o.status === "paid" && !!o.shipBy && new Date(o.shipBy) < t0, trackingRef: o.trackingRef,
+          payoutStatus: p?.status ?? null, payOn: p?.payOn ?? null, returnReason: o.ret?.reason ?? null, returnDetails: o.ret?.details ?? null };
+      });
+    },
+    async teamListings(q, filter, offset = 0) {
+      teamOnly(); runDue();
+      const needle = q.trim().toLowerCase();
+      return s.products.filter((p) => {
+        const sh = shopOf(p.shopId);
+        if (needle && !`${p.title} ${sh.name} ${sh.handle}`.toLowerCase().includes(needle)) return false;
+        switch (filter) {
+          case "auctions": return p.mode === "auction" && (p.status === "live" || p.status === "sold_out");
+          case "removed": return p.status === "removed";
+          case "proof": return p.proofStatus === "pending";
+          default: return p.status === "live";
+        }
+      }).slice(offset, offset + 50).map((p): TeamListing => {
+        const sh = shopOf(p.shopId); const postIds = s.posts.filter((po) => po.productId === p.id).map((po) => po.id);
+        return { id: p.id, title: p.title, priceCents: p.priceCents, mode: p.mode, label: p.label, status: p.status, stock: p.stock, createdAt: now().toISOString(),
+          removedReason: null, proofStatus: p.proofStatus, shopId: sh.id, shopName: sh.name, shopHandle: sh.handle, sellerId: sh.ownerId,
+          auctionState: p.auctionState ?? null, auctionEndsAt: p.auctionEndsAt ?? null,
+          reports: s.reports.filter((r) => r.status === "open" && postIds.includes(r.targetId)).length };
+      });
+    },
+    async removeListing(productId, reason) {
+      teamOnly();
+      if (!reason.trim()) throw new Error("Add a reason. The seller sees it.");
+      const p = s.products.find((x) => x.id === productId);
+      if (!p) throw new Error("Listing not found.");
+      p.status = "removed";
+      notify(shopOf(p.shopId).ownerId, "Listing removed", `${p.title}: ${reason.trim()}`, "/me?tab=selling");
+      logTeam("Removed listing", "product", productId, reason.trim());
+      save();
+    },
+    async teamLog() {
+      teamOnly();
+      return (s.teamLog ?? []).map((a) => ({ ...a, target: a.targetKind === "user" ? (() => { const u = s.users.find((x) => x.id === a.targetId); return u ? (u.handle ? "@" + u.handle : u.displayName) : null; })()
+        : a.targetKind === "shop" ? s.shops.find((x) => x.id === a.targetId)?.name ?? null
+        : a.targetKind === "product" ? s.products.find((x) => x.id === a.targetId)?.title ?? null
+        : a.targetKind === "order" ? s.orders.find((x) => x.id === a.targetId)?.product.title ?? null : null }));
+    },
+    async mySuspension() {
+      const x = s.currentUserId ? s.suspensions?.[s.currentUserId] : undefined;
+      return x ? { reason: x.reason, at: x.at } : null;
+    },
+
     async isAdmin() {
       return !!s.users.find((u) => u.id === s.currentUserId)?.admin;
     },
@@ -1011,6 +1241,8 @@ export function createDemoApi(): Api {
       const st: ReviewStatus = approved ? "approved" : "rejected";
       if (what === "id") { if (approved && sh.checks.idStatus !== "approved") trust(sh.ownerId, "verified"); sh.checks.idStatus = st; }
       else sh.checks.certStatus = st;
+      logTeam(`${approved ? "Approved" : "Rejected"} ${what === "id" ? "ID check" : "food certificate"}`, "shop", sh.id);
+      notify(sh.ownerId, approved ? "Check approved" : "Check needs attention", approved ? `Your ${what === "id" ? "ID" : "certificate"} check is approved.` : `Please upload your ${what === "id" ? "ID" : "certificate"} again.`, "/me?tab=selling");
       save();
     },
     async disputedOrders() {
@@ -1022,6 +1254,7 @@ export function createDemoApi(): Api {
       if (!o || o.status !== "return_requested" || !o.ret) throw new Error("No open return.");
       if (uphold) { trust(o.shopOwnerId, o.ret.reason === "faulty" ? "flaw_not_shown" : "not_as_described"); o.ret.status = "in_transit"; setStatus(o, "return_in_transit"); }
       else { trust(o.buyerId, "return_claim_rejected"); o.ret.status = "rejected"; setStatus(o, "completed"); }
+      logTeam(uphold ? "Return: buyer is right" : "Return: seller is right", "order", o.id, o.ret.reason);
       save();
     },
 
@@ -1034,7 +1267,7 @@ export function createDemoApi(): Api {
     async markTopUpPaid(payoutId) {
       if (!(await api.isAdmin())) throw new Error("Admins only");
       const p = s.payouts.find((x) => x.id === payoutId);
-      if (p) p.topUpPaid = true;
+      if (p && !p.topUpPaid) { p.topUpPaid = true; logTeam("Marked top up paid", "payout", p.id, `R${Math.round(p.topUpCents / 100)}`); }
       save();
     },
 

@@ -252,6 +252,47 @@ export interface PendingReview {
 export interface SavedDelivery { delivery?: string; locker?: string; name?: string; phone?: string; address?: string }
 export interface AppError { id: string; message: string; stack?: string | null; path?: string | null; platform?: string | null; version?: string | null; createdAt: string; userId?: string | null }
 
+// ===== Team dashboard =====
+export interface TeamOverview {
+  people: number; peopleNew7: number; suspended: number;
+  shopsOpen: number; shopsOnboarding: number; shopsClosed: number;
+  checksWaiting: number; reportsOpen: number; returnsWaiting: number; topUpsDue: number; topUpsDueCents: Cents; errors7: number;
+  liveListings: number; auctionsOpen: number;
+  ordersToday: number; orders30: number; sales30Cents: Cents; fees30Cents: Cents; credit30Cents: Cents; toShip: number; late: number;
+  byStatus: Partial<Record<OrderStatus, number>>;
+  daily: { day: string; orders: number; salesCents: Cents }[];
+}
+export type PeopleFilter = "all" | "sellers" | "buyers" | "waiting" | "suspended" | "team";
+export interface TeamPerson {
+  id: string; name: string; handle: string | null; email: string | null; role: "user" | "admin";
+  trust: number; tier: string; createdAt: string; avatarUrl: string | null; setUp: boolean;
+  suspendedAt: string | null; suspendedReason: string | null;
+  shop: { id: string; name: string; handle: string; status: MyShop["status"]; category: Category; idStatus: ReviewStatus; bankStatus: ReviewStatus; certStatus: ReviewStatus } | null;
+  ordersBought: number; ordersSold: number; reportsAgainst: number;
+}
+export interface TeamPersonDetail extends TeamPerson {
+  bio: string; city: string; adultConfirmedAt: string | null; termsAcceptedAt: string | null; phone: string | null; bank: string | null;
+  files: { label: string; url: string }[]; liveListings: number;
+  orders: { id: string; createdAt: string; status: OrderStatus; title: string; totalCents: Cents; side: "bought" | "sold"; other: string }[];
+  trustEvents: { kind: string; points: number; note: string | null; at: string }[];
+  reports: { id: string; reason: ReportReason; targetKind: ReportTarget; details: string; status: string; createdAt: string }[];
+  actions: { action: string; note: string | null; at: string; by: string }[];
+}
+export type TeamOrderFilter = "all" | "open" | "to_ship" | "late" | "returns" | "done";
+export interface TeamOrder {
+  id: string; createdAt: string; paidAt: string | null; status: OrderStatus; mode: SaleMode; title: string;
+  shopName: string; shopHandle: string; sellerId: string; buyerId: string; buyer: string;
+  totalCents: Cents; feeCents: Cents; creditCents: Cents; payoutCents: Cents; shipBy: string | null; late: boolean; trackingRef: string | null;
+  payoutStatus: string | null; payOn: string | null; returnReason: string | null; returnDetails: string | null;
+}
+export type TeamListingFilter = "live" | "auctions" | "removed" | "proof";
+export interface TeamListing {
+  id: string; title: string; priceCents: Cents; mode: SaleMode; label: ListingLabel; status: string; stock: number; createdAt: string;
+  removedReason: string | null; proofStatus: ReviewStatus; shopId: string; shopName: string; shopHandle: string; sellerId: string;
+  auctionState: string | null; auctionEndsAt: string | null; reports: number;
+}
+export interface TeamLogEntry { id: string; action: string; targetKind: string; targetId: string | null; target: string | null; note: string | null; at: string; by: string }
+
 export interface Api {
   mode: "demo" | "live";
   // Auth
@@ -369,6 +410,20 @@ export interface Api {
   disputeReturn(id: string): Promise<void>;
   payouts(): Promise<Payout[]>;
   // Admin
+  // Team dashboard
+  teamOverview(): Promise<TeamOverview>;
+  teamPeople(q: string, filter: PeopleFilter, offset?: number): Promise<TeamPerson[]>;
+  teamPerson(id: string): Promise<TeamPersonDetail>;
+  suspendAccount(userId: string, reason: string): Promise<void>;
+  unsuspendAccount(userId: string): Promise<void>;
+  setShopStatus(shopId: string, status: "open" | "paused" | "banned", reason?: string): Promise<void>;
+  setTeamRole(userId: string, role: "user" | "admin"): Promise<void>;
+  teamOrders(q: string, filter: TeamOrderFilter, offset?: number): Promise<TeamOrder[]>;
+  teamListings(q: string, filter: TeamListingFilter, offset?: number): Promise<TeamListing[]>;
+  removeListing(productId: string, reason: string): Promise<void>;
+  teamLog(): Promise<TeamLogEntry[]>;
+  /** Your own suspension, if your account is suspended. */
+  mySuspension(): Promise<{ reason: string; at: string } | null>;
   isAdmin(): Promise<boolean>;
   pendingReviews(): Promise<PendingReview[]>;
   adminReview(shopId: string, what: "id" | "cert", approved: boolean): Promise<void>;

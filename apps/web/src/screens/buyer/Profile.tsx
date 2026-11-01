@@ -25,6 +25,7 @@ export function Profile() {
   const [params, setParams] = useSearchParams();
   const [profile, , reloadProfile] = useLoad(() => (user ? api.myProfile() : Promise.resolve(null)), [user?.id]);
   const [credit] = useLoad(() => (user ? api.welcomeCreditAvailable() : Promise.resolve(false)), [user?.id]);
+  const [suspension] = useLoad(() => (user ? api.mySuspension() : Promise.resolve(null)), [user?.id]);
   const [shop, shopError, reloadShop] = useLoad(() => (user ? api.myShop() : Promise.resolve(null)), [user?.id]);
   const [sales] = useLoad(() => (shop && shop.status !== "onboarding" ? api.sellerOrders() : Promise.resolve([] as Order[])), [shop?.id, shop?.status]);
   const [sheet, setSheet] = useState<null | "edit" | "following" | "trust">(null);
@@ -63,6 +64,11 @@ export function Profile() {
 
   return (
     <div className="screen profile">
+      {suspension && (
+        <div className="error" role="alert" style={{ margin: "8px 0 12px" }}>
+          <b>Your account is suspended.</b> {suspension.reason} You can still see your orders. Email support if you think this is a mistake.
+        </div>
+      )}
       <div className="pbar">
         <button className="bare" onClick={() => setSheet("edit")} aria-label="Edit profile"><Icon name="edit" /></button>
         <div className="row" style={{ gap: 4 }}>

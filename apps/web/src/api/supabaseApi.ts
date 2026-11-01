@@ -5,7 +5,7 @@ import type {
   ListingSuggestion, Conversation, OpenReport,
   MyProfile, ShopPublic,
   Api, BankInput, Category, CheckoutInput, FeedItem, ListingInput, MyShop, Notification, Order, Payout, PendingReview,
-  ProductPublic, User,
+  ProductPublic, User, TeamPerson, TeamPersonDetail,
 } from "./types";
 
 export function createSupabaseApi(url: string, anonKey: string): Api {
@@ -589,6 +589,57 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
       return rows.map((p): Payout => ({ id: p.id, orderId: p.order_id, amountCents: p.amount_cents, payOn: p.pay_on, status: p.status, releasableAt: p.releasable_at }));
     },
 
+    // ===== Team dashboard =====
+    async teamOverview() {
+      return check(await sb.rpc("admin_overview")) as any;
+    },
+    async teamPeople(q, filter, offset = 0) {
+      const rows = check(await sb.rpc("admin_people", { p_q: q, p_filter: filter, p_limit: 50, p_offset: offset })) as any[];
+      return rows.map(toPerson);
+    },
+    async teamPerson(id) {
+      const r = check(await sb.rpc("admin_person", { p_user: id })) as any;
+      const signed = async (p: string | null) => (p ? (await sb.storage.from("private").createSignedUrl(p, 600)).data?.signedUrl ?? "" : "");
+      const files: { label: string; url: string }[] = [];
+      if (r.idFiles?.id) files.push({ label: "ID document", url: await signed(r.idFiles.id) });
+      if (r.idFiles?.selfie) files.push({ label: "Selfie with ID", url: await signed(r.idFiles.selfie) });
+      if (r.idFiles?.cert) files.push({ label: "Food certificate", url: await signed(r.idFiles.cert) });
+      const out: TeamPersonDetail = { ...toPerson(r), bio: r.bio ?? "", city: r.city ?? "", adultConfirmedAt: r.adultConfirmedAt, termsAcceptedAt: r.termsAcceptedAt,
+        phone: r.phone, bank: r.bank, files, liveListings: r.liveListings ?? 0, orders: r.orders ?? [], trustEvents: r.trustEvents ?? [], reports: r.reports ?? [], actions: r.actions ?? [] };
+      return out;
+    },
+    async suspendAccount(userId, reason) {
+      check(await sb.rpc("admin_suspend", { p_user: userId, p_reason: reason }));
+    },
+    async unsuspendAccount(userId) {
+      check(await sb.rpc("admin_unsuspend", { p_user: userId }));
+    },
+    async setShopStatus(shopId, status, reason) {
+      check(await sb.rpc("admin_set_shop_status", { p_shop: shopId, p_status: status, p_reason: reason ?? null }));
+    },
+    async setTeamRole(userId, role) {
+      check(await sb.rpc("admin_set_role", { p_user: userId, p_role: role }));
+    },
+    async teamOrders(q, filter, offset = 0) {
+      return check(await sb.rpc("admin_orders", { p_q: q, p_filter: filter, p_limit: 50, p_offset: offset })) as any[];
+    },
+    async teamListings(q, filter, offset = 0) {
+      return check(await sb.rpc("admin_listings", { p_q: q, p_filter: filter, p_limit: 50, p_offset: offset })) as any[];
+    },
+    async removeListing(productId, reason) {
+      if (!reason.trim()) throw new Error("Add a reason. The seller sees it.");
+      check(await sb.rpc("admin_remove_product", { p_product: productId, p_reason: reason.trim(), p_counterfeit: false }));
+    },
+    async teamLog() {
+      return (check(await sb.rpc("admin_log", { p_limit: 200 })) as any[]).map((a) => ({ ...a, id: String(a.id) }));
+    },
+    async mySuspension() {
+      const { data: u } = await sb.auth.getUser();
+      if (!u.user) return null;
+      const { data } = await sb.from("suspensions").select("reason, at").eq("user_id", u.user.id).maybeSingle();
+      return data ? { reason: (data as any).reason, at: (data as any).at } : null;
+    },
+
     async isAdmin() {
       const { data } = await sb.rpc("is_admin");
       return !!data;
@@ -627,6 +678,11 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
       check(await sb.rpc("admin_mark_topup_paid", { p_payout: payoutId }));
     },
   };
+  function toPerson(r: any): TeamPerson {
+    return { id: r.id, name: r.name ?? "", handle: r.handle, email: r.email, role: r.role, trust: r.trust, tier: r.tier, createdAt: r.createdAt,
+      avatarUrl: avatarUrl(r.avatarPath), setUp: !!r.setUp, suspendedAt: r.suspendedAt ?? null, suspendedReason: r.suspendedReason ?? null,
+      shop: r.shop ?? null, ordersBought: r.ordersBought ?? 0, ordersSold: r.ordersSold ?? 0, reportsAgainst: r.reportsAgainst ?? 0 };
+  }
   return api;
 }
 

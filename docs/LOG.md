@@ -23,6 +23,7 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 | Timed auctions | Built (migration 0016), live database needs it; checkout and run-due functions to deploy [Lehloma] |
 | Live streams | Not started (shown as "coming next") |
 | Error reports, share previews, welcome, saved delivery | Done (previews need the web host) |
+| Team dashboard (/team) | Built (migration 0017): accounts, suspensions, checks, reports, returns, orders, listings, money, errors, activity log. Live database needs 0017 [Ofentse to approve] |
 
 ## Run the current version
 
@@ -55,13 +56,14 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 - Signing in happens in a sheet over the current screen and then finishes what you tapped (like, follow, buy, message). The code signs in by itself once 6 digits are in.
 - Profile: TikTok style page with Posts, Likes and Reposts.
 - Seller: onboarding, Create in steps with drafts and photo suggestions, Camera, Live (locked until ready), orders to ship (most urgent first, copy address), payouts.
-- Team (admin): reports, checks, returns, top ups, app errors.
+- Team dashboard at `/team` (laptop first, works on a phone): Overview with sales, fees and what needs doing; Accounts with search, filters and a full page per person (shop, checks, ID files, orders, trust history, reports, what the team did); suspend and lift, pause, close or open shops, add or remove team members; Seller checks; Reports; Returns; Orders; Listings (remove with a reason); Money (top ups); App errors; Activity log of every team action. Suspended people can sign in and see orders but can't buy, sell, bid, comment or message; the database blocks it.
 - Phone apps: Capacitor in `apps/web/ios` and `apps/web/android`. Links to items and shops open the app once the domain is set up.
 - Ranking: `apps/web/src/lib/rank.ts` is where Lehloma's engine plugs in.
 - Tests: `npm test` (core), `npm run test:db` (security rules on local Postgres), `npm run test:e2e` (full journey, iPhone size, screenshots in `apps/web/e2e/shots`).
 
 ## Next up
 
+- **Team dashboard live:** apply migration 0017 to the live database and make Ofentse's account (@shups) a team member. [Ofentse to approve]
 - **Server functions:** deploy `delete-account`, `suggest-listing` and `checkout` after `npm run check:functions`. The live database is up to date. [Lehloma]
 - **Web host and domain:** connect the repo to Netlify (`netlify.toml` is ready), set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` there, point myhaul.co.za at it. This gives the privacy and help pages, WhatsApp previews and links that open the app. [Ofentse]
 - **Links open the app:** put the Apple Team ID in `public/.well-known/apple-app-site-association` and the Play signing SHA256 in `assetlinks.json`; turn on Associated Domains and Push in Xcode. [Lehloma]
@@ -95,6 +97,16 @@ Debug as we go: anyone who finds or fixes a problem updates this list. Highest r
 Fixed in this round: Safari double back on the edge swipe (now only in the installed app), deleting an account now also deletes the person's photos and videos, React Router warnings.
 
 ## Log
+
+### 2026-11-01: Team dashboard
+
+- New `/team` dashboard replaces the old Team screen (`/admin` now goes there). Side menu on a laptop, slide in menu and card tables on a phone. Menu counts show what needs doing.
+- Migration 0017 `team_dashboard`: `suspensions` table (private: only the person and the team can read it), triggers that stop a suspended account from ordering, bidding, messaging, commenting, starting chats, making offers, listing or posting; `admin_actions` log, filled by the new functions and by triggers on seller checks, reports, listings, top ups and return decisions; functions `admin_overview`, `admin_people`, `admin_person`, `admin_suspend`, `admin_unsuspend`, `admin_set_shop_status`, `admin_set_role`, `admin_orders`, `admin_listings`, `admin_log`. All check `is_admin()`.
+- Rules: a reason is needed to suspend, pause or close (the person sees it). You can't suspend yourself or a team member, or change your own role. Opening a shop needs the ID and bank checks approved.
+- Profile shows "Your account is suspended" with the reason.
+- Demo: two new sample people (Thabo, a buyer, and Zola, a seller waiting for her ID check) and one open report, so the dashboard has something to show. Team view: sign in with an email starting with "admin".
+- Tests: database tests for every new rule; the end to end test now runs the dashboard (overview, top up, reports, approve an ID, suspend, log, suspended person sees why).
+- Open: apply 0017 live and make @shups a team member (both need Ofentse's approval in the chat).
 
 ### 2026-10-30: Timed auctions
 - **Sellers** (after 5 good orders, as the rules already said): Create a listing, Price step, pick **Auction**: starting bid, optional reserve, 1, 3, 5 or 7 days, one size. Locked with the reason shown until unlocked.
