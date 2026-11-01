@@ -97,6 +97,37 @@ Based on the OWASP Top 10 (2025), the OWASP API Security Top 10, Supabase's prod
 | 8.5 | Keys leaked by a team member | Keys only in Supabase and Netlify settings, never in chat or git. Rotate if anyone leaves. | [x] rule |
 | 8.6 | POPIA (South African privacy law) | Privacy page, delete account, data kept to a minimum. Information Officer to register. | [~] [Ofentse] |
 
+## 9. Beyond the code: how marketplaces actually get attacked
+
+Most real losses on apps like ours come from fraud between people, stolen accounts and our own accounts, not from breaking the code.
+
+| # | Risk | What stops it | Status |
+| --- | --- | --- | --- |
+| 9.1 | Our own accounts taken over (GitHub, Supabase, Netlify, Google, domain registrar, Apple and Google developer accounts). Whoever gets one of these owns the app. | Two step sign in (authenticator app, not SMS) on every one, for both founders. Separate strong passwords from a password manager. | [ ] [Ofentse, Lehloma] do this first |
+| 9.2 | Phishing: a fake myHaul site or WhatsApp message asking for sign in codes or "payment" | Sign in emails say we never ask for the code; the app never asks for card details (TradeSafe does). Help page explains this. Register look alike domains later. | [~] add the warning to emails and Help |
+| 9.3 | Fake "myHaul support" accounts messaging people | Reserved usernames (myhaul, support, admin...) can't be taken. Add a "Team" badge on real team accounts. | [~] badge to build |
+| 9.4 | Sellers taking buyers off the app ("EFT me directly, it's cheaper") then not sending | Escrow protects only on app payments. Trust penalty for off app payment; report button in chat. Automatic warning when bank details or "pay outside" appear in chat not built yet. | [~] |
+| 9.5 | Empty box, wrong item or "never arrived" claims | Packing video, tracking numbers, buyer photos on returns, team decides disputes, trust penalties both ways. | [x] |
+| 9.6 | Return fraud: buyer sends back a different or worn item | Seller confirms the return on arrival; disputes go to the team with videos. | [~] add photos at return arrival |
+| 9.7 | Money laundering: fake sales between two accounts to move money | Escrow provider does identity checks (FICA); our ID checks; per seller limits and team review of unusual sales. | [~] alert on unusual volume |
+| 9.8 | Trust score gaming: a seller buys from themselves with fake accounts to raise trust and unlock auctions | Self buying blocked; credit capped. Orders between linked accounts (same phone, address, device) still count. | [ ] don't count trust from linked accounts |
+| 9.9 | Shill bidding with a second account | Seller can't bid on own items; penalty exists. Linked accounts not detected yet. | [~] same as 9.8 |
+| 9.10 | Stolen or fake IDs at seller sign up (including AI made photos) | Team compares ID with a selfie holding it. An identity check service (liveness, Home Affairs check) later. | [~] |
+| 9.11 | Prohibited items (weapons, drugs, medicine, animals, alcohol to minors, counterfeits) | Seller rules, counterfeit word check, reports, team removal and shop closing. Prohibited list in the seller rules. | [~] write the full list |
+| 9.12 | Unsafe meetups and home addresses: collection from a baker's home, stalking | Addresses only shown to the buyer of a paid order; prefer lockers. Safety tips on collection orders. | [~] add tips, never show address before payment (check) |
+| 9.13 | Harassment and grooming in chats, minors on the app | 18 and over confirmed at sign up, block and report, rude word filter, team can suspend. | [x] |
+| 9.14 | Scraping: bots copying all sellers, prices and photos | Public data is limited to what sellers post; emails, phones and addresses never public. Rate limits on the database API. | [~] |
+| 9.15 | Flooding our services to run up costs or take us offline (sign in emails, uploads, database) | Supabase rate limits, upload limits, AI limits, our flood limits. Spend caps on Supabase, Mux and Anthropic accounts. | [~] [Lehloma] set spend caps |
+| 9.16 | A copy of our app in the app stores or a modified app | Only our signed builds; report clones to Apple and Google. The modified app can't do more than a normal user: all rules are on the server. | [x] by design |
+| 9.17 | Bad code from a package (supply chain) or from AI written code | Exact package versions, `npm audit`, tests that try to cheat every rule, SECURITY.md rules for every change, human review before deploys. | [~] add automatic checks on GitHub |
+| 9.18 | Insider risk: a team member misusing access | Activity log of every team action; least access; keys rotated when anyone leaves. | [x] |
+| 9.19 | A data breach (IDs, emails, addresses) | Little data kept, IDs in a private bucket. POPIA says we must tell the Information Regulator and the people affected. Write a short breach plan. | [ ] [Ofentse] |
+| 9.20 | Lost or stolen phone with the app signed in | Sign out, delete account; payments always go through TradeSafe's own page. "Sign out of other devices" not built. | [~] |
+
+## Can people hack us?
+
+Anything on the internet can be attacked; no app is unhackable. The aim is that the easy attacks fail, money can't leave without a check, the damage from any one mistake is small, and we notice quickly. Every rule that protects money or data lives in the database or on the server, so changing the app on a phone gets an attacker nothing.
+
 ## Rules for every new feature
 
 1. New table: turn on row security, write policies for each action, and grant only the actions the app uses (nothing for signed out visitors unless it is public).
