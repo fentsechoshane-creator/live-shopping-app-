@@ -56,21 +56,17 @@ Never put secret keys in the web app, in chat, or in git. Only `VITE_` values go
    $$);
    ```
 
-9. Team alerts every 5 minutes and the AI reviewer every hour (same secret):
+9. Team alerts every 5 minutes (same secret):
    ```sql
    select cron.schedule('team-alerts', '*/5 * * * *', $$
      select net.http_post(url := 'https://<ref>.supabase.co/functions/v1/team-alerts',
        headers := jsonb_build_object('x-cron-secret', '<CRON_SECRET>', 'content-type', 'application/json'), body := '{}'::jsonb);
    $$);
-   select cron.schedule('team-review', '7 * * * *', $$
-     select net.http_post(url := 'https://<ref>.supabase.co/functions/v1/team-review',
-       headers := jsonb_build_object('x-cron-secret', '<CRON_SECRET>', 'content-type', 'application/json'), body := '{}'::jsonb);
-   $$);
    ```
-   Alerts always show in the dashboard and in team members' notifications. To also get them by email or Telegram, add these secrets (all optional, all free at our size):
+   Alerts always show in the dashboard and in team members' app notifications. Each channel below is optional and free; set the secrets for the ones you want:
+   - Phone (the myHaul app): Android needs `FCM_SERVICE_ACCOUNT` (the whole JSON from Firebase > Project settings > Service accounts). iPhone needs `APNS_KEY` (the .p8 text), `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_BUNDLE_ID`, and `APNS_PRODUCTION=true` for App Store builds. Team members install the app, sign in and allow notifications. The same keys will send order notifications to buyers and sellers later.
+   - Telegram: make a bot with @BotFather, add it to a team group, then set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`.
    - Email: `RESEND_API_KEY` (resend.com), `ALERT_EMAILS` (comma separated), `ALERT_FROM` (an address on a domain verified in Resend).
-   - Telegram: make a bot with @BotFather, add it to the team group, then set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`.
-   - The AI reviewer needs `ANTHROPIC_API_KEY` (paid per use, about a fraction of a cent per item). Without it, it does nothing.
 10. Payments: set `TRADESAFE_MODE=mock` while testing (fake payments). Without this setting checkout refuses, so test mode can never be left on by accident.
 
 At this point everything works with fake escrow: Pay opens a test payment page.

@@ -90,8 +90,7 @@ Based on the OWASP Top 10 (2025), the OWASP API Security Top 10, Supabase's prod
 | # | Risk | What stops it | Status |
 | --- | --- | --- | --- |
 | 8.1 | Losing data | Supabase daily backups. Point in time recovery needs the Pro plan. | [ ] [Ofentse] before launch |
-| 8.2 | Not knowing we were attacked | Team alerts every 5 minutes (reports, checks, late orders, credit bursts, budget, bank changes, error spikes), shown in the dashboard and team notifications, and by email or Telegram once set up; an AI reviewer that triages reports and risky top ups; a summary from Claude three times a day; activity log. | [x] 0019 |
-| 8.8 | The AI reviewer tricked by text people wrote | Their text is passed as data with an instruction never to follow it; the AI can only write a suggestion, never act; outputs are cleaned and limited. | [x] |
+| 8.2 | Not knowing we were attacked | Team alerts every 5 minutes (reports, checks, late orders, credit bursts, budget, bank changes, error spikes), shown in the dashboard and team notifications, and on the team's phones, Telegram and email once set up; a summary from Claude three times a day; activity log. | [x] 0019 |
 | 8.3 | Old packages with known holes | `npm audit`: Supabase client and React Router updated (high severity fixed). Left: a React Router open redirect advisory, blocked by our own link check (no backslashes, only paths inside myHaul); and dev only tools (Vite, Vitest) that never ship. Moving to React Router 7 later clears it. | [x] 2026-11-01 |
 | 8.4 | Supabase security advisor warnings | Run after every database change. | [~] run once 0017 and 0018 are live |
 | 8.7 | Server functions never type checked | Deno now runs here too (`npx deno@2.1.4` works), all functions pass `deno check` and the shared tests. | [x] |

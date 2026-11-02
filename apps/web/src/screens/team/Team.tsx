@@ -6,7 +6,7 @@ import { Link, NavLink, Route, Routes, useNavigate, useParams, useSearchParams }
 import { ORDER_STATUS_TEXT, REPORT_REASONS, type OrderStatus } from "@app/core";
 import {
   api, type PeopleFilter, type TeamListing, type TeamListingFilter, type TeamOrder, type TeamOrderFilter, type TeamOverview,
-  type TeamPerson, type TeamPersonDetail, type TeamLogEntry, type TeamAlert, type AiReview,
+  type TeamPerson, type TeamPersonDetail, type TeamLogEntry, type TeamAlert,
 } from "../../api";
 import { useLoad, useSession } from "../../session";
 import { Icon } from "../../components/Icon";
@@ -511,7 +511,6 @@ function Reports() {
             <div className="row between"><b>{REPORT_REASONS[r.reason]}</b><span className="pill">{r.targetKind}</span></div>
             {r.summary && <p>“{r.summary}”</p>}
             {r.details && <p className="small muted">Reporter: {r.details}</p>}
-            {r.ai && <AiBox ai={r.ai} />}
             <p className="small muted">{timeAgo(r.createdAt)}</p>
             <div className="row" style={{ gap: 8 }}>
               <button className="btn danger grow" disabled={busy || r.targetKind === "user" || r.targetKind === "message"}
@@ -683,8 +682,7 @@ function Money() {
                 <td data-l="Bank">{t.bank}</td><td data-l="Amount"><b>{R(t.amountCents)}</b></td>
                 <td data-l="Pay by">{t.payOn ? dateText(t.payOn) : "Payout held"}</td>
                 <td data-l="Check first"><div className="team-flags">{(t.flags ?? []).length === 0 ? <span className="pill green">Looks fine</span>
-                  : t.flags!.map((f) => <span key={f} className="pill amber">{f}</span>)}</div>
-                  {t.ai && <AiBox ai={t.ai} small />}</td>
+                  : t.flags!.map((f) => <span key={f} className="pill amber">{f}</span>)}</div></td>
                 <td data-l=""><button className="btn dark small" disabled={busy} onClick={() => act(() => api.markTopUpPaid(t.payoutId), "Marked as paid")}>Mark paid</button></td></tr>
             ))}</tbody>
           </table>
@@ -750,7 +748,7 @@ function Alerts() {
   const seen = (ids: string[]) => api.markAlertsSeen(ids).then(refresh).catch(() => {});
   return (
     <div className="team-page">
-      <Head title="Alerts" sub="The app checks every few minutes for things that need you, and tells the whole team: here, in your notifications, and by email or Telegram once those are set up."
+      <Head title="Alerts" sub="The app checks every few minutes for things that need you, and tells the whole team: here, in your notifications, and on your phone, Telegram and email once those are set up."
         right={unseen.length > 0 ? <button className="btn line" onClick={() => seen(unseen.map((a) => a.id))}>Mark all as seen</button> : undefined} />
       {alerts.length === 0 && <Empty>Nothing needs you right now.</Empty>}
       {alerts.length > 0 && (
@@ -764,18 +762,6 @@ function Alerts() {
           ))}
         </section>
       )}
-    </div>
-  );
-}
-
-/** The AI reviewer's suggestion. It never acts by itself. */
-function AiBox({ ai, small }: { ai: AiReview; small?: boolean }) {
-  return (
-    <div className={`team-ai ${ai.risk}`}>
-      <div className="row" style={{ gap: 6 }}><Icon name="spark" size={14} /><b>AI review{ai.demo ? " (demo example)" : ""}</b>
-        <span className={`pill ${ai.risk === "high" ? "red" : ai.risk === "medium" ? "amber" : "green"}`}>{ai.risk} risk</span></div>
-      {!small && <p>{ai.summary}</p>}
-      <p><b>Suggests:</b> {ai.suggestion}</p>
     </div>
   );
 }

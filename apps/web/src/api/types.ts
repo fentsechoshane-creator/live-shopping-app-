@@ -50,9 +50,7 @@ export interface Message {
   imageUrl: string | null; offer: Offer | null;
 }
 export interface BlockedPerson { userId: string; name: string; shopId: string | null; shopHandle: string | null }
-export interface OpenReport { id: string; targetKind: ReportTarget; targetId: string; reason: ReportReason; details: string; createdAt: string; summary: string; ai?: AiReview | null }
-/** The AI reviewer's view. Only a suggestion: the team decides. */
-export interface AiReview { risk: "low" | "medium" | "high"; summary: string; suggestion: string; demo?: boolean }
+export interface OpenReport { id: string; targetKind: ReportTarget; targetId: string; reason: ReportReason; details: string; createdAt: string; summary: string }
 export interface TeamAlert { id: string; kind: string; severity: "urgent" | "normal"; title: string; body: string; link: string | null; createdAt: string; seen: boolean }
 
 export interface ListingSuggestion {
@@ -243,7 +241,7 @@ export interface TopUp {
   amountCents: Cents;
   payOn: string | null;
   /** Who bought, and warning signs for the team to check before paying (fake buyer accounts farming credit). */
-  buyer?: string; buyerId?: string; sellerId?: string; flags?: string[]; ai?: AiReview | null;
+  buyer?: string; buyerId?: string; sellerId?: string; flags?: string[];
 }
 
 export interface PendingReview {

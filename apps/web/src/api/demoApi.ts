@@ -7,7 +7,7 @@ import {
 import { handleProblem } from "../lib/handle";
 import type {
   Api, Category, ReportReason, ReportTarget, CheckoutInput, FeedItem, ListingInput, MyShop, Notification, Order, Payout, PendingReview, ProductPublic, ReviewStatus,
-  ShopPublic, User, SavedDelivery, AppError, AuctionInfo, TeamAlert, AiReview, TeamOverview, TeamPerson, TeamPersonDetail, TeamOrder, TeamListing, TeamLogEntry,
+  ShopPublic, User, SavedDelivery, AppError, AuctionInfo, TeamAlert, TeamOverview, TeamPerson, TeamPersonDetail, TeamOrder, TeamListing, TeamLogEntry,
 } from "./types";
 
 interface DShop {
@@ -206,12 +206,6 @@ export function createDemoApi(): Api {
       reportsAgainst: s.reports.filter((r) => r.status === "open" && targets.includes(r.targetId)).length,
     };
   };
-  /** Demo only: an example of what the AI reviewer writes. The live one uses Claude (team-review). */
-  const demoAi = (reason: string): AiReview => ({
-    risk: reason === "counterfeit" || reason === "scam" ? "high" : reason === "offensive" ? "medium" : "low", demo: true,
-    summary: reason === "counterfeit" ? "A buyer thinks this listing copies a big brand. The caption says no logos, but the shape matches a known shoe." : "A user reported this as " + reason.replace(/_/g, " ") + ".",
-    suggestion: reason === "counterfeit" ? "Ask the seller for proof it is unbranded; remove it if they can't show it." : "Look at it and dismiss if nothing is wrong.",
-  });
   /** Demo version of check_alerts(): raises each alert once. */
   const demoAlerts = () => {
     const out = (s.alerts = s.alerts ?? []);
@@ -739,8 +733,7 @@ export function createDemoApi(): Api {
         const summary = r.targetKind === "post" ? s.posts.find((p) => p.id === r.targetId)?.caption
           : r.targetKind === "comment" ? s.comments.find((c) => c.id === r.targetId)?.body
           : r.targetKind === "shop" ? s.shops.find((x) => x.id === r.targetId)?.name : "";
-        return { id: r.id, targetKind: r.targetKind, targetId: r.targetId, reason: r.reason, details: r.details, createdAt: r.createdAt, summary: summary ?? "",
-          ai: isTeam() ? demoAi(r.reason) : null };
+        return { id: r.id, targetKind: r.targetKind, targetId: r.targetId, reason: r.reason, details: r.details, createdAt: r.createdAt, summary: summary ?? "" };
       });
     },
     async handleReport(rid, action) {

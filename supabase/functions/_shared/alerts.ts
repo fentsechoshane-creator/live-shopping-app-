@@ -1,9 +1,11 @@
-// Sends new team alerts by email (Resend) and Telegram, when those are set up. Both are optional and free at our size.
+// Sends new team alerts to the team's phones (the myHaul app), Telegram and email, whichever are set up. All free at our size.
+// Phone: the push secrets in push.ts; team members get them once they've installed the app and allowed notifications.
 // Secrets (Supabase > Edge Functions > Secrets, never in the app or git):
 //   RESEND_API_KEY, ALERT_EMAILS (comma separated), ALERT_FROM (a sender on a domain verified in Resend)
 //   TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID (the team group chat)
 //   APP_URL (https://myhaul-app.netlify.app or https://myhaul.co.za) for links
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2.45.4";
+import { sendPush } from "./push.ts";
 
 type Alert = { id: number; severity: string; title: string; body: string; link: string | null };
 
@@ -16,6 +18,15 @@ export async function sendNewAlerts(db: SupabaseClient): Promise<{ sent: number;
   const subject = urgent ? `myHaul: ${urgent} urgent ${urgent === 1 ? "alert" : "alerts"}` : `myHaul: ${alerts.length} new ${alerts.length === 1 ? "alert" : "alerts"}`;
   const lines = alerts.map((a) => `${a.severity === "urgent" ? "URGENT: " : ""}${a.title}\n${a.body}${a.link ? `\n${app}${a.link}` : ""}`);
   const channels: string[] = [];
+
+  // Phone: one notification per run, so a busy moment doesn't buzz ten times.
+  try {
+    const { data: team } = await db.from("profiles").select("id").eq("role", "admin");
+    const first = alerts.find((a) => a.severity === "urgent") ?? alerts[0];
+    const more = alerts.length > 1 ? ` (+${alerts.length - 1} more)` : "";
+    const phones = await sendPush(db, (team ?? []).map((x: any) => x.id), { title: subject, body: `${first.title}${more}`, link: alerts.length > 1 ? "/team/alerts" : first.link ?? "/team/alerts" });
+    if (phones) channels.push("phone");
+  } catch (e) { console.error("alert push", e); }
 
   const resend = Deno.env.get("RESEND_API_KEY"), to = Deno.env.get("ALERT_EMAILS"), from = Deno.env.get("ALERT_FROM");
   if (resend && to && from) {

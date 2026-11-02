@@ -525,10 +525,9 @@ try {
   await page.getByText(/New report/).first().waitFor();
   await page.getByText(/Seller check waiting/).first().waitFor();
   await shot("team-alerts");
-  // Reports: the AI reviewer's suggestion shows; the reported posts are removed.
+  // Reports: the reported posts are removed.
   await page.goto(`${BASE}/team/reports`);
   await page.getByText("Fake or counterfeit").first().waitFor();
-  await page.getByText(/AI review/).first().waitFor();
   for (let i = 0; i < 5 && (await page.getByRole("button", { name: "Remove it" }).count()); i++) {
     await page.getByRole("button", { name: "Remove it" }).first().click();
     await page.waitForTimeout(400);

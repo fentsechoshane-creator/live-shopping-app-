@@ -64,7 +64,7 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 
 ## Next up
 
-- **Alerts:** apply 0019 live, deploy `team-alerts` and `team-review`, schedule them (docs/SETUP.md step 9), add Resend or Telegram secrets. [Lehloma]
+- **Alerts:** apply 0019 live, deploy and schedule `team-alerts` (docs/SETUP.md step 9), add the phone (Firebase and Apple), Telegram and email secrets. [Lehloma]
 - **Security:** apply 0018 live with 0017; set `TRADESAFE_MODE=mock` in Supabase secrets while testing (payments are refused without it); deploy the changed functions (checkout, escrow-webhook, run-due, suggest-listing). Then the open items in docs/SECURITY.md: team two step sign in, CAPTCHA at sign up, backups. [Lehloma, Ofentse]
 - **Team dashboard live:** apply migration 0017 to the live database and make Ofentse's account (@shups) a team member. [Ofentse to approve]
 - **Server functions:** deploy `delete-account`, `suggest-listing` and `checkout` after `npm run check:functions`. The live database is up to date. [Lehloma]
@@ -91,7 +91,7 @@ Debug as we go: anyone who finds or fixes a problem updates this list. Highest r
 | 9 | Rude word filter may block innocent Afrikaans words ("naai" also means sew, "moer" a nut). | Low | Review the list with a native speaker. [CONFIRM] |
 | 10 | Saved replies are stored on the phone, not the account. | Low | Move to the database later. |
 | 11 | Sound starts after the first tap in a browser (browser rule). | Low | Native app plays with sound straight away. |
-| 12 | Push: phones register and we ask after a first order or message, but nothing sends yet. | Medium for launch | Sending function with Apple and Firebase keys. [Lehloma] |
+| 12 | Push: the sender exists (`_shared/push.ts`, used for team alerts) but order notifications to buyers and sellers don't use it yet. Needs the Apple and Firebase keys. | Medium for launch | Wire notifications into push; add keys. [Lehloma] |
 | 13 | Privacy page has placeholders (company, support email, Information Officer). | High for store review | Fill in, lawyer review. [Ofentse] |
 | 14 | Share previews and "open in app" links only work once the site is on myhaul.co.za with the Team ID and SHA256 filled in. Until then links open the web version. | Medium | See Next up. [CONFIRM domain] |
 | 15 | Ranking by interests is simple (picked categories first, mixed with others). | Low | Lehloma's engine replaces `rankFeed` in `lib/rank.ts`. |
@@ -101,14 +101,15 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
-### 2026-11-02: Team alerts, AI reviewer and a summary three times a day
+### 2026-11-02: Team alerts on phone, Telegram and email, and a summary three times a day
 
-- Migration 0019 `alerts`: `team_alerts` (each alert once, team only) and `check_alerts()`: new reports, seller checks waiting (including a changed bank account), orders late to ship, returns waiting, welcome credit budget past 80%, credit bursts, shops with many credit orders, top ups due, error spikes and high risk AI reviews. Every team member also gets each alert as an app notification. `ai_reviews` for the AI reviewer.
-- New server functions: `team-alerts` (every 5 minutes; sends new alerts by email through Resend and by Telegram when their secrets are set) and `team-review` (every hour; Claude triages open reports and top ups waiting to be paid, writes a risk level, summary and suggestion; never acts; needs `ANTHROPIC_API_KEY`). Shared `cronAllowed()` for scheduled jobs. docs/SETUP.md step 9 has the schedules and secrets.
-- Dashboard: Alerts page with a count in the menu, urgent banner on Overview, AI review boxes on reports and top ups. Counts refresh every minute while the dashboard is open.
-- Scheduled task "myHaul team check" (Claude, on the founders' plan): reads the live database at 06:42, 12:42 and 20:42 and pushes a short summary. Read only, no personal data in the summary.
-- Tests: database alert tests; functions type checked; end to end test covers alerts and the AI box.
-- Open: apply 0017, 0018 and 0019 live; deploy team-alerts and team-review and schedule them; set Resend or Telegram secrets.
+- Migration 0019 `alerts`: `team_alerts` (each alert once, team only) and `check_alerts()`: new reports, seller checks waiting (including a changed bank account), orders late to ship, returns waiting, welcome credit budget past 80%, credit bursts, shops with many credit orders, top ups due and error spikes. Every team member also gets each alert as an app notification.
+- New server function `team-alerts` (every 5 minutes): sends new alerts to the team's phones (one notification per run), Telegram and email, whichever have secrets set. New `_shared/push.ts` sends phone notifications: Android through Firebase (FCM v1), iPhone through Apple (APNs); dead tokens are removed. This also closes the "nothing sends push yet" gap: order notifications can use it next. docs/SETUP.md step 9.
+- Dashboard: Alerts page with a count in the menu, urgent banner on Overview. Counts refresh every minute while open.
+- Scheduled task "myHaul team check" (Claude, on the founders' plan): reads the live database at 06:42, 12:42 and 20:42 and pushes a short summary. Read only, no personal data.
+- An AI reviewer was built and then removed at Ofentse's request (no API costs wanted).
+- Tests: database alert tests; push signing tests (Apple and Google); functions type checked; end to end test covers alerts.
+- Open: apply 0017, 0018 and 0019 live; deploy and schedule team-alerts; add the phone, Telegram and email secrets.
 
 ### 2026-11-01: Security review and hardening
 
