@@ -64,6 +64,7 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 
 ## Next up
 
+- **Alerts:** apply 0019 live, deploy `team-alerts` and `team-review`, schedule them (docs/SETUP.md step 9), add Resend or Telegram secrets. [Lehloma]
 - **Security:** apply 0018 live with 0017; set `TRADESAFE_MODE=mock` in Supabase secrets while testing (payments are refused without it); deploy the changed functions (checkout, escrow-webhook, run-due, suggest-listing). Then the open items in docs/SECURITY.md: team two step sign in, CAPTCHA at sign up, backups. [Lehloma, Ofentse]
 - **Team dashboard live:** apply migration 0017 to the live database and make Ofentse's account (@shups) a team member. [Ofentse to approve]
 - **Server functions:** deploy `delete-account`, `suggest-listing` and `checkout` after `npm run check:functions`. The live database is up to date. [Lehloma]
@@ -99,6 +100,15 @@ Debug as we go: anyone who finds or fixes a problem updates this list. Highest r
 Fixed in this round: Safari double back on the edge swipe (now only in the installed app), deleting an account now also deletes the person's photos and videos, React Router warnings.
 
 ## Log
+
+### 2026-11-02: Team alerts, AI reviewer and a summary three times a day
+
+- Migration 0019 `alerts`: `team_alerts` (each alert once, team only) and `check_alerts()`: new reports, seller checks waiting (including a changed bank account), orders late to ship, returns waiting, welcome credit budget past 80%, credit bursts, shops with many credit orders, top ups due, error spikes and high risk AI reviews. Every team member also gets each alert as an app notification. `ai_reviews` for the AI reviewer.
+- New server functions: `team-alerts` (every 5 minutes; sends new alerts by email through Resend and by Telegram when their secrets are set) and `team-review` (every hour; Claude triages open reports and top ups waiting to be paid, writes a risk level, summary and suggestion; never acts; needs `ANTHROPIC_API_KEY`). Shared `cronAllowed()` for scheduled jobs. docs/SETUP.md step 9 has the schedules and secrets.
+- Dashboard: Alerts page with a count in the menu, urgent banner on Overview, AI review boxes on reports and top ups. Counts refresh every minute while the dashboard is open.
+- Scheduled task "myHaul team check" (Claude, on the founders' plan): reads the live database at 06:42, 12:42 and 20:42 and pushes a short summary. Read only, no personal data in the summary.
+- Tests: database alert tests; functions type checked; end to end test covers alerts and the AI box.
+- Open: apply 0017, 0018 and 0019 live; deploy team-alerts and team-review and schedule them; set Resend or Telegram secrets.
 
 ### 2026-11-01: Security review and hardening
 

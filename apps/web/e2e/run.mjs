@@ -520,9 +520,15 @@ try {
   // Money: the R349 tee bought with the welcome credit leaves a R17.06 top up for us to pay Lebo's Thrift.
   await page.goto(`${BASE}/team/money`);
   await page.getByText("R17.06").first().waitFor();
-  // Reports: the reported posts are removed.
+  // Alerts: the app has already flagged the open reports and the seller check.
+  await page.goto(`${BASE}/team/alerts`);
+  await page.getByText(/New report/).first().waitFor();
+  await page.getByText(/Seller check waiting/).first().waitFor();
+  await shot("team-alerts");
+  // Reports: the AI reviewer's suggestion shows; the reported posts are removed.
   await page.goto(`${BASE}/team/reports`);
   await page.getByText("Fake or counterfeit").first().waitFor();
+  await page.getByText(/AI review/).first().waitFor();
   for (let i = 0; i < 5 && (await page.getByRole("button", { name: "Remove it" }).count()); i++) {
     await page.getByRole("button", { name: "Remove it" }).first().click();
     await page.waitForTimeout(400);

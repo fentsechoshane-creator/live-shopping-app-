@@ -5,7 +5,7 @@ import type {
   ListingSuggestion, Conversation, OpenReport,
   MyProfile, ShopPublic,
   Api, BankInput, Category, CheckoutInput, FeedItem, ListingInput, MyShop, Notification, Order, Payout, PendingReview,
-  ProductPublic, User, TeamPerson, TeamPersonDetail,
+  ProductPublic, User, TeamPerson, TeamPersonDetail, AiReview,
 } from "./types";
 
 export function createSupabaseApi(url: string, anonKey: string): Api {
@@ -356,7 +356,9 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
         if (r.target_kind === "shop") summary = ((await sb.from("shops").select("name").eq("id", r.target_id).maybeSingle()).data as any)?.name ?? "";
         out.push({ id: r.id, targetKind: r.target_kind, targetId: r.target_id, reason: r.reason, details: r.details, createdAt: r.created_at, summary });
       }
-      return out;
+      // The AI reviewer's suggestions (team only; nothing comes back for anyone else).
+      const ai = await aiFor("report", out.map((r) => r.id));
+      return out.map((r) => ({ ...r, ai: ai[r.id] ?? null }));
     },
     async handleReport(id, action) {
       check(await sb.rpc("admin_handle_report", { p_report: id, p_action: action }));
@@ -633,6 +635,13 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
     async teamLog() {
       return (check(await sb.rpc("admin_log", { p_limit: 200 })) as any[]).map((a) => ({ ...a, id: String(a.id) }));
     },
+    async teamAlerts() {
+      const rows = check(await sb.from("team_alerts").select("*").order("created_at", { ascending: false }).limit(100)) as any[];
+      return rows.map((a) => ({ id: String(a.id), kind: a.kind, severity: a.severity, title: a.title, body: a.body, link: a.link, createdAt: a.created_at, seen: !!a.seen_at }));
+    },
+    async markAlertsSeen(ids) {
+      if (ids.length) check(await sb.from("team_alerts").update({ seen_at: new Date().toISOString() }).in("id", ids.map(Number)));
+    },
     async mySuspension() {
       const { data: u } = await sb.auth.getUser();
       if (!u.user) return null;
@@ -669,13 +678,19 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
     async topUpsDue() {
       // Includes warning signs (new buyer, same phone as the seller, collected in person, many credit orders).
       const rows = check(await sb.rpc("admin_topups")) as any[];
+      const ai = await aiFor("topup", rows.map((r) => r.payoutId));
       return rows.map((r) => ({ payoutId: r.payoutId, shopName: r.shopName, bank: r.bank, amountCents: r.amountCents, payOn: r.payOn,
-        buyer: r.buyer, buyerId: r.buyerId, sellerId: r.sellerId, flags: r.flags ?? [] }));
+        buyer: r.buyer, buyerId: r.buyerId, sellerId: r.sellerId, flags: r.flags ?? [], ai: ai[r.payoutId] ?? null }));
     },
     async markTopUpPaid(payoutId) {
       check(await sb.rpc("admin_mark_topup_paid", { p_payout: payoutId }));
     },
   };
+  async function aiFor(kind: "report" | "topup", ids: string[]): Promise<Record<string, AiReview>> {
+    if (!ids.length) return {};
+    const { data } = await sb.from("ai_reviews").select("target_id, risk, summary, suggestion").eq("target_kind", kind).in("target_id", ids);
+    return Object.fromEntries(((data ?? []) as any[]).map((a) => [a.target_id, { risk: a.risk, summary: a.summary, suggestion: a.suggestion }]));
+  }
   function toPerson(r: any): TeamPerson {
     return { id: r.id, name: r.name ?? "", handle: r.handle, email: r.email, role: r.role, trust: r.trust, tier: r.tier, createdAt: r.createdAt,
       avatarUrl: avatarUrl(r.avatarPath), setUp: !!r.setUp, suspendedAt: r.suspendedAt ?? null, suspendedReason: r.suspendedReason ?? null,

@@ -6,7 +6,7 @@ import { Link, NavLink, Route, Routes, useNavigate, useParams, useSearchParams }
 import { ORDER_STATUS_TEXT, REPORT_REASONS, type OrderStatus } from "@app/core";
 import {
   api, type PeopleFilter, type TeamListing, type TeamListingFilter, type TeamOrder, type TeamOrderFilter, type TeamOverview,
-  type TeamPerson, type TeamPersonDetail, type TeamLogEntry,
+  type TeamPerson, type TeamPersonDetail, type TeamLogEntry, type TeamAlert, type AiReview,
 } from "../../api";
 import { useLoad, useSession } from "../../session";
 import { Icon } from "../../components/Icon";
@@ -15,7 +15,7 @@ import { SignInForm } from "../buyer/Account";
 import { ErrorNote, R, dateText, dateTimeText, timeAgo, useAction } from "../../components/ui";
 
 // ===== Shared state: the counts in the side menu, refreshed after every action =====
-const TeamCtx = createContext<{ o: TeamOverview | null; refresh: () => void }>({ o: null, refresh: () => {} });
+const TeamCtx = createContext<{ o: TeamOverview | null; alerts: TeamAlert[]; refresh: () => void }>({ o: null, alerts: [], refresh: () => {} });
 const useTeam = () => useContext(TeamCtx);
 
 /** Runs a team action, shows a message, and refreshes the counts and the page. */
@@ -27,8 +27,9 @@ function useTeamAction(reload?: () => void) {
   return { busy, error, act, setError };
 }
 
-const NAV: { to: string; label: string; icon: string; count?: (o: TeamOverview) => number; urgent?: boolean }[] = [
+const NAV: { to: string; label: string; icon: string; count?: (o: TeamOverview, alerts: TeamAlert[]) => number; urgent?: boolean }[] = [
   { to: "/team", label: "Overview", icon: "home" },
+  { to: "/team/alerts", label: "Alerts", icon: "bell", count: (_o, a) => a.filter((x) => !x.seen).length, urgent: true },
   { to: "/team/accounts", label: "Accounts", icon: "team" },
   { to: "/team/checks", label: "Seller checks", icon: "shield", count: (o) => o.checksWaiting, urgent: true },
   { to: "/team/reports", label: "Reports", icon: "flag", count: (o) => o.reportsOpen, urgent: true },
@@ -45,8 +46,11 @@ export function TeamApp() {
   const [isAdmin] = useLoad(() => (user ? api.isAdmin() : Promise.resolve(false)), [user?.id]);
   const [o, setO] = useState<TeamOverview | null>(null);
   const [menu, setMenu] = useState(false);
-  const refresh = () => { api.teamOverview().then(setO).catch(() => {}); };
+  const [alerts, setAlerts] = useState<TeamAlert[]>([]);
+  const refresh = () => { api.teamOverview().then(setO).catch(() => {}); api.teamAlerts().then(setAlerts).catch(() => {}); };
   useEffect(() => { if (isAdmin) refresh(); }, [isAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Keep the counts fresh while the dashboard is open.
+  useEffect(() => { if (!isAdmin) return; const t = window.setInterval(refresh, 60_000); return () => window.clearInterval(t); }, [isAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { document.title = "myHaul Team"; return () => { document.title = "myHaul"; }; }, []);
 
   if (!ready || (user && isAdmin === undefined)) return <div className="team-gate"><div className="muted">Loading…</div></div>;
@@ -70,13 +74,13 @@ export function TeamApp() {
   );
 
   return (
-    <TeamCtx.Provider value={{ o, refresh }}>
+    <TeamCtx.Provider value={{ o, alerts, refresh }}>
       <div className="team">
         <aside className={`team-nav ${menu ? "open" : ""}`}>
           <div className="team-logo">myHaul <span>Team</span></div>
           <nav onClick={() => setMenu(false)}>
             {NAV.map((n) => {
-              const c = o && n.count ? n.count(o) : 0;
+              const c = o && n.count ? n.count(o, alerts) : 0;
               return (
                 <NavLink key={n.to} to={n.to} end={n.to === "/team"} className={({ isActive }) => `team-link ${isActive ? "on" : ""}`}>
                   <Icon name={n.icon as any} size={18} /><span className="grow">{n.label}</span>
@@ -98,6 +102,7 @@ export function TeamApp() {
           </div>
           <Routes>
             <Route path="/team" element={<Overview />} />
+            <Route path="/team/alerts" element={<Alerts />} />
             <Route path="/team/accounts" element={<Accounts />} />
             <Route path="/team/accounts/:id" element={<Person />} />
             <Route path="/team/checks" element={<Checks />} />
@@ -190,7 +195,7 @@ const shopPill: Record<string, string> = { onboarding: "", open: "green", paused
 
 // ===== Overview =====
 function Overview() {
-  const { o, refresh } = useTeam();
+  const { o, alerts, refresh } = useTeam();
   useEffect(() => { refresh(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   if (!o) return <div className="team-page"><Head title="Overview" /><div className="muted">Loading…</div></div>;
   const max = Math.max(1, ...o.daily.map((d) => d.orders));
@@ -205,6 +210,11 @@ function Overview() {
   return (
     <div className="team-page">
       <Head title="Overview" sub="The last 30 days, in rand. Updated every time you open this page." />
+      {alerts.some((a) => !a.seen && a.severity === "urgent") && (
+        <Link to="/team/alerts" className="team-banner red" style={{ display: "block", textDecoration: "none" }}>
+          <b>{alerts.filter((a) => !a.seen && a.severity === "urgent").length} urgent {alerts.filter((a) => !a.seen && a.severity === "urgent").length === 1 ? "alert" : "alerts"}.</b> {alerts.find((a) => !a.seen && a.severity === "urgent")!.title}. Open alerts.
+        </Link>
+      )}
       <section className="team-kpis">
         <Kpi label="Sales" value={R(o.sales30Cents)} sub={`${o.orders30} paid orders`} />
         <Kpi label="Our fees" value={R(o.fees30Cents)} sub={`Welcome credit given: ${R(o.credit30Cents)}`} />
@@ -501,6 +511,7 @@ function Reports() {
             <div className="row between"><b>{REPORT_REASONS[r.reason]}</b><span className="pill">{r.targetKind}</span></div>
             {r.summary && <p>“{r.summary}”</p>}
             {r.details && <p className="small muted">Reporter: {r.details}</p>}
+            {r.ai && <AiBox ai={r.ai} />}
             <p className="small muted">{timeAgo(r.createdAt)}</p>
             <div className="row" style={{ gap: 8 }}>
               <button className="btn danger grow" disabled={busy || r.targetKind === "user" || r.targetKind === "message"}
@@ -672,7 +683,8 @@ function Money() {
                 <td data-l="Bank">{t.bank}</td><td data-l="Amount"><b>{R(t.amountCents)}</b></td>
                 <td data-l="Pay by">{t.payOn ? dateText(t.payOn) : "Payout held"}</td>
                 <td data-l="Check first"><div className="team-flags">{(t.flags ?? []).length === 0 ? <span className="pill green">Looks fine</span>
-                  : t.flags!.map((f) => <span key={f} className="pill amber">{f}</span>)}</div></td>
+                  : t.flags!.map((f) => <span key={f} className="pill amber">{f}</span>)}</div>
+                  {t.ai && <AiBox ai={t.ai} small />}</td>
                 <td data-l=""><button className="btn dark small" disabled={busy} onClick={() => act(() => api.markTopUpPaid(t.payoutId), "Marked as paid")}>Mark paid</button></td></tr>
             ))}</tbody>
           </table>
@@ -726,6 +738,44 @@ function Log() {
           ))}</tbody>
         </table>
       )}
+    </div>
+  );
+}
+
+// ===== Alerts =====
+function Alerts() {
+  const { alerts, refresh } = useTeam();
+  const nav = useNavigate();
+  const unseen = alerts.filter((a) => !a.seen);
+  const seen = (ids: string[]) => api.markAlertsSeen(ids).then(refresh).catch(() => {});
+  return (
+    <div className="team-page">
+      <Head title="Alerts" sub="The app checks every few minutes for things that need you, and tells the whole team: here, in your notifications, and by email or Telegram once those are set up."
+        right={unseen.length > 0 ? <button className="btn line" onClick={() => seen(unseen.map((a) => a.id))}>Mark all as seen</button> : undefined} />
+      {alerts.length === 0 && <Empty>Nothing needs you right now.</Empty>}
+      {alerts.length > 0 && (
+        <section className="team-card" style={{ padding: 0 }}>
+          {alerts.map((a) => (
+            <button key={a.id} className={`team-alert ${a.seen ? "seen" : ""}`} onClick={() => { if (!a.seen) seen([a.id]); if (a.link) nav(a.link); }}>
+              <span className={`pill ${a.severity === "urgent" ? "red" : "amber"}`}>{a.severity === "urgent" ? "Urgent" : "To do"}</span>
+              <span className="grow"><b>{a.title}</b><span className="small muted" style={{ display: "block" }}>{a.body}</span></span>
+              <span className="small muted">{timeAgo(a.createdAt)}</span>
+            </button>
+          ))}
+        </section>
+      )}
+    </div>
+  );
+}
+
+/** The AI reviewer's suggestion. It never acts by itself. */
+function AiBox({ ai, small }: { ai: AiReview; small?: boolean }) {
+  return (
+    <div className={`team-ai ${ai.risk}`}>
+      <div className="row" style={{ gap: 6 }}><Icon name="spark" size={14} /><b>AI review{ai.demo ? " (demo example)" : ""}</b>
+        <span className={`pill ${ai.risk === "high" ? "red" : ai.risk === "medium" ? "amber" : "green"}`}>{ai.risk} risk</span></div>
+      {!small && <p>{ai.summary}</p>}
+      <p><b>Suggests:</b> {ai.suggestion}</p>
     </div>
   );
 }

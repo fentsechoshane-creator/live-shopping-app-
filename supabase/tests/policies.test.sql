@@ -620,3 +620,27 @@ do $$ begin
 end $$;
 reset role;
 select 'security tests passed' as result;
+
+-- ===== Team alerts and AI reviews =====
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000d');
+insert into reports (reporter_id, target_kind, target_id, reason) values (auth.uid(), 'user', '00000000-0000-0000-0000-00000000000b', 'scam');
+reset role;
+select pg_temp.act_as_service();
+do $$ declare first int; again int; begin
+  first := check_alerts();
+  again := check_alerts();
+  assert first >= 1, 'alerts raised';
+  assert again = 0, 'each alert only once';
+end $$;
+reset role;
+do $$ begin assert exists (select 1 from notifications where user_id = '00000000-0000-0000-0000-00000000000c' and title like 'New report%'), 'team told in the app'; end $$;
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000b');
+do $$ begin assert (select count(*) from team_alerts) = 0, 'alerts are team only'; end $$;
+select pg_temp.expect_error($$select check_alerts()$$, 'permission denied');
+reset role;
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000c');
+do $$ begin assert (select count(*) from team_alerts where kind = 'report') >= 1, 'team sees alerts'; end $$;
+update team_alerts set seen_at = now() where kind = 'report';
+select pg_temp.expect_error($$update team_alerts set title = 'x'$$, 'permission denied');
+reset role;
+select 'alert tests passed' as result;

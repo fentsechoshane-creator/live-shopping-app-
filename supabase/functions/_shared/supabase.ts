@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.45.4";
-import { UserError, env } from "./http.ts";
+import { UserError, env, sameSecret } from "./http.ts";
 
 /** Service role client: bypasses row level security. Only use after checking who is calling. */
 export function adminClient(): SupabaseClient {
@@ -24,4 +24,11 @@ export async function isAdmin(admin: SupabaseClient, userId: string): Promise<bo
 export function must<T>(res: { data: T; error: { message: string } | null }, what: string): T {
   if (res.error) throw new Error(`${what}: ${res.error.message}`);
   return res.data;
+}
+
+/** Scheduled jobs: the caller must send the secret kept in Supabase Vault (CRON_SECRET overrides it for local runs). */
+export async function cronAllowed(req: Request, db: SupabaseClient): Promise<boolean> {
+  const given = req.headers.get("x-cron-secret") ?? "";
+  const fixed = Deno.env.get("CRON_SECRET");
+  return fixed ? sameSecret(given, fixed) : given.length > 0 && (await db.rpc("cron_secret_ok", { p_secret: given })).data === true;
 }

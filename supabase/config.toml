@@ -26,3 +26,9 @@ verify_jwt = false
 
 [functions.run-due]
 verify_jwt = false
+
+[functions.team-alerts]
+verify_jwt = false
+
+[functions.team-review]
+verify_jwt = false

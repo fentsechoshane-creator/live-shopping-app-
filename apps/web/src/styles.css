@@ -900,3 +900,11 @@ button.g3 { border: 0; padding: 0; display: block; width: 100%; }
   .team-dl { grid-template-columns: 110px minmax(0, 1fr); }
   .team-person-head { align-items: flex-start; }
 }
+.team-alert { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--hairline); background: var(--surface); padding: 14px 18px; font: inherit; color: var(--ink); cursor: pointer; }
+.team-alert:last-child { border-bottom: 0; }
+.team-alert:hover { background: var(--surface-2); }
+.team-alert.seen { opacity: 0.6; }
+.team-ai { margin: 10px 0; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); font-size: 13.5px; }
+.team-ai p { margin: 6px 0 0; }
+.team-ai.high { background: var(--red-soft); }
+@media (max-width: 900px) { .team-head { flex-wrap: wrap; align-items: flex-start; } }

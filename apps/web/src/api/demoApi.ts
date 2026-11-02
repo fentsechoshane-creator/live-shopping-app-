@@ -7,7 +7,7 @@ import {
 import { handleProblem } from "../lib/handle";
 import type {
   Api, Category, ReportReason, ReportTarget, CheckoutInput, FeedItem, ListingInput, MyShop, Notification, Order, Payout, PendingReview, ProductPublic, ReviewStatus,
-  ShopPublic, User, SavedDelivery, AppError, AuctionInfo, TeamOverview, TeamPerson, TeamPersonDetail, TeamOrder, TeamListing, TeamLogEntry,
+  ShopPublic, User, SavedDelivery, AppError, AuctionInfo, TeamAlert, AiReview, TeamOverview, TeamPerson, TeamPersonDetail, TeamOrder, TeamListing, TeamLogEntry,
 } from "./types";
 
 interface DShop {
@@ -41,6 +41,7 @@ interface State {
   suspensions?: Record<string, { reason: string; at: string }>;
   teamLog?: TeamLogEntry[];
   trustLog?: { userId: string; kind: string; points: number; at: string }[];
+  alerts?: (TeamAlert & { dedupe: string })[];
 }
 
 const KEY = "lsa-demo-v4"; // v4: adds a sample auction
@@ -204,6 +205,25 @@ export function createDemoApi(): Api {
       ordersSold: s.orders.filter((o) => o.shopOwnerId === u.id && o.status !== "pending_payment").length,
       reportsAgainst: s.reports.filter((r) => r.status === "open" && targets.includes(r.targetId)).length,
     };
+  };
+  /** Demo only: an example of what the AI reviewer writes. The live one uses Claude (team-review). */
+  const demoAi = (reason: string): AiReview => ({
+    risk: reason === "counterfeit" || reason === "scam" ? "high" : reason === "offensive" ? "medium" : "low", demo: true,
+    summary: reason === "counterfeit" ? "A buyer thinks this listing copies a big brand. The caption says no logos, but the shape matches a known shoe." : "A user reported this as " + reason.replace(/_/g, " ") + ".",
+    suggestion: reason === "counterfeit" ? "Ask the seller for proof it is unbranded; remove it if they can't show it." : "Look at it and dismiss if nothing is wrong.",
+  });
+  /** Demo version of check_alerts(): raises each alert once. */
+  const demoAlerts = () => {
+    const out = (s.alerts = s.alerts ?? []);
+    const raise = (kind: string, severity: TeamAlert["severity"], title: string, body: string, link: string, dedupe: string) => {
+      if (out.some((a) => a.dedupe === dedupe)) return;
+      out.unshift({ id: id(), kind, severity, title, body, link, createdAt: now().toISOString(), seen: false, dedupe });
+    };
+    s.reports.filter((r) => r.status === "open").forEach((r) => raise("report", "urgent", "New report: " + r.reason.replace(/_/g, " "), `Someone reported a ${r.targetKind}. Answer within 24 hours.`, "/team/reports", "report:" + r.id));
+    s.shops.filter((x) => x.checks.idStatus === "pending" || x.checks.certStatus === "pending").forEach((x) => raise("check", "normal", "Seller check waiting: " + x.name, "Check their ID or certificate.", "/team/checks", "check:" + x.id));
+    s.orders.filter((o) => o.status === "paid" && o.shipBy && new Date(o.shipBy) < now()).forEach((o) => raise("late", "urgent", "Late to ship: " + o.product.title, o.shop.name + " hasn't shipped.", "/team/orders?f=late", "late:" + o.id));
+    if (s.payouts.some((p) => p.topUpCents > 0 && !p.topUpPaid)) raise("topup", "normal", "Top ups to pay soon", "Welcome credit top ups are due.", "/team/money", "topup:" + now().toISOString().slice(0, 10));
+    s.alerts = out.slice(0, 100);
   };
   const notSuspended = () => {
     if (s.currentUserId && s.suspensions?.[s.currentUserId]) throw new Error("This account is suspended. Email support if you think this is a mistake.");
@@ -719,7 +739,8 @@ export function createDemoApi(): Api {
         const summary = r.targetKind === "post" ? s.posts.find((p) => p.id === r.targetId)?.caption
           : r.targetKind === "comment" ? s.comments.find((c) => c.id === r.targetId)?.body
           : r.targetKind === "shop" ? s.shops.find((x) => x.id === r.targetId)?.name : "";
-        return { id: r.id, targetKind: r.targetKind, targetId: r.targetId, reason: r.reason, details: r.details, createdAt: r.createdAt, summary: summary ?? "" };
+        return { id: r.id, targetKind: r.targetKind, targetId: r.targetId, reason: r.reason, details: r.details, createdAt: r.createdAt, summary: summary ?? "",
+          ai: isTeam() ? demoAi(r.reason) : null };
       });
     },
     async handleReport(rid, action) {
@@ -1218,6 +1239,15 @@ export function createDemoApi(): Api {
         : a.targetKind === "shop" ? s.shops.find((x) => x.id === a.targetId)?.name ?? null
         : a.targetKind === "product" ? s.products.find((x) => x.id === a.targetId)?.title ?? null
         : a.targetKind === "order" ? s.orders.find((x) => x.id === a.targetId)?.product.title ?? null : null }));
+    },
+    async teamAlerts() {
+      teamOnly(); runDue(); demoAlerts(); save();
+      return (s.alerts ?? []).map(({ dedupe: _d, ...a }) => a);
+    },
+    async markAlertsSeen(ids) {
+      teamOnly();
+      (s.alerts ?? []).forEach((a) => { if (ids.includes(a.id)) a.seen = true; });
+      save();
     },
     async mySuspension() {
       const x = s.currentUserId ? s.suspensions?.[s.currentUserId] : undefined;
