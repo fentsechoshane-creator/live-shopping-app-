@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000">
+  <defs>
+    <filter id="lift" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="14" dy="7" stdDeviation="9" flood-color="#000" flood-opacity="0.24"/>
+    </filter>
+    <filter id="soft" x="-30%" y="-100%" width="160%" height="300%"><feGaussianBlur stdDeviation="9"/></filter>
+    <filter id="contact" x="-10%" y="-200%" width="120%" height="500%"><feGaussianBlur stdDeviation="3"/></filter>
+    <filter id="ground" x="-50%" y="-200%" width="200%" height="500%"><feGaussianBlur stdDeviation="18"/></filter>
+  </defs><rect width="1000" height="1000" fill="#ecfdf3"/>
+<g transform="translate(500 430) scale(0.86) translate(-488 -420)">
+  <path d="M174,650 L460,650 L512,628.16 L599,644.9599999999999 L248.3,678 Z"
+    fill="#000" opacity="0.20" filter="url(#soft)"/>
+  <rect x="168" y="646" width="326.4" height="9" rx="4" fill="#000" opacity="0.38" filter="url(#contact)"/>
+  <path d="M459,670 L725,670 L775,649 L856,668.74 L527.9,702.9 Z"
+    fill="#000" opacity="0.20" filter="url(#soft)"/>
+  <rect x="453" y="666" width="305" height="9" rx="4" fill="#000" opacity="0.38" filter="url(#contact)"/>
+  <path d="M240,740 L476,740 L518,722.36 L590,734.96 L300.8,761 Z"
+    fill="#000" opacity="0.20" filter="url(#soft)"/>
+  <rect x="234" y="736" width="269.4" height="9" rx="4" fill="#000" opacity="0.38" filter="url(#contact)"/>
+  <path d="M498,750 L684,750 L718,735.72 L775,744.96 L545.3,765.4 Z"
+    fill="#000" opacity="0.20" filter="url(#soft)"/>
+  <rect x="492" y="746" width="213.8" height="9" rx="4" fill="#000" opacity="0.38" filter="url(#contact)"/>
+  <g class="bag">
+    <defs>
+      <linearGradient id="f1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8e8e93"/><stop offset="1" stop-color="#808085"/></linearGradient>
+      <linearGradient id="s1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6b6b70"/><stop offset="1" stop-color="#48484d"/></linearGradient>
+      <linearGradient id="l1" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#fff" stop-opacity="0.15"/><stop offset="0.3" stop-color="#fff" stop-opacity="0.06"/>
+        <stop offset="0.55" stop-color="#fff" stop-opacity="0"/><stop offset="0.8" stop-color="#000" stop-opacity="0.05"/><stop offset="1" stop-color="#000" stop-opacity="0.13"/>
+      </linearGradient>
+      <linearGradient id="i1" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#000" stop-opacity="0.05"/><stop offset="1" stop-color="#000" stop-opacity="0.35"/></linearGradient>
+    </defs>
+    <!-- back handle, seen through the opening -->
+    <path d="M275.2,242.356 C275.2,98.356 391.2,98.356 391.2,242.356" fill="none" stroke="#414145" stroke-width="11.745" stroke-linecap="round"/>
+    <!-- inside of the bag -->
+    <path d="M170,250 L222,228.16 L512,228.16 L460,250 Z" fill="#48484d"/>
+    <path d="M170,250 L222,228.16 L512,228.16 L460,250 Z" fill="url(#i1)"/>
+    <!-- side gusset with its centre fold -->
+    <path d="M460,250 L512,228.16 L512,628.16 L460,650 Z" fill="url(#s1)"/>
+    <path d="M486,239.08 L486,591.08 L460,650 L512,628.16"
+      fill="none" stroke="#000" stroke-opacity="0.12" stroke-width="2.32" stroke-linejoin="round"/>
+    <!-- front panel -->
+    <rect x="170" y="250" width="290" height="400" rx="5.22" fill="url(#f1)"/>
+    <!-- light from the top left: brighter top left, a little darker bottom right -->
+    <rect x="170" y="250" width="290" height="400" rx="5.22" fill="url(#l1)"/>
+    <!-- folded top edge -->
+    <rect x="170" y="250" width="290" height="28.000000000000004" rx="5.22" fill="#000" opacity="0.10"/>
+    <!-- soft light on the left edge -->
+    <rect x="170" y="250" width="17.4" height="400" rx="5.22" fill="#fff" opacity="0.10"/>
+    <!-- front handle -->
+    <path d="M257,250 C257,106 373,106 373,250" fill="none" stroke="#48484d" stroke-width="13.049999999999999" stroke-linecap="round"/>
+    <path d="M254.651,247.129 C254.651,103.129 370.651,103.129 370.651,247.129" fill="none" stroke="#c7c7cc" stroke-width="3.654" stroke-linecap="round" opacity="0.55"
+      stroke-dasharray="129.6 432"/>
+    <!-- eyelets -->
+    <circle cx="257" cy="264" r="8.091" fill="#48484d"/><circle cx="373" cy="264" r="8.091" fill="#48484d"/>
+    <!-- small printed name -->
+    
+  </g>
+
+  <g class="bag" filter="url(#lift)">
+    <defs>
+      <linearGradient id="f2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#22c55e"/><stop offset="1" stop-color="#1fb956"/></linearGradient>
+      <linearGradient id="s2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#16a34a"/><stop offset="1" stop-color="#15803d"/></linearGradient>
+      <linearGradient id="l2" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#fff" stop-opacity="0.15"/><stop offset="0.3" stop-color="#fff" stop-opacity="0.06"/>
+        <stop offset="0.55" stop-color="#fff" stop-opacity="0"/><stop offset="0.8" stop-color="#000" stop-opacity="0.05"/><stop offset="1" stop-color="#000" stop-opacity="0.13"/>
+      </linearGradient>
+      <linearGradient id="i2" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#000" stop-opacity="0.05"/><stop offset="1" stop-color="#000" stop-opacity="0.35"/></linearGradient>
+    </defs>
+    <!-- back handle, seen through the opening -->
+    <path d="M553.5,192.65 C553.5,23.45000000000001 661.5,23.45000000000001 661.5,192.65" fill="none" stroke="#137337" stroke-width="10.935" stroke-linecap="round"/>
+    <!-- inside of the bag -->
+    <path d="M455,200 L505,179 L775,179 L725,200 Z" fill="#15803d"/>
+    <path d="M455,200 L505,179 L775,179 L725,200 Z" fill="url(#i2)"/>
+    <!-- side gusset with its centre fold -->
+    <path d="M725,200 L775,179 L775,649 L725,670 Z" fill="url(#s2)"/>
+    <path d="M750,189.5 L750,603.1 L725,670 L775,649"
+      fill="none" stroke="#000" stroke-opacity="0.12" stroke-width="2.16" stroke-linejoin="round"/>
+    <!-- front panel -->
+    <rect x="455" y="200" width="270" height="470" rx="4.859999999999999" fill="url(#f2)"/>
+    <!-- light from the top left: brighter top left, a little darker bottom right -->
+    <rect x="455" y="200" width="270" height="470" rx="4.859999999999999" fill="url(#l2)"/>
+    <!-- folded top edge -->
+    <rect x="455" y="200" width="270" height="32.900000000000006" rx="4.859999999999999" fill="#000" opacity="0.10"/>
+    <!-- soft light on the left edge -->
+    <rect x="455" y="200" width="16.2" height="470" rx="4.859999999999999" fill="#fff" opacity="0.10"/>
+    <!-- front handle -->
+    <path d="M536,200 C536,30.80000000000001 644,30.80000000000001 644,200" fill="none" stroke="#15803d" stroke-width="12.15" stroke-linecap="round"/>
+    <path d="M533.813,197.327 C533.813,28.12700000000001 641.813,28.12700000000001 641.813,197.327" fill="none" stroke="#86efac" stroke-width="3.4020000000000006" stroke-linecap="round" opacity="0.55"
+      stroke-dasharray="152.28 507.59999999999997"/>
+    <!-- eyelets -->
+    <circle cx="536" cy="216.45" r="7.533" fill="#15803d"/><circle cx="644" cy="216.45" r="7.533" fill="#15803d"/>
+    <!-- small printed name -->
+    
+  </g>
+
+  <g class="bag" filter="url(#lift)">
+    <defs>
+      <linearGradient id="f3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#17171c"/><stop offset="1" stop-color="#121216"/></linearGradient>
+      <linearGradient id="s3" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#24242a"/><stop offset="1" stop-color="#0e0e11"/></linearGradient>
+      <linearGradient id="l3" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#fff" stop-opacity="0.15"/><stop offset="0.3" stop-color="#fff" stop-opacity="0.06"/>
+        <stop offset="0.55" stop-color="#fff" stop-opacity="0"/><stop offset="0.8" stop-color="#000" stop-opacity="0.05"/><stop offset="1" stop-color="#000" stop-opacity="0.13"/>
+      </linearGradient>
+      <linearGradient id="i3" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#000" stop-opacity="0.05"/><stop offset="1" stop-color="#000" stop-opacity="0.35"/></linearGradient>
+    </defs>
+    <!-- back handle, seen through the opening -->
+    <path d="M322.7,433.826 C322.7,325.826 418.7,325.826 418.7,433.826" fill="none" stroke="#43c873" stroke-width="9.719999999999999" stroke-linecap="round"/>
+    <!-- inside of the bag -->
+    <path d="M236,440 L278,422.36 L518,422.36 L476,440 Z" fill="#2c2c33"/>
+    <path d="M236,440 L278,422.36 L518,422.36 L476,440 Z" fill="url(#i3)"/>
+    <!-- side gusset with its centre fold -->
+    <path d="M476,440 L518,422.36 L518,722.36 L476,740 Z" fill="url(#s3)"/>
+    <path d="M497,431.18 L497,695.18 L476,740 L518,722.36"
+      fill="none" stroke="#000" stroke-opacity="0.12" stroke-width="1.92" stroke-linejoin="round"/>
+    <!-- front panel -->
+    <rect x="236" y="440" width="240" height="300" rx="4.319999999999999" fill="url(#f3)"/>
+    <!-- light from the top left: brighter top left, a little darker bottom right -->
+    <rect x="236" y="440" width="240" height="300" rx="4.319999999999999" fill="url(#l3)"/>
+    <!-- folded top edge -->
+    <rect x="236" y="440" width="240" height="21.000000000000004" rx="4.319999999999999" fill="#000" opacity="0.10"/>
+    <!-- soft light on the left edge -->
+    <rect x="236" y="440" width="14.399999999999999" height="300" rx="4.319999999999999" fill="#fff" opacity="0.10"/>
+    <!-- front handle -->
+    <path d="M308,440 C308,332 404,332 404,440" fill="none" stroke="#4ade80" stroke-width="10.799999999999999" stroke-linecap="round"/>
+    <path d="M306.056,437.624 C306.056,329.624 402.056,329.624 402.056,437.624" fill="none" stroke="#d9fbe3" stroke-width="3.024" stroke-linecap="round" opacity="0.55"
+      stroke-dasharray="97.2 324"/>
+    <!-- eyelets -->
+    <circle cx="308" cy="450.5" r="6.696" fill="#4ade80"/><circle cx="404" cy="450.5" r="6.696" fill="#4ade80"/>
+    <!-- small printed name -->
+    
+  </g>
+
+  <g class="bag" filter="url(#lift)">
+    <defs>
+      <linearGradient id="f4" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4ade80"/><stop offset="1" stop-color="#38d26f"/></linearGradient>
+      <linearGradient id="s4" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22c55e"/><stop offset="1" stop-color="#16a34a"/></linearGradient>
+      <linearGradient id="l4" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#fff" stop-opacity="0.15"/><stop offset="0.3" stop-color="#fff" stop-opacity="0.06"/>
+        <stop offset="0.55" stop-color="#fff" stop-opacity="0"/><stop offset="0.8" stop-color="#000" stop-opacity="0.05"/><stop offset="1" stop-color="#000" stop-opacity="0.13"/>
+      </linearGradient>
+      <linearGradient id="i4" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#000" stop-opacity="0.05"/><stop offset="1" stop-color="#000" stop-opacity="0.35"/></linearGradient>
+    </defs>
+    <!-- back handle, seen through the opening -->
+    <path d="M562.9,525.002 C562.9,445.802 638.9,445.802 638.9,525.002" fill="none" stroke="#137337" stroke-width="7.694999999999999" stroke-linecap="round"/>
+    <!-- inside of the bag -->
+    <path d="M494,530 L528,515.72 L718,515.72 L684,530 Z" fill="#16a34a"/>
+    <path d="M494,530 L528,515.72 L718,515.72 L684,530 Z" fill="url(#i4)"/>
+    <!-- side gusset with its centre fold -->
+    <path d="M684,530 L718,515.72 L718,735.72 L684,750 Z" fill="url(#s4)"/>
+    <path d="M701,522.86 L701,716.46 L684,750 L718,735.72"
+      fill="none" stroke="#000" stroke-opacity="0.12" stroke-width="1.52" stroke-linejoin="round"/>
+    <!-- front panel -->
+    <rect x="494" y="530" width="190" height="220" rx="3.42" fill="url(#f4)"/>
+    <!-- light from the top left: brighter top left, a little darker bottom right -->
+    <rect x="494" y="530" width="190" height="220" rx="3.42" fill="url(#l4)"/>
+    <!-- folded top edge -->
+    <rect x="494" y="530" width="190" height="15.400000000000002" rx="3.42" fill="#000" opacity="0.10"/>
+    <!-- soft light on the left edge -->
+    <rect x="494" y="530" width="11.4" height="220" rx="3.42" fill="#fff" opacity="0.10"/>
+    <!-- front handle -->
+    <path d="M551,530 C551,450.8 627,450.8 627,530" fill="none" stroke="#15803d" stroke-width="8.549999999999999" stroke-linecap="round"/>
+    <path d="M549.461,528.119 C549.461,448.91900000000004 625.461,448.91900000000004 625.461,528.119" fill="none" stroke="#ecfdf3" stroke-width="2.394" stroke-linecap="round" opacity="0.55"
+      stroke-dasharray="71.28 237.60000000000002"/>
+    <!-- eyelets -->
+    <circle cx="551" cy="537.7" r="5.300999999999999" fill="#15803d"/><circle cx="627" cy="537.7" r="5.300999999999999" fill="#15803d"/>
+    <!-- small printed name -->
+    
+  </g></g><path d="M315.42 820.10Q331.32 820.10 340.40 829.70Q349.48 839.30 349.48 855.95L349.48 855.95L349.48 905L320.07 905L320.07 859.85Q320.07 853.10 316.32 849.35Q312.57 845.60 306.13 845.60L306.13 845.60Q299.67 845.60 295.92 849.35Q292.17 853.10 292.17 859.85L292.17 859.85L292.17 905L262.77 905L262.77 859.85Q262.77 853.10 259.10 849.35Q255.42 845.60 248.97 845.60L248.97 845.60Q242.38 845.60 238.63 849.35Q234.88 853.10 234.88 859.85L234.88 859.85L234.88 905L205.47 905L205.47 820.85L234.88 820.85L234.88 831.95Q238.77 826.55 245 823.33Q251.22 820.10 259.32 820.10L259.32 820.10Q268.63 820.10 275.90 824.15Q283.17 828.20 287.38 835.55L287.38 835.55Q291.88 828.65 299.22 824.38Q306.57 820.10 315.42 820.10L315.42 820.10ZM420.88 820.85L453.13 820.85L399.73 945.05L367.77 945.05L387.88 901.40L353.38 820.85L386.07 820.85L403.77 868.55L420.88 820.85Z" fill="#0b0b0f"/><path d="M523.02 799.25L552.42 799.25L552.42 905L523.02 905L523.02 862.55L487.18 862.55L487.18 905L457.77 905L457.77 799.25L487.18 799.25L487.18 839L523.02 839L523.02 799.25ZM561.43 862.85Q561.43 849.80 566.15 840.05Q570.88 830.30 579.05 825.05Q587.23 819.80 597.28 819.80L597.28 819.80Q605.98 819.80 612.28 823.25Q618.58 826.70 622.03 832.55L622.03 832.55L622.03 820.85L651.43 820.85L651.43 905L622.03 905L622.03 893.30Q618.58 899.15 612.20 902.60Q605.83 906.05 597.28 906.05L597.28 906.05Q587.23 906.05 579.05 900.80Q570.88 895.55 566.15 885.73Q561.43 875.90 561.43 862.85L561.43 862.85ZM622.03 862.85Q622.03 854.75 617.60 850.10Q613.18 845.45 606.73 845.45L606.73 845.45Q600.13 845.45 595.78 850.02Q591.43 854.60 591.43 862.85L591.43 862.85Q591.43 870.95 595.78 875.67Q600.13 880.40 606.73 880.40L606.73 880.40Q613.18 880.40 617.60 875.75Q622.03 871.10 622.03 862.85L622.03 862.85ZM721.78 820.85L751.33 820.85L751.33 905L721.78 905L721.78 893Q718.03 898.70 711.43 902.23Q704.83 905.75 696.28 905.75L696.28 905.75Q681.58 905.75 673.10 896.08Q664.63 886.40 664.63 869.75L664.63 869.75L664.63 820.85L693.88 820.85L693.88 866Q693.88 873.20 697.70 877.33Q701.53 881.45 707.83 881.45L707.83 881.45Q714.28 881.45 718.03 877.33Q721.78 873.20 721.78 866L721.78 866L721.78 820.85ZM765.13 794L794.52 794L794.52 905L765.13 905L765.13 794Z" fill="#ffffff"/>
+</svg>

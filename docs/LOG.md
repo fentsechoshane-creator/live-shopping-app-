@@ -101,6 +101,12 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-04: New logo, app icon and splash
+
+- New myHaul logo drawn from scratch as vectors (our own artwork, not a Canva element): grey, black and two green shopping bags with a small myHaul print on each, light from the top left with soft shadows, and the name in Poppins ExtraBold. Colours are the app's own tokens.
+- App icon: bags with the name (option B) until people recognise the bags; Ofentse plans to switch to bags only after about 3 months [CONFIRM]. All iPhone and Android sizes, the Android adaptive icon and a white splash screen are generated from `apps/web/assets/`. Web icon, link preview image (`og.png`) and Google Play icon and feature graphic updated.
+- `brand/` holds the logo source, masters and colour codes, with steps to change the logo or switch the icon.
+
 ### 2026-11-02: Team alerts on phone, Telegram and email, and a summary three times a day
 
 - Migration 0019 `alerts`: `team_alerts` (each alert once, team only) and `check_alerts()`: new reports, seller checks waiting (including a changed bank account), orders late to ship, returns waiting, welcome credit budget past 80%, credit bursts, shops with many credit orders, top ups due and error spikes. Every team member also gets each alert as an app notification.

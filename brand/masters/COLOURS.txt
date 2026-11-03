@@ -1,0 +1,15 @@
+myHaul colours (the same codes the app uses)
+
+Green (main, "Haul", Buy now)   #22C55E
+Green dark (bag sides)          #16A34A
+Green deep (handles, shadows)   #15803D
+Green light (small bag)         #4ADE80
+Green pale (highlights)         #86EFAC
+Black (ink, "my", black bag)    #0B0B0F
+Grey (grey bag)                 #8E8E93
+Grey dark (grey bag side)       #6B6B70
+White                           #FFFFFF
+Amber (auctions only)           #FBBF24
+
+Font: Poppins ExtraBold (800). The logo files have the letters as shapes, so they look right without the font.
+Files: .svg is the master (any size, for print and the web). .png are ready to use (transparent background except icon).

@@ -1,0 +1,13 @@
+{
+  "name": "myhaul-brand",
+  "private": true,
+  "description": "The myHaul logo, drawn in code. See README.md.",
+  "scripts": {
+    "build": "node build.cjs masters",
+    "export": "node export.cjs masters store-b:1024:1024::icon-only store-b:512:512::icon-512 adaptive-fg:1024:1024:t:icon-foreground splash:2732:2732::splash feature-graphic:1024:500::feature-graphic og:1200:630::og logo-white:1600:1932::logo-white"
+  },
+  "dependencies": {
+    "@fontsource/poppins": "5.0.14",
+    "opentype.js": "1.3.4"
+  }
+}
