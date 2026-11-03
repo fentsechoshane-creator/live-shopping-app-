@@ -123,7 +123,8 @@ Apple and Google need a way to sign in. Our normal sign in sends a code, which r
 
 - [ ] Live database: apply migrations 0017 to 0020 [Lehloma]
 - [ ] Deploy all server functions, including `team-alerts` and `push-notifications`, and schedule them (docs/SETUP.md) [Lehloma]
-- [ ] Company registered; registration number, address and directors in `terms.html` and `privacy.html` (search for CONFIRM); lawyer confirms the terms [Ofentse]
+- [x] Company registered (2026/885697/07) and details in `terms.html` and `privacy.html`
+- [ ] House number of the registered office in `terms.html` (search for CONFIRM); lawyer confirms the terms [Ofentse]
 - [ ] Domain myhaul.co.za on Netlify, support mailbox help@myhaul.co.za, Netlify site public [Ofentse]
 - [ ] Apple Developer account and Google Play account [Ofentse]
 - [ ] Resend set up for sign in emails [Lehloma]

@@ -94,7 +94,7 @@ Debug as we go: anyone who finds or fixes a problem updates this list. Highest r
 | 10 | Saved replies are stored on the phone, not the account. | Low | Move to the database later. |
 | 11 | Sound starts after the first tap in a browser (browser rule). | Low | Native app plays with sound straight away. |
 | 12 | Push to buyers and sellers is built (`push-notifications`, migration 0020) but needs the Apple and Firebase keys and the schedule. | Medium for launch | Add keys, schedule it. [Lehloma] |
-| 13 | Terms and Privacy Policy are written; company registration number, address, directors and start date are [CONFIRM]. | High for store review | Fill in, lawyer confirms. [Ofentse] |
+| 13 | Terms and Privacy Policy are written with the company details. Still [CONFIRM]: house number on Tinderwood Crescent, launch date. The Information Officer must be registered with the Information Regulator. | High for store review | Fill in, lawyer confirms. [Ofentse] |
 | 14 | Share previews and "open in app" links only work once the site is on myhaul.co.za with the Team ID and SHA256 filled in. Until then links open the web version. | Medium | See Next up. [CONFIRM domain] |
 | 15 | Ranking by interests is simple (picked categories first, mixed with others). | Low | Lehloma's engine replaces `rankFeed` in `lib/rank.ts`. |
 | 16 | The PUDO locker list is sample data, so lockers are switched off. | Low while off | PUDO API account, then turn on. [Ofentse] |
@@ -102,6 +102,12 @@ Debug as we go: anyone who finds or fixes a problem updates this list. Highest r
 Fixed in this round: Safari double back on the edge swipe (now only in the installed app), deleting an account now also deletes the person's photos and videos, React Router warnings.
 
 ## Log
+
+### 2026-11-04: Company registered
+
+- myHaul (Pty) Ltd registered with CIPC on 3 November 2026, registration number 2026/885697/07. Private company, financial year end October. Directors: Shupulu Ofentse Choshane and Lehloma Moloi. Registered office in Kempton Park, Gauteng.
+- Terms of Use and Privacy Policy now carry the registration number, registered office and directors. Disputes go to the Magistrates' Court for the district of our registered office (was Cape Town).
+- Open: the certificate spells Ofentse's name "OFENTSO"; ask CIPC to correct it before opening the bank, TradeSafe and Apple accounts. [Ofentse]
 
 ### 2026-11-04: Ready for the first store upload
 
