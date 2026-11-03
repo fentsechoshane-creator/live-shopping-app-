@@ -60,6 +60,8 @@ Deno.serve(handler(async (req, body) => {
   if (product.sizes?.length && !product.sizes.includes(size)) throw new UserError("Pick a size.");
   const allowed = product.mode === "order_now" ? FOOD : NON_FOOD;
   if (!allowed.includes(delivery)) throw new UserError("That delivery option is not available for this item.");
+  // Lockers are off until we have a PUDO account (set PUDO_ENABLED=true then). The app hides them too.
+  if (delivery === "pudo_locker" && Deno.env.get("PUDO_ENABLED") !== "true") throw new UserError("Locker delivery isn't available yet. Pick courier or collection.");
   if (delivery === "pudo_locker" && !deliveryDetails.locker) throw new UserError("Pick a PUDO locker.");
   if (delivery === "courier" && !(deliveryDetails.address && deliveryDetails.name && deliveryDetails.phone))
     throw new UserError("Add your name, phone and address for the courier.");

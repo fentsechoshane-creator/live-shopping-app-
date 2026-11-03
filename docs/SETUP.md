@@ -67,7 +67,15 @@ Never put secret keys in the web app, in chat, or in git. Only `VITE_` values go
    - Phone (the myHaul app): Android needs `FCM_SERVICE_ACCOUNT` (the whole JSON from Firebase > Project settings > Service accounts). iPhone needs `APNS_KEY` (the .p8 text), `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_BUNDLE_ID`, and `APNS_PRODUCTION=true` for App Store builds. Team members install the app, sign in and allow notifications. The same keys will send order notifications to buyers and sellers later.
    - Telegram: make a bot with @BotFather, add it to a team group, then set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`.
    - Email: `RESEND_API_KEY` (resend.com), `ALERT_EMAILS` (comma separated), `ALERT_FROM` (an address on a domain verified in Resend).
-10. Payments: set `TRADESAFE_MODE=mock` while testing (fake payments). Without this setting checkout refuses, so test mode can never be left on by accident.
+10. Phone notifications for buyers and sellers (orders, messages, bids) every minute, same secret and the same phone keys as above. Needs migration 0020.
+    ```sql
+    select cron.schedule('push-notifications', '* * * * *', $$
+      select net.http_post(url := 'https://<ref>.supabase.co/functions/v1/push-notifications',
+        headers := jsonb_build_object('x-cron-secret', '<CRON_SECRET>', 'content-type', 'application/json'), body := '{}'::jsonb);
+    $$);
+    ```
+11. Switches for things that aren't ready yet. Live selling is hidden unless the web app has `VITE_LIVE=true`. Locker delivery is hidden unless the web app has `VITE_LOCKERS=true` and Supabase secrets have `PUDO_ENABLED=true` (the server refuses lockers without it). Leave all three off for the first store upload.
+12. Payments: set `TRADESAFE_MODE=mock` while testing (fake payments). Without this setting checkout refuses, so test mode can never be left on by accident.
 
 At this point everything works with fake escrow: Pay opens a test payment page.
 

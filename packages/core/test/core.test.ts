@@ -184,6 +184,11 @@ describe("safety", () => {
     expect(looksOffApp("WhatsApp me on 082 123 4567")).toBe(true);
     expect(looksOffApp("I can do EFT if you want")).toBe(true);
     expect(looksOffApp("Does it come in M?")).toBe(false);
+    expect(looksOffApp("Send to my Capitec, acc 1234 567 890")).toBe(true);
+    expect(looksOffApp("Just pay cash on collection")).toBe(true);
+    expect(looksOffApp("Send proof of payment when done")).toBe(true);
+    expect(looksOffApp("It's R350 and ships tomorrow")).toBe(false);
+    expect(looksOffApp("Size 32 waist, 10 out of 10 condition")).toBe(false);
   });
 });
 

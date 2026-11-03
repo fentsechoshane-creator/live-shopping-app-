@@ -8,13 +8,14 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const { chromium } = require("playwright");
 const here = fileURLToPath(new URL(".", import.meta.url));
-const out = here + "report/";
+const out = process.env.SHOTS_OUT ?? here + "report/";
 mkdirSync(out, { recursive: true });
 const PORT = 4175, BASE = `http://localhost:${PORT}`;
 const server = spawn("npx", ["vite", "preview", "--port", String(PORT), "--strictPort"], { cwd: here + "..", stdio: "pipe" });
 await new Promise((r) => setTimeout(r, 2500));
 const browser = await chromium.launch();
-const page = await browser.newPage({ viewport: { width: 393, height: 850 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+const [VW, VH, DPR] = (process.env.SHOTS_SIZE ?? "393x850x2").split("x").map(Number);
+const page = await browser.newPage({ viewport: { width: VW, height: VH }, deviceScaleFactor: DPR, isMobile: true, hasTouch: true });
 page.setDefaultTimeout(15000);
 await page.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.abort());
 // The demo clips are H.264, which this test browser can't play; serve the same clips as WebM for the screenshots.
@@ -164,8 +165,6 @@ try {
   await page.getByRole("button", { name: "M", exact: true }).click();
   await shot("create-price");
 
-  await page.goto(`${BASE}/post?mode=live`);
-  await shot("go-live");
 } catch (e) {
   console.error(e);
   await page.screenshot({ path: `${out}failure.png` });

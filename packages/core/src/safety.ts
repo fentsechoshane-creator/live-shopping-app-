@@ -15,7 +15,8 @@ export function isRude(text: string): boolean {
 export function looksOffApp(text: string): boolean {
   const t = text.toLowerCase();
   if (/(\+27|\b0)[6-8]\d[\s-]?\d{3}[\s-]?\d{4}\b/.test(t)) return true; // SA cell number
-  return /\b(eft|e-?wallet|cash ?send|pay ?shap|bank details|account number|whats ?app me|pay me direct|outside the app|send money)\b/.test(t);
+  if (/\b\d{9,13}\b/.test(t.replace(/[\s-]/g, " ").replace(/(\d) (?=\d)/g, "$1"))) return true; // looks like a bank account number
+  return /\b(eft|e-?wallet|cash ?send|pay ?shap|instant money|bank details|banking details|account (number|no)|acc no|bank transfer|transfer (it|the money)|deposit|proof of payment|pop|paypal|pay me (direct|cash)|pay cash|cash on (delivery|collection)|cod|outside the app|off the app|whats ?app me|dm me on|send money|capitec|fnb|absa|nedbank|standard bank|tyme ?bank)\b/.test(t);
 }
 
 export const REPORT_REASONS = {

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { FEATURES } from "../../features";
 import { LISTING_LABELS, WELCOME_CREDIT } from "@app/core";
 import { api, type FeedItem } from "../../api";
 import { useLoad, useSession } from "../../session";
@@ -71,7 +72,7 @@ export function Feed() {
         <Segmented<Tab> label="Feed" onVideo value={tab} onChange={setTab} options={[
           { value: "for_you", label: "For you" },
           { value: "following", label: "Following" },
-          { value: "live", label: <><span className="dot-live" />Live</> },
+          ...(FEATURES.live ? [{ value: "live" as Tab, label: <><span className="dot-live" />Live</> }] : []),
         ]} />
         <div className="row" style={{ gap: 8 }}>
           <button className="wallet-chip vglass" onClick={() => withUser(() => setWallet(true), "Sign in to see your credit")}

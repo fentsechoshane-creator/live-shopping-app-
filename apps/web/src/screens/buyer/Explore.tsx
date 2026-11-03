@@ -95,7 +95,7 @@ export function Explore() {
       {items && !q && (
         <div className="empty-card" style={{ marginTop: 18 }}>
           <span className="icon-btn" style={{ background: "var(--red-soft)", color: "var(--red-text)" }}><Icon name="live" /></span>
-          <span className="grow"><b>Auctions are open</b><div className="small muted">Trusted sellers run timed auctions. Lives come next.</div></span>
+          <span className="grow"><b>Auctions are open</b><div className="small muted">Trusted sellers run timed auctions. Bid before the clock runs out.</div></span>
         </div>
       )}
       {wallet && <WalletSheet credit={!!credit} onClose={() => setWallet(false)} />}

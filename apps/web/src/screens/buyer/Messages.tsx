@@ -156,13 +156,19 @@ export function Thread() {
           </div>
         ))}
         {data.typing && <div className="bubble typing" aria-label="Typing"><span /><span /><span /></div>}
-        {risky && <div className="note amber" style={{ margin: "6px 0" }}>Careful: this looks like a request to pay or chat outside the app. If you pay outside, you lose buyer protection. You can report it.</div>}
+        {risky && (
+          <div className="note amber" role="alert" style={{ margin: "6px 0" }}>
+            <b>Careful: this looks like a request to pay outside myHaul.</b> If you pay by EFT, cash or any other way outside the app, your money isn't protected and
+            we can't help you get it back. Only pay with the Buy now or Pay buttons in the app.
+            <div style={{ marginTop: 8 }}><button className="btn danger small" onClick={() => setReporting(true)}>Report this chat</button></div>
+          </div>
+        )}
         <div ref={endRef} />
       </div>
 
       <div className="chat-foot">
         <ErrorNote error={sendError} />
-        {looksOffApp(text) && <div className="small" style={{ color: "var(--amber-text)", margin: "0 4px 6px" }}>Sharing numbers or bank details moves you outside buyer protection.</div>}
+        {looksOffApp(text) && <div className="small" style={{ color: "var(--amber-text)", margin: "0 4px 6px" }}>Payments outside myHaul aren't protected. Asking buyers to pay outside the app breaks the seller rules.</div>}
         {about && (
           <div className="attach">
             <span className="small muted">Asking about</span>

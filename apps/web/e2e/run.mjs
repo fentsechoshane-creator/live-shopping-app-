@@ -303,7 +303,7 @@ try {
   await page.getByRole("link", { name: /Item: Oversized tee, sand/ }).first().waitFor(); // the item is on the message
   await check(page.getByText("Asking about").count().then((n) => n === 0), "attachment sent with the message");
   await page.getByLabel("Message", { exact: true }).fill("Can I WhatsApp you on 082 123 4567?");
-  await page.getByText(/Sharing numbers or bank details/).waitFor();
+  await page.getByText(/Payments outside myHaul aren.t protected/).waitFor();
   await page.getByLabel("Message", { exact: true }).fill("");
   await shot("chat");
   await page.goto(`${BASE}/activity?tab=messages`);
@@ -415,7 +415,7 @@ try {
   await shot("create-suggest");
   await page.getByRole("button", { name: "Use these" }).click();
   await check(page.getByLabel("Title").inputValue().then((v) => v === "Denim jacket, light wash, size M"), "suggested title filled in");
-  await check(page.getByRole("tablist", { name: "Post" }).count().then((n) => n === 0), "Camera, Create, Live hides after the first page");
+  await check(page.getByRole("tablist", { name: "Post" }).count().then((n) => n === 0), "the Camera and Create switch hides after the first page");
   // Replicas are stopped on the step where you type the title.
   await page.getByLabel("Title").fill("Jordan 4 reps 1:1");
   await page.getByRole("button", { name: "Next" }).click();
@@ -462,11 +462,8 @@ try {
   await page.getByRole("heading", { name: "What are you selling?" }).waitFor(); // the photo is already in, so Create starts at step 1
   await page.getByRole("button", { name: "Back" }).click();
   await page.locator(".wz-preview img").waitFor(); // back to the first page with the photo, and the switch is back
-  await page.getByRole("tab", { name: "Live" }).click();
-  await page.getByRole("button", { name: "Go live" }).click();
-  await page.getByRole("dialog", { name: "Can't go live yet" }).getByText(/can't go live without stock/).waitFor();
-  await page.waitForTimeout(400);
-  await shot("live-blocked");
+  // Live selling stays hidden until it's built (Apple rejects "coming soon" features).
+  await check(page.getByRole("tab", { name: "Live" }).count().then((n) => n === 0), "no Live mode until it's built");
 
   await page.goto(BASE);
   await page.getByRole("region", { name: /Vintage denim jacket, size M/ }).waitFor();

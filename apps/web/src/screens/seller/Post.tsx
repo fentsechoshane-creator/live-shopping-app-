@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { FEATURES } from "../../features";
 import { goLiveBlockers, liveStock, MIN_LIVE_STOCK } from "@app/core";
 import { api } from "../../api";
 import { useLoad } from "../../session";
@@ -16,7 +17,8 @@ type Mode = "camera" | "create" | "live";
  */
 export function Post() {
   const [params, setParams] = useSearchParams();
-  const mode: Mode = (["camera", "create", "live"] as const).find((m) => m === params.get("mode")) ?? "camera";
+  const MODES = (FEATURES.live ? ["camera", "create", "live"] : ["camera", "create"]) as Mode[];
+  const mode: Mode = MODES.find((m) => m === params.get("mode")) ?? "camera";
   const setMode = (m: Mode) => { setSub(false); setParams(m === "camera" ? {} : { mode: m }, { replace: true }); };
   // Cover first (a video or a photo), then extra photos. Only the cover can be a video.
   const [media, setMedia] = useState<File[]>([]);
@@ -31,7 +33,7 @@ export function Post() {
   const nav = useNavigate();
   const close = useGoBack("/");
   const dark = mode !== "create";
-  const swipeModes = useTabSwipe(["camera", "create", "live"] as const, mode, setMode); // swipe between Camera, Create and Live
+  const swipeModes = useTabSwipe(MODES, mode, setMode); // swipe between Camera, Create and Live
 
   if (shop === undefined) return <div className="post dark"><div className="cam"><div className="cam-msg"><Loading /></div></div></div>;
   // Only sellers can post. Without an open shop, ask first; "No" leaves you where you were.
@@ -50,7 +52,7 @@ export function Post() {
         <>
           <button className={`post-close ${dark ? "vglass" : "glass"}`} onClick={close} aria-label="Close"><Icon name="close" size={20} /></button>
           <div className={`post-modes ${dark ? "vglass" : "glass"}`} role="tablist" aria-label="Post">
-            {(["camera", "create", "live"] as const).map((m) => (
+            {MODES.map((m) => (
               <button key={m} role="tab" aria-selected={mode === m} onClick={() => setMode(m)}>
                 {m === "live" && <span className="dot-live" />}{m === "camera" ? "Camera" : m === "create" ? "Create" : "Live"}
               </button>

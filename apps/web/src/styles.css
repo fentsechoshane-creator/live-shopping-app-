@@ -905,3 +905,8 @@ button.g3 { border: 0; padding: 0; display: block; width: 100%; }
 .team-alert:hover { background: var(--surface-2); }
 .team-alert.seen { opacity: 0.6; }
 @media (max-width: 900px) { .team-head { flex-wrap: wrap; align-items: flex-start; } }
+.legal .important, .legal .note { background: var(--amber-soft); border-radius: var(--r-sm); padding: 12px 14px; color: var(--ink); font-weight: 600; font-size: 14px; }
+.legal h3 { font-size: 15px; margin: 14px 0 4px; }
+.legal table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.legal a { color: var(--blue); }
+.btn.small { min-height: 34px; padding: 6px 12px; font-size: 13.5px; }

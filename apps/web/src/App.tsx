@@ -1,4 +1,4 @@
-import { NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
+import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useSwipe } from "./components/gestures";
 import { isNative, registerPush, setNavigator, startNative, statusBarFor } from "./native";
@@ -21,7 +21,7 @@ import { Payouts, SellerOrderDetail, SellerOrders } from "./screens/seller/Selli
 import { Post, SellerGate } from "./screens/seller/Post";
 import { TeamApp } from "./screens/team/Team";
 import { Thread } from "./screens/buyer/Messages";
-import { BlockedAccounts, DeleteAccountSheet, Privacy } from "./screens/Settings";
+import { BlockedAccounts, DeleteAccountSheet, Privacy, Terms, CONTACT } from "./screens/Settings";
 
 function RequireUser({ children }: { children: ReactNode }) {
   const { user, ready } = useSession();
@@ -119,12 +119,14 @@ function SideMenu() {
           {shop && shop.status !== "onboarding" && <MenuRow icon="payout" t="Payouts" s="Paid once the return window closes" onClick={() => go("/sell/payouts")} />}
           <MenuRow icon="bell" t="Notifications" s="Orders, returns and shop updates" onClick={() => go("/activity")} />
           <MenuRow icon="help" t="Returns and help" s="7 day returns on Buy now, buyer protection" onClick={() => go("/help")} />
+          <MenuRow icon="chat" t="Contact us" s={`${CONTACT}, we reply within 2 working days`} onClick={() => { window.location.href = `mailto:${CONTACT}?subject=${encodeURIComponent("myHaul help")}`; }} />
           {admin && <MenuRow icon="team" t="Team dashboard" s="Accounts, checks, reports, orders and money" onClick={() => go("/team")} />}
         </div>
         <div className="group" style={{ marginTop: 14 }}>
           <MenuRow icon="chat" t="Messages" s="Chats with buyers and sellers" onClick={() => go("/activity?tab=messages")} />
           <MenuRow icon="block" t="Blocked accounts" s="People you blocked" onClick={() => go("/settings/blocked")} />
-          <MenuRow icon="lock" t="Privacy and terms" s="How we use your data, community rules" onClick={() => go("/privacy")} />
+          <MenuRow icon="lock" t="Terms of Use" s="The rules for buying, selling and returns" onClick={() => go("/terms")} />
+          <MenuRow icon="shield" t="Privacy Policy" s="How we use and protect your data" onClick={() => go("/privacy")} />
         </div>
         <div className="group" style={{ marginTop: 14 }}>
           <div className="cell">
@@ -163,6 +165,11 @@ function Help() {
         <div className="cell"><span className="grow"><span className="t" style={{ display: "block" }}>Wrong, faulty or not as described</span><span className="s" style={{ display: "block" }}>Ask for a return from the order. The seller pays the postage. Faulty items: up to 6 months.</span></span></div>
         <div className="cell"><span className="grow"><span className="t" style={{ display: "block" }}>Your money is held safely</span><span className="s" style={{ display: "block" }}>An escrow provider holds every payment until the return window closes.</span></span></div>
         <div className="cell"><span className="grow"><span className="t" style={{ display: "block" }}>Auctions and made to order food</span><span className="s" style={{ display: "block" }}>No change of mind returns, but you are covered if something is wrong.</span></span></div>
+      </div>
+      <h2>Still need help?</h2>
+      <div className="group">
+        <a className="cell" href={`mailto:${CONTACT}?subject=${encodeURIComponent("myHaul help")}`}><span className="grow"><span className="t" style={{ display: "block" }}>Email us at {CONTACT}</span><span className="s" style={{ display: "block" }}>We reply within 2 working days. Add your order number if it's about an order.</span></span></a>
+        <Link className="cell" to="/terms"><span className="grow"><span className="t" style={{ display: "block" }}>Terms of Use</span><span className="s" style={{ display: "block" }}>The full rules for buying, selling, returns and refunds.</span></span></Link>
       </div>
     </div>
   );
@@ -224,6 +231,7 @@ export function App() {
           <Route path="/messages/:id" element={guard(<Thread />)} />
           <Route path="/settings/blocked" element={guard(<BlockedAccounts />)} />
           <Route path="/privacy" element={<Privacy />} />
+          <Route path="/terms" element={<Terms />} />
           <Route path="*" element={<div className="screen"><BackButton /><div className="empty">Page not found.</div></div>} />
         </Routes>
         </ErrorBoundary>

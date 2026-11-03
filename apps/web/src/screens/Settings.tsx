@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 import { useLoad, useSession } from "../session";
@@ -52,66 +52,42 @@ export function DeleteAccountSheet({ onClose }: { onClose: () => void }) {
   );
 }
 
-const CONTACT = "help@myhaul.co.za"; // [CONFIRM] create this mailbox and add company details before publishing
+export const CONTACT = "help@myhaul.co.za"; // [CONFIRM] create this mailbox before launch
 
-/** Privacy policy and terms in plain words, with contact details (store rules ask for both). */
-export function Privacy() {
+/**
+ * Terms of Use and Privacy Policy. One source: the public pages (terms.html, privacy.html), which the website, the app
+ * stores and the app all show. Our own static files, so showing their HTML here is safe.
+ */
+function LegalPage({ file, title }: { file: string; title: string }) {
+  const [html, setHtml] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let live = true;
+    fetch(file).then((r) => (r.ok ? r.text() : Promise.reject())).then((t) => {
+      const doc = new DOMParser().parseFromString(t, "text/html");
+      const main = doc.querySelector("main");
+      main?.querySelector("header")?.remove();
+      main?.querySelector("footer")?.remove();
+      main?.querySelectorAll("script, style, iframe").forEach((n) => n.remove());
+      if (live) main ? setHtml(main.innerHTML) : setFailed(true);
+    }).catch(() => live && setFailed(true));
+    return () => { live = false; };
+  }, [file]);
   return (
     <div className="screen legal">
       <BackButton />
-      <h1>Privacy and terms</h1>
-      <p className="note amber">Draft for review by a lawyer before launch. Company name, registration number and Information Officer details still to be added. [CONFIRM]</p>
-
-      <h2>Who we are</h2>
-      <p>[Company name] [CONFIRM], Cape Town, South Africa. Contact us at {CONTACT}. Our Information Officer under POPIA can be reached at the same address.</p>
-
-      <h2>What we collect</h2>
-      <ul>
-        <li>Your email or cell number, name, bio and profile details.</li>
-        <li>For sellers: ID document and selfie (for checks), bank details (held by our escrow partner), and shop details.</li>
-        <li>Your posts, photos, videos, comments, likes, reposts, follows and messages.</li>
-        <li>Orders, delivery details and payments (card details are handled by the payment provider, not us).</li>
-        <li>Basic device and usage data to keep the app working and safe.</li>
-      </ul>
-
-      <h2>Why we use it</h2>
-      <ul>
-        <li>To run your account, show you posts, and process orders, deliveries, returns and payouts.</li>
-        <li>To keep the app safe: checking sellers, stopping fakes and scams, and handling reports.</li>
-        <li>To meet legal duties, such as tax and financial records.</li>
-      </ul>
-
-      <h2>Who we share it with</h2>
-      <ul>
-        <li>Our escrow and payment partner (TradeSafe), couriers you choose, video hosting (Mux) and our database host (Supabase).</li>
-        <li>Never sold to advertisers.</li>
-      </ul>
-
-      <h2>Your rights</h2>
-      <ul>
-        <li>See, correct or delete your information. You can delete your account in the app: Menu, Delete my account.</li>
-        <li>Complain to us, or to the Information Regulator of South Africa.</li>
-      </ul>
-
-      <h2>How long we keep it</h2>
-      <p>While your account is open. After you delete it, we keep order and payment records for 5 years as the law requires, then delete them.</p>
-
-      <h2>Community rules</h2>
-      <ul>
-        <li>No fakes or replicas, no hate or harassment, no nudity, no scams.</li>
-        <li>Keep payments in the app. Paying outside removes buyer protection.</li>
-        <li>Report anything that breaks these rules. Our team checks reports within 24 hours and may remove content or close accounts.</li>
-      </ul>
-
-      <h2>Children</h2>
-      <p>myHaul is for people aged 18 and over. [CONFIRM age policy]</p>
-
-      <h2>Buying and selling</h2>
-      <ul>
-        <li>Payments are held by our escrow partner until the return window closes, then paid to the seller.</li>
-        <li>Buy now items: 7 day change of mind returns from delivery (you pay return postage). Faulty items: up to 6 months.</li>
-        <li>Sellers pay a 6% fee per sale. Founding sellers pay 0% for 90 days.</li>
-      </ul>
+      <h1>{title}</h1>
+      {!html && !failed && <Loading />}
+      {failed && <p>Couldn't load this page. Read it at <a href={`https://myhaul.co.za${file}`}>myhaul.co.za{file}</a> or email {CONTACT}.</p>}
+      {html && <div dangerouslySetInnerHTML={{ __html: html }} />}
     </div>
   );
+}
+
+export function Privacy() {
+  return <LegalPage file="/privacy.html" title="Privacy Policy" />;
+}
+
+export function Terms() {
+  return <LegalPage file="/terms.html" title="Terms of Use" />;
 }

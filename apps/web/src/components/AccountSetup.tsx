@@ -128,7 +128,7 @@ export function AccountSetup() {
           )}
           <div className="setup-foot">
             <p className="small muted" style={{ textAlign: "center", margin: "0 0 10px" }}>
-              By tapping Create account, you agree to our <a href="/privacy.html" target="_blank" rel="noreferrer">Terms and Privacy Policy</a>.
+              By tapping Create account, you agree to our <a href="/terms.html" target="_blank" rel="noreferrer">Terms of Use</a> and <a href="/privacy.html" target="_blank" rel="noreferrer">Privacy Policy</a>.
             </p>
             <button className="btn green block big" disabled={busy || !name.trim() || !free}>{busy ? "Creating…" : "Create account"}</button>
           </div>

@@ -21,7 +21,8 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 | Mobile app (iPhone and Android) | Built with Capacitor. Android test build on GitHub; iPhone needs a Mac with Xcode |
 | Chat, offers, holds, comments | Done |
 | Timed auctions | Built (migration 0016), live database needs it; checkout and run-due functions to deploy [Lehloma] |
-| Live streams | Not started (shown as "coming next") |
+| Live streams | Not started. Hidden for the first store upload (switch `VITE_LIVE`) |
+| Store readiness | Terms of Use, Privacy Policy, Contact us, phone notifications, reviewer notes, screenshots done. Company details [CONFIRM] |
 | Error reports, share previews, welcome, saved delivery | Done (previews need the web host) |
 | Security (docs/SECURITY.md) | Full review done (migration 0018 plus server and app fixes). Live database needs 0017 and 0018 [Ofentse to approve]. Next: two step sign in for the team, CAPTCHA at sign up |
 | Team dashboard (/team) | Built (migration 0017): accounts, suspensions, checks, reports, returns, orders, listings, money, errors, activity log. Live database needs 0017 [Ofentse to approve] |
@@ -56,7 +57,7 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 - Buyer: welcome screens with interests on first open, feed (For you ranked by interests, loads more as you scroll; Following; Live), Explore with word search, item sheet, checkout that remembers delivery details, orders with returns and ratings, activity, chats with offers and holds.
 - Signing in happens in a sheet over the current screen and then finishes what you tapped (like, follow, buy, message). The code signs in by itself once 6 digits are in.
 - Profile: TikTok style page with Posts, Likes and Reposts.
-- Seller: onboarding, Create in steps with drafts and photo suggestions, Camera, Live (locked until ready), orders to ship (most urgent first, copy address), payouts.
+- Seller: onboarding, Create in steps with drafts and photo suggestions, Camera (Live hidden until built), orders to ship (most urgent first, copy address), payouts.
 - Team dashboard at `/team` (laptop first, works on a phone): Overview with sales, fees and what needs doing; Accounts with search, filters and a full page per person (shop, checks, ID files, orders, trust history, reports, what the team did); suspend and lift, pause, close or open shops, add or remove team members; Seller checks; Reports; Returns; Orders; Listings (remove with a reason); Money (top ups); App errors; Activity log of every team action. Suspended people can sign in and see orders but can't buy, sell, bid, comment or message; the database blocks it.
 - Phone apps: Capacitor in `apps/web/ios` and `apps/web/android`. Links to items and shops open the app once the domain is set up.
 - Ranking: `apps/web/src/lib/rank.ts` is where Lehloma's engine plugs in.
@@ -64,6 +65,7 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 
 ## Next up
 
+- **Before the store upload:** apply migrations 0017 to 0020 live; deploy and schedule `team-alerts` and `push-notifications` (docs/SETUP.md steps 9 and 10); fill in the company details in `terms.html` and `privacy.html`; set up help@myhaul.co.za; make the reviewer account (docs/STORE.md). [Lehloma, Ofentse]
 - **Alerts:** apply 0019 live, deploy and schedule `team-alerts` (docs/SETUP.md step 9), add the phone (Firebase and Apple), Telegram and email secrets. [Lehloma]
 - **Security:** apply 0018 live with 0017; set `TRADESAFE_MODE=mock` in Supabase secrets while testing (payments are refused without it); deploy the changed functions (checkout, escrow-webhook, run-due, suggest-listing). Then the open items in docs/SECURITY.md: team two step sign in, CAPTCHA at sign up, backups. [Lehloma, Ofentse]
 - **Team dashboard live:** apply migration 0017 to the live database and make Ofentse's account (@shups) a team member. [Ofentse to approve]
@@ -71,7 +73,7 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 - **Web host and domain:** connect the repo to Netlify (`netlify.toml` is ready), set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` there, point myhaul.co.za at it. This gives the privacy and help pages, WhatsApp previews and links that open the app. [Ofentse]
 - **Links open the app:** put the Apple Team ID in `public/.well-known/apple-app-site-association` and the Play signing SHA256 in `assetlinks.json`; turn on Associated Domains and Push in Xcode. [Lehloma]
 - Developer accounts, Google's 12 tester 14 day closed test, reviewer test account. [Ofentse]
-- Push sending function (Apple and Firebase keys), PUDO and Courier Guy accounts for real lockers and tracking. [Lehloma]
+- Apple and Firebase keys for push (the sender is built), PUDO and Courier Guy accounts for real lockers and tracking. [Lehloma]
 - Then: shop reviews on shop pages, search filters (size, price, area), video cover and trim, seller stats, invite a friend, live selling.
 
 ## Known issues and risks
@@ -91,15 +93,26 @@ Debug as we go: anyone who finds or fixes a problem updates this list. Highest r
 | 9 | Rude word filter may block innocent Afrikaans words ("naai" also means sew, "moer" a nut). | Low | Review the list with a native speaker. [CONFIRM] |
 | 10 | Saved replies are stored on the phone, not the account. | Low | Move to the database later. |
 | 11 | Sound starts after the first tap in a browser (browser rule). | Low | Native app plays with sound straight away. |
-| 12 | Push: the sender exists (`_shared/push.ts`, used for team alerts) but order notifications to buyers and sellers don't use it yet. Needs the Apple and Firebase keys. | Medium for launch | Wire notifications into push; add keys. [Lehloma] |
-| 13 | Privacy page has placeholders (company, support email, Information Officer). | High for store review | Fill in, lawyer review. [Ofentse] |
+| 12 | Push to buyers and sellers is built (`push-notifications`, migration 0020) but needs the Apple and Firebase keys and the schedule. | Medium for launch | Add keys, schedule it. [Lehloma] |
+| 13 | Terms and Privacy Policy are written; company registration number, address, directors and start date are [CONFIRM]. | High for store review | Fill in, lawyer confirms. [Ofentse] |
 | 14 | Share previews and "open in app" links only work once the site is on myhaul.co.za with the Team ID and SHA256 filled in. Until then links open the web version. | Medium | See Next up. [CONFIRM domain] |
 | 15 | Ranking by interests is simple (picked categories first, mixed with others). | Low | Lehloma's engine replaces `rankFeed` in `lib/rank.ts`. |
-| 16 | The PUDO locker list is sample data. | High for launch | PUDO API account. [Ofentse] |
+| 16 | The PUDO locker list is sample data, so lockers are switched off. | Low while off | PUDO API account, then turn on. [Ofentse] |
 
 Fixed in this round: Safari double back on the edge swipe (now only in the installed app), deleting an account now also deletes the person's photos and videos, React Router warnings.
 
 ## Log
+
+### 2026-11-04: Ready for the first store upload
+
+- Live selling is hidden everywhere (no Live tab, no Live mode in Create) behind `VITE_LIVE`. Locker delivery is hidden behind `VITE_LOCKERS`, and the server refuses lockers unless `PUDO_ENABLED=true`, because the locker list is still sample data.
+- Full Terms of Use (`public/terms.html`, in the app at /terms) written on South African law: Consumer Protection Act, ECTA (including the cooling off rules), POPIA, Counterfeit Goods Act, Foodstuffs Act for bakers. Covers escrow, fees, welcome credit abuse, auctions, returns, seller rules, liability and disputes. Privacy page renamed Privacy Policy, 18+ only, linked to the terms. Only company facts are left as [CONFIRM] (registration number, address, directors, start date). A lawyer should confirm before launch.
+- Menu has Terms of Use, Privacy Policy and Contact us (help@myhaul.co.za [CONFIRM mailbox]). Help has a "Still need help?" section.
+- Phone notifications for everyone: migration 0020 (`pushed_at`) and the `push-notifications` job, every minute, one push per person per run. Uses the same Apple and Firebase keys as team alerts.
+- Chat safety: the "pay outside the app" warning now catches account numbers, bank names, cash on delivery, proof of payment and PayPal, with a Report this chat button.
+- Reviewer account steps and notes in docs/STORE.md, and a fresh checklist.
+- Store screenshots: six framed screens on white, `apps/web/store/screenshots/apple-6.9` (1320 x 2868) and `google-phone` (1080 x 1920). Rebuild with `node apps/web/e2e/store-frames.mjs`.
+- Open: migrations 0017 to 0020 live, deploy and schedule the functions, secrets, company details in the terms, domain and support mailbox. [Lehloma, Ofentse]
 
 ### 2026-11-04: New logo, app icon and splash
 

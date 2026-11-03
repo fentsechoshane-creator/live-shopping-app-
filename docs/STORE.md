@@ -93,13 +93,15 @@ Users post photos, videos and comments, and chat with each other. Purchases are 
 
 ## Test account for the reviewers
 
-Apple and Google need a way to sign in. Our normal sign in sends a code, which reviewers can't receive, so the app also has "Sign in with a password".
+Apple and Google need a way to sign in. Our normal sign in sends a code, which reviewers can't receive, so the sign in screen also has "Sign in with a password".
 
-1. In Supabase > Authentication > Users, add a user `review@myhaul.co.za` with a password. [Ofentse or Lehloma]
-2. Put a sample shop and a few items on it so reviewers can see buying and selling.
-3. In App Store Connect (App Review Information) and Google Play Console (App access), give the email and password and these notes:
+1. Supabase > Authentication > Users > Add user > Create new user: email `review@myhaul.co.za`, a strong password, tick "Auto confirm user". [Ofentse or Lehloma]
+2. Sign in with it once on the app and finish Create account: name "App Review", username `app.review`, birthday over 18. Don't make it a team account.
+3. Open a shop on it called "Review Shop" (approve its ID check in the team dashboard) and post two or three items with videos, so reviewers can see the seller side.
+4. Make sure real founding sellers have live listings: reviewers must see a full feed, never sample data.
+5. In App Store Connect (App Review Information > Sign in required) and Google Play Console (App content > App access), give the email and password and paste these notes:
 
-> Sign in: tap "Sign in with a password" and use the account above. Payments use our escrow partner's test mode, so no real money moves. To see the seller side, open the menu and the shop "Review Shop". Report and block are in the ••• menu on any post, comment, shop or chat. Delete account is at the bottom of the menu.
+> myHaul is a marketplace for physical goods from independent South African sellers, so purchases use our escrow partner TradeSafe rather than in app purchase. Sign in: on the sign in screen tap "Sign in with a password" and use the account above. During review payments run in TradeSafe's sandbox, so no real money moves: any test card TradeSafe shows will work. Buyer side: tap Buy now on any video. Seller side: open Profile, then Selling, for the account's "Review Shop". User safety: Report and Block are in the more menu (three dots) on every video, comment, shop and chat; reports reach our team within 24 hours. Terms of Use and Privacy Policy are in the menu and accepted at sign up. Delete account: Menu > Delete my account. The app is for people aged 18 and over.
 
 ## Build and submit
 
@@ -117,13 +119,17 @@ Apple and Google need a way to sign in. Our normal sign in sends a code, which r
 
 ## Still to do before submitting
 
-- [x] Live database up to date (0001 to 0014)
-- [ ] Deploy the server functions `delete-account`, `suggest-listing`, `checkout` [Lehloma]
-- [ ] Domain, hosted web pages, support mailbox [Ofentse]
-- [ ] Company or owner details and Information Officer in the privacy pages; lawyer review [Ofentse]
-- [ ] Apple Developer account (R1,700 a year or so [CONFIRM current price]) and Google Play account (once off, about R450 [CONFIRM]) [Ofentse]
-- [ ] Reviewer test account with a sample shop
-- [ ] TradeSafe live keys (real payments) or keep test mode for the first TestFlight round
-- [ ] Push notification keys (Apple APNs key and Firebase for Android) and the sending function [Lehloma]
-- [ ] Final icon design [Ofentse]
-- [ ] Netlify site on myhaul.co.za, Team ID and SHA256 in the `.well-known` files [Ofentse and Lehloma]
+**Built (2026-11-04):** Live selling hidden until it's built (Apple rejects "coming soon" features); Terms of Use page, linked at sign up and in the menu; iPhone only (no iPad review); push notifications for orders and messages; sample PUDO lockers hidden (collection and courier with tracking only); warning in chats about paying outside the app; Contact us in the menu; new icon, splash, feature graphic and screenshots.
+
+- [ ] Live database: apply migrations 0017 to 0020 [Lehloma]
+- [ ] Deploy all server functions, including `team-alerts` and `push-notifications`, and schedule them (docs/SETUP.md) [Lehloma]
+- [ ] Company registered; registration number, address and directors in `terms.html` and `privacy.html` (search for CONFIRM); lawyer confirms the terms [Ofentse]
+- [ ] Domain myhaul.co.za on Netlify, support mailbox help@myhaul.co.za, Netlify site public [Ofentse]
+- [ ] Apple Developer account and Google Play account [Ofentse]
+- [ ] Resend set up for sign in emails [Lehloma]
+- [ ] TradeSafe sandbox keys for review, live keys for launch [Lehloma]
+- [ ] Mux keys [Ofentse]
+- [ ] Push keys: Apple APNs key and Firebase service account [Lehloma]
+- [ ] Reviewer account with "Review Shop", and founding sellers with real listings
+- [ ] Team ID and SHA256 in the `.well-known` files [Lehloma]
+- [ ] Google: 14 day closed test with 12 testers; data safety form; age rating questionnaire (18+)

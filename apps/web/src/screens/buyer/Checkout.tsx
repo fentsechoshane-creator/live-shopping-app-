@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { FEATURES } from "../../features";
 import { DELIVERY_OPTIONS, orderTotals, type DeliveryOption } from "@app/core";
 import { api, type FeedItem, type Offer } from "../../api";
 import { useSession } from "../../session";
@@ -18,7 +19,8 @@ export function CheckoutSheet({ item, onClose, offer, auctionPrice }: { item: Fe
   const price = auctionPrice ?? (offer ? offer.priceCents : p.priceCents);
   const extra = offer ? offer.productIds.length - 1 : 0;
   const food = p.mode === "order_now";
-  const options = (Object.keys(DELIVERY_OPTIONS) as DeliveryOption[]).filter((d) => !!DELIVERY_OPTIONS[d].foodOnly === food);
+  // PUDO lockers stay off until we have a PUDO account (the list is sample data): collection and courier only.
+  const options = (Object.keys(DELIVERY_OPTIONS) as DeliveryOption[]).filter((d) => !!DELIVERY_OPTIONS[d].foodOnly === food && (d !== "pudo_locker" || FEATURES.lockers));
   const [size, setSize] = useState(p.sizes.length === 1 ? p.sizes[0] : "");
   const [delivery, setDelivery] = useState<DeliveryOption>(options[0]);
   const [locker, setLocker] = useState("");
