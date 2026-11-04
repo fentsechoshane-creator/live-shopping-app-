@@ -29,6 +29,14 @@ begin
   end;
   raise exception 'Expected an error containing "%" for: %', needle, sql;
 end $$;
+-- Packing proof for an order (video and sealed parcel photo by the seller, after payment).
+create function pg_temp.packed(o uuid) returns void language plpgsql as $$
+declare seller uuid := (select s.owner_id from orders x join shops s on s.id = x.shop_id where x.id = o); v uuid; p uuid;
+begin
+  insert into media (owner_id, kind, storage_path, status) values (seller, 'video', seller || '/packing-test.mp4', 'ready') returning id into v;
+  insert into media (owner_id, kind, storage_path, status) values (seller, 'image', seller || '/packing-test.jpg', 'ready') returning id into p;
+  update orders set packing_media_id = v, packing_photo_media_id = p where id = o;
+end $$;
 grant execute on all functions in schema pg_temp to anon, authenticated, service_role;
 
 insert into auth.users (id, email) values
@@ -134,7 +142,13 @@ insert into orders (id, buyer_id, shop_id, product_id, mode, item_price_cents, d
 select pg_temp.expect_error($$update orders set status = 'shipped' where id = '10000000-0000-0000-0000-000000000001'$$, 'cannot go from');
 update orders set status = 'paid' where id = '10000000-0000-0000-0000-000000000001';
 select pg_temp.expect_error($$update orders set total_cents = 1, item_price_cents = 1, seller_payout_cents = 1, seller_fee_cents = 0, protection_fee_cents = 0 where id = '10000000-0000-0000-0000-000000000001'$$, 'cannot be changed');
-update orders set status = 'shipped', packing_media_id = (select id from media limit 1), tracking_ref = 'TCG123' where id = '10000000-0000-0000-0000-000000000001';
+-- No shipping without packing proof, even from the server.
+select pg_temp.expect_error($$update orders set status = 'shipped', tracking_ref = 'TCG123' where id = '10000000-0000-0000-0000-000000000001'$$, 'packing video');
+select pg_temp.expect_error($$update orders set status = 'shipped', packing_media_id = (select id from media where kind = 'video' limit 1), packing_photo_media_id = (select id from media where kind = 'video' limit 1) where id = '10000000-0000-0000-0000-000000000001'$$, 'packing');
+reset role;
+select pg_temp.packed('10000000-0000-0000-0000-000000000001');
+select pg_temp.act_as_service();
+update orders set status = 'shipped', tracking_ref = 'TCG123' where id = '10000000-0000-0000-0000-000000000001';
 reset role;
 do $$ begin
   assert (select stock from products where title = 'Oversized tee, sand') = 0, 'stock taken on payment';
@@ -183,6 +197,7 @@ insert into orders (id, buyer_id, shop_id, product_id, mode, item_price_cents, d
   values ('10000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-00000000000b', (select id from shops where handle = 'thrift.with.lebo'),
   (select id from products where title = 'Chunky white runner'), 'order_now', 40000, 'collect_baker', 0, 1200, 41200, 2400, 37600);
 update orders set status = 'paid' where id = '10000000-0000-0000-0000-000000000002';
+select pg_temp.packed('10000000-0000-0000-0000-000000000002');
 update orders set status = 'shipped' where id = '10000000-0000-0000-0000-000000000002';
 reset role;
 select pg_temp.act_as('00000000-0000-0000-0000-00000000000b');
@@ -194,8 +209,8 @@ select pg_temp.act_as_service();
 update orders set status = 'completed' where id = '10000000-0000-0000-0000-000000000002';
 reset role;
 do $$ begin
-  -- 61 + 5 star (+1) + kept (+2)
-  assert (select trust_score from profiles where id = '00000000-0000-0000-0000-00000000000a') = 64, 'review and kept order add points';
+  -- 61 + shipped fast with packing proof (+1) + 5 star (+1) + kept (+2)
+  assert (select trust_score from profiles where id = '00000000-0000-0000-0000-00000000000a') = 65, 'review and kept order add points';
   assert (select good_orders(id) from shops where handle = 'thrift.with.lebo') = 1, 'one good order';
 end $$;
 
@@ -699,3 +714,62 @@ select pg_temp.act_as_anon();
 do $$ begin assert (select count(*) from feed(50, 0) where shop_handle = 'thrift.with.lebo') = (select n from feed_before), 'back in the feed'; end $$;
 reset role;
 select 'feature switch tests passed' as result;
+
+-- ===== Packing proof =====
+-- Three of Lebo's orders with packing proof to review.
+insert into orders (id, buyer_id, shop_id, product_id, mode, item_price_cents, delivery, delivery_fee_cents, protection_fee_cents, total_cents, seller_fee_cents, seller_payout_cents)
+  select ('20000000-0000-0000-0000-00000000000' || i)::uuid, '00000000-0000-0000-0000-00000000000b', (select id from shops where handle = 'thrift.with.lebo'),
+    (select id from products where title = 'Oversized tee, sand'), 'buy_now', 35000, 'collect_cpt', 0, 1200, 36200, 2100, 32900 from generate_series(1, 3) i;
+create temp table pk as select id from orders where shop_id = (select id from shops where handle = 'thrift.with.lebo') order by created_at limit 3;
+do $$ declare r record; begin
+  for r in select id from pk loop
+    if (select packing_media_id from orders where id = r.id) is null then perform pg_temp.packed(r.id); end if;
+  end loop;
+end $$;
+grant select on pk to authenticated, service_role;
+do $$ begin assert (select count(*) from pk) = 3, 'three orders to test with'; end $$;
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000b');
+select pg_temp.expect_error($$select admin_packing((select id from pk limit 1))$$, 'team');
+select pg_temp.expect_error($$select admin_packing_review((select id from pk limit 1), false, 'x')$$, 'team');
+reset role;
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000c');
+do $$ declare j jsonb := admin_packing((select id from pk order by id limit 1)); begin
+  assert j ->> 'code' like 'MH %' and j ->> 'video' is not null and j ->> 'photo' is not null, 'team sees the code, video and photo';
+  assert exists (select 1 from admin_log(5) x where x ->> 'action' = 'Viewed packing proof'), 'views are logged';
+end $$;
+select admin_packing_shared((select id from pk order by id limit 1), 'Buyer asked by email');
+select pg_temp.expect_error($$select admin_packing_review((select id from pk order by id limit 1), false, '')$$, 'what was wrong');
+do $$ declare r record; n int; i int := 0; begin
+  for r in select id from pk order by id loop
+    i := i + 1;
+    n := admin_packing_review(r.id, false, 'The item was not shown from every side.');
+    assert n = i, 'strikes count up';
+  end loop;
+end $$;
+select pg_temp.expect_error($$select admin_packing_review((select id from pk order by id limit 1), false, 'again')$$, 'already has a strike');
+reset role;
+do $$ begin
+  assert exists (select 1 from trust_events where user_id = '00000000-0000-0000-0000-00000000000a' and kind = 'packing_strike'), '2nd strike costs trust';
+  assert feature_state('00000000-0000-0000-0000-00000000000a', 'sell') = 'off', '3rd strike pauses listing';
+  assert exists (select 1 from notifications where user_id = '00000000-0000-0000-0000-00000000000a' and title like 'Listings paused%'), 'seller is told';
+end $$;
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000a');
+do $$ begin assert (select count(*) from packing_strikes) = 3, 'seller sees their strikes'; end $$;
+reset role;
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000b');
+do $$ begin assert (select count(*) from packing_strikes) = 0, 'others do not'; end $$;
+select pg_temp.expect_error($$select packing_due_purge()$$, 'permission denied');
+reset role;
+-- Deleted 6 months after delivery.
+update orders set delivered_at = now() - interval '7 months' where id = (select id from pk order by id limit 1);
+select pg_temp.act_as_service();
+do $$ declare ids uuid[]; begin
+  select array_agg(order_id) into ids from packing_due_purge();
+  assert (select id from pk order by id limit 1) = any (ids), 'old proof is due';
+  assert not exists (select 1 from packing_due_purge() d join pk on pk.id = d.order_id where d.order_id <> (select id from pk order by id limit 1)
+                     and (select coalesce(delivered_at, shipped_at) from orders where id = d.order_id) > now() - interval '6 months'), 'recent proof is kept';
+  perform packing_mark_purged(ids);
+end $$;
+reset role;
+do $$ begin assert (select packing_media_id is null and packing_purged_at is not null from orders where id = (select id from pk order by id limit 1)), 'proof deleted and marked'; end $$;
+select 'packing proof tests passed' as result;

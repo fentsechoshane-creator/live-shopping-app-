@@ -58,7 +58,7 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
       creditUsed: o.credit_cents, total: o.total_cents, sellerFee: o.seller_fee_cents, sellerPayout: o.seller_payout_cents,
       creditTopUp: o.credit_topup_cents ?? 0,
     },
-    checkoutUrl: o.checkout_url, trackingRef: o.tracking_ref, paidAt: o.paid_at, shipBy: o.ship_by, shippedAt: o.shipped_at,
+    checkoutUrl: o.checkout_url, trackingRef: o.tracking_ref, packingCode: o.packing_code ?? null, paidAt: o.paid_at, shipBy: o.ship_by, shippedAt: o.shipped_at,
     deliveredAt: o.delivered_at, releasableAt: o.releasable_at, createdAt: o.created_at,
     ret: o.returns ? { reason: o.returns.reason, details: o.returns.details, status: o.returns.status, postagePayer: o.returns.postage_payer } : null,
     review: o.reviews ? { stars: o.reviews.stars } : null,
@@ -567,13 +567,16 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
       return (check(await sb.from("orders").select(ORDER_SELECT).eq("shop_id", shopId).neq("status", "pending_payment")
         .order("created_at", { ascending: false })) as any[]).map(toOrder);
     },
-    async shipOrder(id, trackingRef, packingVideo) {
-      let packingMediaId: string | null = null;
-      if (packingVideo) {
-        const path = await upload("private", packingVideo, "packing");
-        packingMediaId = (check(await sb.from("media").insert({ owner_id: await uid(), kind: "video", storage_path: path, status: "ready" }).select("id").single()) as any).id;
-      }
-      await call("order-action", { orderId: id, action: "ship", trackingRef: trackingRef || null, packingMediaId });
+    async shipOrder(id, trackingRef, packingVideo, packingPhoto) {
+      // Both go to the private bucket: only the seller and our team can open them.
+      const me = await uid();
+      const add = async (file: File, kind: "video" | "image", prefix: string) => {
+        const path = await upload("private", file, prefix);
+        return (check(await sb.from("media").insert({ owner_id: me, kind, storage_path: path, status: "ready" }).select("id").single()) as any).id as string;
+      };
+      const packingMediaId = await add(packingVideo, "video", "packing");
+      const packingPhotoMediaId = await add(packingPhoto, "image", "parcel");
+      await call("order-action", { orderId: id, action: "ship", trackingRef: trackingRef || null, packingMediaId, packingPhotoMediaId });
     },
     async acceptReturn(id) {
       await call("order-action", { orderId: id, action: "accept_return" });
@@ -606,6 +609,26 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
       if (r.idFiles?.cert) files.push({ label: "Food certificate", url: await signed(r.idFiles.cert) });
       const out: TeamPersonDetail = { ...toPerson(r), bio: r.bio ?? "", city: r.city ?? "", adultConfirmedAt: r.adultConfirmedAt, termsAcceptedAt: r.termsAcceptedAt,
         phone: r.phone, bank: r.bank, files, liveListings: r.liveListings ?? 0, orders: r.orders ?? [], trustEvents: r.trustEvents ?? [], reports: r.reports ?? [], actions: r.actions ?? [] };
+      return out;
+    },
+    async teamPacking(orderId) {
+      const r = check(await sb.rpc("admin_packing", { p_order: orderId })) as any;
+      const sign = async (p: string | null) => (p ? (await sb.storage.from("private").createSignedUrl(p, 600)).data?.signedUrl ?? null : null);
+      return { orderId, code: r.code, videoUrl: await sign(r.video), photoUrl: await sign(r.photo), shippedAt: r.shippedAt,
+        review: r.review, reviewedAt: r.reviewedAt, purgedAt: r.purgedAt, strikes90: Number(r.strikes90 ?? 0) };
+    },
+    async teamPackingReview(orderId, ok, note) {
+      return Number(check(await sb.rpc("admin_packing_review", { p_order: orderId, p_ok: ok, p_note: note ?? null })) ?? 0);
+    },
+    async teamPackingQueue() {
+      return (check(await sb.rpc("admin_packing_queue")) as any[]) ?? [];
+    },
+    async teamPackingShare(orderId, note) {
+      const r = check(await sb.rpc("admin_packing", { p_order: orderId })) as any;
+      const week = 7 * 86400;
+      const sign = async (p: string | null) => (p ? (await sb.storage.from("private").createSignedUrl(p, week)).data?.signedUrl ?? null : null);
+      const out = { video: await sign(r.video), photo: await sign(r.photo) };
+      check(await sb.rpc("admin_packing_shared", { p_order: orderId, p_note: note ?? null }));
       return out;
     },
     async teamFeatures(userId) {

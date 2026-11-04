@@ -157,6 +157,8 @@ export interface Order {
   totals: Pick<OrderTotals, "itemPrice" | "deliveryFee" | "protectionFee" | "creditUsed" | "total" | "sellerFee" | "sellerPayout" | "creditTopUp">;
   checkoutUrl: string | null;
   trackingRef: string | null;
+  /** Shown to the seller to film and write on the parcel, like "MH 4821". */
+  packingCode: string | null;
   paidAt: string | null;
   shipBy: string | null;
   shippedAt: string | null;
@@ -277,6 +279,14 @@ export interface TeamPerson {
 export type MyFeatures = Partial<Record<AccountFeature, "on" | "off">>;
 /** One switch on the dashboard, with what the normal rule says right now. */
 export interface TeamFeature { state: FeatureState; reason: string | null; at: string | null; by: string | null; autoOk: boolean; autoNote: string }
+
+/** One order's packing proof, for the team. Links expire in 10 minutes. */
+export interface PackingProof {
+  orderId: string; code: string | null; videoUrl: string | null; photoUrl: string | null; shippedAt: string | null;
+  review: "ok" | "strike" | null; reviewedAt: string | null; purgedAt: string | null; strikes90: number;
+}
+/** A spot check waiting in To do. */
+export interface PackingCheck { orderId: string; title: string; shopName: string; sellerId: string; shippedAt: string; code: string | null }
 
 export interface TeamPersonDetail extends TeamPerson {
   bio: string; city: string; adultConfirmedAt: string | null; termsAcceptedAt: string | null; phone: string | null; bank: string | null;
@@ -412,7 +422,8 @@ export interface Api {
   /** Suggested title, type, condition and price from a photo. Null when suggestions are not available. */
   suggestListing(photo: Blob): Promise<ListingSuggestion | null>;
   sellerOrders(): Promise<Order[]>;
-  shipOrder(id: string, trackingRef: string, packingVideo: File | null): Promise<void>;
+  /** Packing proof is required: a video (15 seconds to 2 minutes) and a photo of the sealed parcel. */
+  shipOrder(id: string, trackingRef: string, packingVideo: File, packingPhoto: File): Promise<void>;
   acceptReturn(id: string): Promise<void>;
   returnReceived(id: string): Promise<void>;
   disputeReturn(id: string): Promise<void>;
@@ -432,6 +443,14 @@ export interface Api {
   teamLog(): Promise<TeamLogEntry[]>;
   teamAlerts(): Promise<TeamAlert[]>;
   markAlertsSeen(ids: string[]): Promise<void>;
+  /** Packing proof for one order. Each look is logged. */
+  teamPacking(orderId: string): Promise<PackingProof>;
+  /** Fine, or a strike with a reason the seller sees. Returns the seller's strikes in 90 days. */
+  teamPackingReview(orderId: string, ok: boolean, note?: string): Promise<number>;
+  /** Spot checks: about 1 in 20 recent shipments. */
+  teamPackingQueue(): Promise<PackingCheck[]>;
+  /** Links for a buyer who asked by email. They expire in 7 days; sharing is logged. */
+  teamPackingShare(orderId: string, note?: string): Promise<{ video: string | null; photo: string | null }>;
   /** Every feature switch for one account. */
   teamFeatures(userId: string): Promise<Record<AccountFeature, TeamFeature>>;
   /** Auto removes the switch. On and off need a reason (team only, not shown to the person). */

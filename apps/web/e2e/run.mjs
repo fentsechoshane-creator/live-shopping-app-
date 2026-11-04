@@ -629,6 +629,46 @@ try {
   await check(page.getByText(/Ends in (24|23) hours/).count().then((n) => n > 0), "offer ends in a day");
   await page.waitForTimeout(400);
   await shot("chat-offer-checkout");
+  const offerPay = page.getByRole("dialog", { name: "Checkout" });
+  await offerPay.getByRole("button", { name: "M", exact: true }).click();
+  await offerPay.getByRole("button", { name: /Free collection/ }).click();
+  await offerPay.getByRole("button", { name: /^Pay R/ }).click();
+  await page.waitForURL(/mock-pay/);
+  await page.getByRole("button", { name: "Pay now" }).click();
+  await page.waitForURL(/\/orders\//);
+
+  // ===== Packing proof: no shipping without the video and the sealed parcel photo =====
+  await signOut();
+  await signIn("lebo@shop.demo");
+  await page.goto(`${BASE}/sell/orders`);
+  await page.getByRole("link", { name: /Oversized tee/ }).first().click();
+  await page.getByText("Packing code", { exact: true }).waitFor();
+  const shipBtn = page.getByRole("button", { name: /Mark as shipped|Ready, handed over/ });
+  await check(shipBtn.isDisabled(), "can't ship without packing proof");
+  await page.getByLabel("Packing video").setInputFiles(here + "../src/assets/demo/tee.mp4");
+  await page.getByText(/Packing video added/).waitFor();
+  await check(shipBtn.isDisabled(), "still needs the parcel photo");
+  await page.getByLabel("Photo of the sealed parcel").setInputFiles(here + "../store/screenshots/raw/checkout.png");
+  await page.getByText("Photo of the sealed parcel added").waitFor();
+  await shot("packing-proof");
+  await shipBtn.click();
+  await page.getByText("Marked as shipped").waitFor();
+  // The team checks it in To do and gives a strike; the seller is told.
+  await signOut();
+  await signIn("admin@test.co.za");
+  await page.goto(`${BASE}/team/todo?f=packing`);
+  await page.getByRole("heading", { name: "Packing checks" }).waitFor();
+  await page.getByRole("button", { name: "Check" }).first().click();
+  const proof = page.getByRole("dialog", { name: "Packing proof" });
+  await proof.getByLabel("Packing video").waitFor();
+  await shot("team-packing");
+  await proof.getByRole("button", { name: "Doesn't follow the rules" }).click();
+  const why2 = page.getByRole("dialog", { name: /packing strike/ });
+  await why2.getByLabel(/seller sees this/).fill("The item was never shown out of the bag.");
+  await why2.getByRole("button", { name: "Give strike" }).click();
+  await proof.getByText("Strike given").waitFor();
+  await page.goto(`${BASE}/team/log`);
+  await page.getByText("Packing strike 1 of 3").first().waitFor();
 
   if (errors.length) throw new Error("Page errors: " + errors.join(" | "));
   if (consoleIssues.size) console.log("Console issues:\n  " + [...consoleIssues].join("\n  "));

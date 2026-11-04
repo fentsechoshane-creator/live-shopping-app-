@@ -6,7 +6,7 @@ import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate, usePa
 import { ACCOUNT_FEATURES, ORDER_STATUS_TEXT, REPORT_REASONS, type AccountFeature, type FeatureState, type OrderStatus } from "@app/core";
 import {
   api, type PeopleFilter, type TeamListing, type TeamListingFilter, type TeamOrder, type TeamOrderFilter, type TeamOverview,
-  type TeamPerson, type TeamPersonDetail, type TeamLogEntry, type TeamAlert,
+  type TeamPerson, type TeamPersonDetail, type TeamLogEntry, type TeamAlert, type PackingProof,
 } from "../../api";
 import { useLoad, useSession } from "../../session";
 import { Icon } from "../../components/Icon";
@@ -15,7 +15,7 @@ import { SignInForm } from "../buyer/Account";
 import { ErrorNote, R, dateText, dateTimeText, timeAgo, useAction } from "../../components/ui";
 
 // ===== Shared state: the counts in the side menu, refreshed after every action =====
-const TeamCtx = createContext<{ o: TeamOverview | null; alerts: TeamAlert[]; refresh: () => void }>({ o: null, alerts: [], refresh: () => {} });
+const TeamCtx = createContext<{ o: TeamOverview | null; alerts: TeamAlert[]; packing: number; refresh: () => void }>({ o: null, alerts: [], packing: 0, refresh: () => {} });
 const useTeam = () => useContext(TeamCtx);
 
 /** Runs a team action, shows a message, and refreshes the counts and the page. */
@@ -27,13 +27,13 @@ function useTeamAction(reload?: () => void) {
   return { busy, error, act, setError };
 }
 
-type NavItem = { to: string; label: string; icon: string; count?: (o: TeamOverview, alerts: TeamAlert[]) => number; urgent?: boolean };
+type NavItem = { to: string; label: string; icon: string; count?: (o: TeamOverview, alerts: TeamAlert[], packing: number) => number; urgent?: boolean };
 const todoCount = (o: TeamOverview) => o.checksWaiting + o.reportsOpen + o.returnsWaiting + o.late + o.topUpsDue;
 /** The menu, grouped by what you're doing: work to do, looking something up, keeping the app running. */
 const NAV: { group: string | null; items: NavItem[] }[] = [
   { group: null, items: [
     { to: "/team", label: "Overview", icon: "home" },
-    { to: "/team/todo", label: "To do", icon: "check", count: (o) => todoCount(o), urgent: true },
+    { to: "/team/todo", label: "To do", icon: "check", count: (o, _a, p) => todoCount(o) + p, urgent: true },
   ] },
   { group: "Look up", items: [
     { to: "/team/accounts", label: "Accounts", icon: "team" },
@@ -53,7 +53,8 @@ export function TeamApp() {
   const [o, setO] = useState<TeamOverview | null>(null);
   const [menu, setMenu] = useState(false);
   const [alerts, setAlerts] = useState<TeamAlert[]>([]);
-  const refresh = () => { api.teamOverview().then(setO).catch(() => {}); api.teamAlerts().then(setAlerts).catch(() => {}); };
+  const [packing, setPacking] = useState(0);
+  const refresh = () => { api.teamOverview().then(setO).catch(() => {}); api.teamAlerts().then(setAlerts).catch(() => {}); api.teamPackingQueue().then((q) => setPacking(q.length)).catch(() => {}); };
   useEffect(() => { if (isAdmin) refresh(); }, [isAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
   // Keep the counts fresh while the dashboard is open.
   useEffect(() => { if (!isAdmin) return; const t = window.setInterval(refresh, 60_000); return () => window.clearInterval(t); }, [isAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -80,7 +81,7 @@ export function TeamApp() {
   );
 
   return (
-    <TeamCtx.Provider value={{ o, alerts, refresh }}>
+    <TeamCtx.Provider value={{ o, alerts, packing, refresh }}>
       <div className="team">
         <aside className={`team-nav ${menu ? "open" : ""}`}>
           <div className="team-logo">myHaul <span>Team</span></div>
@@ -89,7 +90,7 @@ export function TeamApp() {
               <div key={g.group ?? "main"} className="team-nav-group">
                 {g.group && <div className="team-nav-h">{g.group}</div>}
                 {g.items.map((n) => {
-                  const c = o && n.count ? n.count(o, alerts) : 0;
+                  const c = o && n.count ? n.count(o, alerts, packing) : 0;
                   return (
                     <NavLink key={n.to} to={n.to} end={n.to === "/team"} className={({ isActive }) => `team-link ${isActive ? "on" : ""}`}>
                       <Icon name={n.icon as any} size={18} /><span className="grow">{n.label}</span>
@@ -614,7 +615,7 @@ function Returns() {
   return (
     <section className="todo-section">
       <h2>Returns</h2>
-      <p className="small muted">The seller disagreed with a return. Compare the listing video, the packing video and the buyer's photos before deciding.</p>
+      <p className="small muted">The seller disagreed with a return. Compare the listing video, the packing video and the buyer's photos. No packing video, or one that doesn't show the item clearly, means the buyer is right.</p>
       <ErrorNote error={error ?? err} />
       {rows?.length === 0 && <Empty>No returns to decide.</Empty>}
       <div className="team-grid">
@@ -624,6 +625,7 @@ function Returns() {
             <p className="small muted">{o.shop.name} · ordered {dateText(o.createdAt)}</p>
             <p><b>{o.ret?.reason.replace(/_/g, " ")}</b>{o.ret?.details ? `: “${o.ret.details}”` : ""}</p>
             <div className="row" style={{ gap: 8 }}>
+              <PackingButton orderId={o.id} />
               <button className="btn green grow" disabled={busy} onClick={() => act(() => api.decideReturn(o.id, true), "Buyer gets a refund")}>Buyer is right</button>
               <button className="btn line grow" disabled={busy} onClick={() => act(() => api.decideReturn(o.id, false), "Seller gets paid")}>Seller is right</button>
             </div>
@@ -663,7 +665,7 @@ function Orders() {
       {rows === null && !err && <div className="muted">Loading…</div>}
       {rows && rows.length > 0 && (
         <table className="tt">
-          <thead><tr><th>Item</th><th>Shop</th><th>Buyer</th><th>Total</th><th>Our fee</th><th>Status</th><th>Payout</th><th>Date</th></tr></thead>
+          <thead><tr><th>Item</th><th>Shop</th><th>Buyer</th><th>Total</th><th>Our fee</th><th>Status</th><th>Payout</th><th>Packing</th><th>Date</th></tr></thead>
           <tbody>{rows.map((o) => (
             <tr key={o.id}>
               <td data-l="Item"><b>{o.title}</b>{o.mode !== "buy_now" && <div className="small muted">{o.mode === "auction" ? "Auction" : "Made to order"}</div>}</td>
@@ -674,6 +676,7 @@ function Orders() {
               <td data-l="Status"><span className={`pill ${o.late ? "red" : ORDER_PILL[o.status] ?? ""}`}>{o.late ? "Late to ship" : orderStatus(o.status)}</span>
                 {o.returnReason && <div className="small muted">{o.returnReason.replace(/_/g, " ")}</div>}</td>
               <td data-l="Payout" className="small">{o.payoutStatus ? `${o.payoutStatus}${o.payOn ? `, ${dateText(o.payOn)}` : ""}` : "—"}</td>
+              <td data-l="Packing">{["pending_payment", "paid", "cancelled"].includes(o.status) ? <span className="small muted">Not shipped</span> : <PackingButton orderId={o.id} small />}</td>
               <td data-l="Date" className="small">{dateText(o.createdAt)}</td>
             </tr>
           ))}</tbody>
@@ -832,9 +835,9 @@ function Log() {
 
 // ===== Alerts =====
 /** Everything that needs the team, in one list. Handling an item clears it everywhere. Alerts on phones, Telegram and email point here. */
-type TodoFilter = "all" | "checks" | "reports" | "returns" | "late" | "topups";
+type TodoFilter = "all" | "checks" | "reports" | "returns" | "late" | "topups" | "packing";
 function Todo() {
-  const { o, alerts, refresh } = useTeam();
+  const { o, alerts, packing, refresh } = useTeam();
   const [params, setParams] = useSearchParams();
   const f = (params.get("f") as TodoFilter) || "all";
   const set = (v: TodoFilter) => setParams(v === "all" ? {} : { f: v }, { replace: true });
@@ -843,8 +846,8 @@ function Todo() {
     const ids = alerts.filter((a) => !a.seen).map((a) => a.id);
     if (ids.length) api.markAlertsSeen(ids).then(refresh).catch(() => {});
   }, [alerts.length]); // eslint-disable-line react-hooks/exhaustive-deps
-  const n = { checks: o?.checksWaiting ?? 0, reports: o?.reportsOpen ?? 0, returns: o?.returnsWaiting ?? 0, late: o?.late ?? 0, topups: o?.topUpsDue ?? 0 };
-  const total = n.checks + n.reports + n.returns + n.late + n.topups;
+  const n = { checks: o?.checksWaiting ?? 0, reports: o?.reportsOpen ?? 0, returns: o?.returnsWaiting ?? 0, late: o?.late ?? 0, topups: o?.topUpsDue ?? 0, packing };
+  const total = n.checks + n.reports + n.returns + n.late + n.topups + n.packing;
   const label = (t: string, c: number) => (c > 0 ? `${t} (${c})` : t);
   const show = (k: Exclude<TodoFilter, "all">) => f === k || (f === "all" && n[k] > 0);
   return (
@@ -852,7 +855,7 @@ function Todo() {
       <Head title="To do" sub="Everything that needs the team. Reports first: the app stores want an answer within 24 hours." />
       <div className="team-toolbar">
         <Filters value={f} onChange={set} options={[["all", label("All", total)], ["reports", label("Reports", n.reports)], ["checks", label("Seller checks", n.checks)],
-          ["returns", label("Returns", n.returns)], ["late", label("Late orders", n.late)], ["topups", label("Top ups", n.topups)]]} />
+          ["returns", label("Returns", n.returns)], ["late", label("Late orders", n.late)], ["topups", label("Top ups", n.topups)], ["packing", label("Packing checks", n.packing)]]} />
       </div>
       {o && f === "all" && total === 0 && <Empty>All caught up.</Empty>}
       {show("reports") && <Reports />}
@@ -860,6 +863,7 @@ function Todo() {
       {show("returns") && <Returns />}
       {show("late") && <LateOrders />}
       {show("topups") && <TopUps />}
+      {show("packing") && <PackingChecks />}
       {alerts.length > 0 && (
         <details className="team-card todo-sent">
           <summary><b>Alerts we sent</b> <span className="small muted">to the team's phones, Telegram and email</span></summary>
@@ -894,6 +898,83 @@ function LateOrders() {
           ))}</tbody>
         </table>
       )}
+    </section>
+  );
+}
+
+/** Opens one order's packing proof. */
+function PackingButton({ orderId, small }: { orderId: string; small?: boolean }) {
+  const [open, setOpen] = useState(false);
+  return <>
+    <button className={`btn line ${small ? "small" : "grow"}`} onClick={() => setOpen(true)}>Packing proof</button>
+    {open && <PackingDialog orderId={orderId} onClose={() => setOpen(false)} />}
+  </>;
+}
+
+/** The video, the parcel photo and the code, with the team's verdict and a link to send a buyer who asked. */
+function PackingDialog({ orderId, onClose, onDone }: { orderId: string; onClose: () => void; onDone?: () => void }) {
+  const [p, err, reload] = useLoad<PackingProof>(() => api.teamPacking(orderId), [orderId]);
+  const { busy, error, act } = useTeamAction(() => { reload(); onDone?.(); });
+  const [strike, setStrike] = useState(false);
+  const share = () => act(async () => {
+    const l = await api.teamPackingShare(orderId, "Buyer asked by email");
+    const text = [l.video && `Packing video: ${l.video}`, l.photo && `Sealed parcel photo: ${l.photo}`].filter(Boolean).join("\n");
+    await navigator.clipboard?.writeText(text).catch(() => {});
+  }, "Links copied. They expire in 7 days.");
+  return (
+    <div className="team-modal-scrim" onClick={onClose}>
+      <div className="team-modal wide" role="dialog" aria-label="Packing proof" onClick={(e) => e.stopPropagation()}>
+        <div className="row between"><h2>Packing proof</h2><button className="icon-btn" aria-label="Close" onClick={onClose}><Icon name="close" /></button></div>
+        <ErrorNote error={err ?? error} />
+        {!p ? <div className="muted">Loading…</div> : p.purgedAt ? <p className="muted">Deleted on {dateText(p.purgedAt)}, 6 months after delivery.</p> : !p.videoUrl && !p.photoUrl ? (
+          <p className="muted">No packing proof on this order. {api.mode === "demo" ? "(Demo: proof is kept on the phone that shipped it.)" : "Orders shipped before packing proof was required have none. In a dispute, the buyer is right."}</p>
+        ) : (
+          <>
+            <p className="small">Code to look for: <b>{p.code}</b> · shipped {p.shippedAt ? dateTimeText(p.shippedAt) : "—"} · this shop has <b>{p.strikes90}</b> {p.strikes90 === 1 ? "strike" : "strikes"} in 90 days</p>
+            <div className="pack-media">
+              {p.videoUrl && <video src={p.videoUrl} controls playsInline preload="metadata" aria-label="Packing video" />}
+              {p.photoUrl && <img src={p.photoUrl} alt="Sealed parcel" />}
+            </div>
+            <p className="small muted">Check: the code shows, the item is shown from every side with any flaws, it goes into the parcel, and the parcel is sealed with the code visible.</p>
+            {p.review && <p><span className={`pill ${p.review === "ok" ? "green" : "red"}`}>{p.review === "ok" ? "Checked: fine" : "Strike given"}</span> <span className="small muted">{p.reviewedAt ? timeAgo(p.reviewedAt) : ""}</span></p>}
+            <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+              {!p.review && <button className="btn green" disabled={busy} onClick={() => act(() => api.teamPackingReview(orderId, true), "Marked as fine")}>Looks fine</button>}
+              {p.review !== "strike" && <button className="btn danger" disabled={busy} onClick={() => setStrike(true)}>Doesn't follow the rules</button>}
+              <button className="btn line" disabled={busy} onClick={share}>Copy links for the buyer (7 days)</button>
+            </div>
+          </>
+        )}
+        {strike && <ReasonDialog title="Give a packing strike?" confirm="Give strike" busy={busy} onCancel={() => setStrike(false)}
+          body="1st strike is a warning. 2nd loses trust points. 3rd in 90 days pauses their listings. They're told why."
+          reasonLabel="What was wrong (the seller sees this)" placeholder="For example: The item was never shown out of the bag."
+          onConfirm={(r) => { setStrike(false); act(() => api.teamPackingReview(orderId, false, r), "Strike given. The seller has been told."); }} />}
+      </div>
+    </div>
+  );
+}
+
+/** Spot checks: some recent shipments, picked at random, to catch bad packing habits before a dispute does. */
+function PackingChecks() {
+  const [rows, err, reload] = useLoad(() => api.teamPackingQueue(), []);
+  const { refresh } = useTeam();
+  const [open, setOpen] = useState<string | null>(null);
+  return (
+    <section className="todo-section">
+      <h2>Packing checks</h2>
+      <p className="small muted">Random shipments from the last 2 weeks. Watch the video: code, every side of the item, sealed parcel.</p>
+      <ErrorNote error={err} />
+      {rows?.length === 0 && <Empty>No packing checks waiting.</Empty>}
+      {rows && rows.length > 0 && (
+        <table className="tt">
+          <thead><tr><th>Item</th><th>Shop</th><th>Code</th><th>Shipped</th><th aria-label="Actions" /></tr></thead>
+          <tbody>{rows.map((r) => (
+            <tr key={r.orderId}><td data-l="Item"><b>{r.title}</b></td><td data-l="Shop"><Link to={`/team/accounts/${r.sellerId}`}>{r.shopName}</Link></td>
+              <td data-l="Code">{r.code}</td><td data-l="Shipped" className="small">{timeAgo(r.shippedAt)}</td>
+              <td data-l=""><button className="btn dark small" onClick={() => setOpen(r.orderId)}>Check</button></td></tr>
+          ))}</tbody>
+        </table>
+      )}
+      {open && <PackingDialog orderId={open} onClose={() => setOpen(null)} onDone={() => { reload(); refresh(); }} />}
     </section>
   );
 }

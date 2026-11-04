@@ -37,12 +37,22 @@ Deno.serve(handler(async (req, body) => {
     }
     case "ship": {
       if (!isSeller || order.status !== "paid") throw new UserError("Only paid orders can be shipped.");
-      const { trackingRef, packingMediaId } = body;
+      const { trackingRef, packingMediaId, packingPhotoMediaId } = body;
+      // Packing proof is required for every order, courier or collection (migration 0023 checks it again).
+      if (!packingMediaId || !packingPhotoMediaId) throw new UserError("Add the packing video and the photo of the sealed parcel before shipping.");
       if (order.delivery === "courier" || order.delivery === "pudo_locker") {
         if (!trackingRef) throw new UserError("Add the tracking number.");
       }
+      // Check the proof before escrow is told the item is on its way (the database checks it again when the status changes).
+      const { data: proof } = await db.from("media").select("id, owner_id, kind, created_at").in("id", [packingMediaId, packingPhotoMediaId]);
+      const v = proof?.find((m: any) => m.id === packingMediaId), p = proof?.find((m: any) => m.id === packingPhotoMediaId);
+      if (!v || !p || v.owner_id !== uid || p.owner_id !== uid || v.kind !== "video" || p.kind !== "image"
+          || new Date(v.created_at) < new Date(order.paid_at) || new Date(p.created_at) < new Date(order.paid_at)) {
+        throw new UserError("Film the packing video and photo for this order in the app, after it was paid.");
+      }
+      must(await db.from("orders").update({ packing_media_id: packingMediaId, packing_photo_media_id: packingPhotoMediaId }).eq("id", orderId).eq("status", "paid"), "packing proof");
       await es.startDelivery(order.escrow_allocation_id);
-      await setStatus("shipped", { tracking_ref: trackingRef ?? null, packing_media_id: packingMediaId ?? null });
+      await setStatus("shipped", { tracking_ref: trackingRef ?? null });
       break;
     }
     case "accept_return": {

@@ -19,7 +19,8 @@ interface DProduct extends ProductPublic { shopId: string; proofStatus: ReviewSt
   auctionEndsAt?: string | null; reserveCents?: number | null; auctionState?: AuctionInfo["state"]; auctionRound?: number;
   auctionWinner?: string | null; auctionPriceCents?: number | null; auctionPayBy?: string | null }
 interface DPost { id: string; shopId: string; productId: string; caption: string; video: FeedItem["video"]; createdAt: string; photos?: string[] }
-interface DOrder extends Order { shopOwnerId: string; bundleIds?: string[]; offerId?: string | null }
+interface DOrder extends Order { shopOwnerId: string; bundleIds?: string[]; offerId?: string | null;
+  packingVideo?: string; packingPhoto?: string; packingReview?: "ok" | "strike"; packingReviewedAt?: string }
 interface DUser extends User { trust: number; welcomeUsed: boolean; admin: boolean; createdAt?: string; bio?: string;
   handle?: string | null; avatar?: string | null; handleChangedAt?: string | null; adult?: boolean; terms?: boolean }
 type DPayout = Payout & { shopId: string; topUpCents: number; topUpPaid: boolean };
@@ -39,6 +40,7 @@ interface State {
   errors?: AppError[];
   bids?: { id: string; productId: string; round: number; bidderId: string; amountCents: number; at: string }[];
   suspensions?: Record<string, { reason: string; at: string }>;
+  packingStrikes?: { shopId: string; orderId: string; note: string; at: string }[];
   features?: Record<string, Partial<Record<AccountFeature, { state: "on" | "off"; reason: string; at: string; by: string }>>>;
   teamLog?: TeamLogEntry[];
   trustLog?: { userId: string; kind: string; points: number; at: string }[];
@@ -155,8 +157,12 @@ async function loadBlobs(): Promise<Map<string, string>> {
   return out;
 }
 
+/** A 4 digit code per order, like the database makes. */
+const packingCodeFor = (id: string) => "MH " + String([...id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 10000, 7)).padStart(4, "0");
+
 export function createDemoApi(): Api {
   let s = load();
+  s.orders.forEach((o) => { o.packingCode = o.packingCode ?? packingCodeFor(o.id); });
   let blobUrls = new Map<string, string>();
   const mediaReady = loadBlobs().then((m) => { blobUrls = m; });
   const mediaUrl = (u: string | null | undefined) => (u?.startsWith("idb:") ? blobUrls.get(u.slice(4)) ?? null : u ?? null);
@@ -459,7 +465,7 @@ export function createDemoApi(): Api {
       const o: DOrder = {
         id: oid, status: "pending_payment", mode: p.mode, product: { id: p.id, title }, bundleIds, offerId: input.offerId ?? null, shop: { id: sh.id, name: sh.name, handle: sh.handle },
         buyerId: u.id, shopOwnerId: sh.ownerId, size: input.size ?? null, delivery: input.delivery, deliveryDetails: input.deliveryDetails as Record<string, string>,
-        foodDate: input.foodDate ?? null, foodSlot: input.foodSlot ?? null, totals, checkoutUrl: `/mock-pay/${oid}`, trackingRef: null,
+        foodDate: input.foodDate ?? null, foodSlot: input.foodSlot ?? null, totals, checkoutUrl: `/mock-pay/${oid}`, trackingRef: null, packingCode: packingCodeFor(oid),
         paidAt: null, shipBy: null, shippedAt: null, deliveredAt: null, releasableAt: null, createdAt: now().toISOString(), ret: null, review: null,
       };
       s.orders.unshift(o);
@@ -1027,13 +1033,19 @@ export function createDemoApi(): Api {
       const sh = myShopRow();
       return sh ? s.orders.filter((o) => o.shop.id === sh.id && o.status !== "pending_payment") : [];
     },
-    async shipOrder(oid, trackingRef, packingVideo) {
+    async shipOrder(oid, trackingRef, packingVideo, packingPhoto) {
       const o = s.orders.find((x) => x.id === oid && x.shopOwnerId === me().id);
       if (!o || o.status !== "paid") throw new Error("Only paid orders can be shipped.");
+      if (!packingVideo || !packingPhoto) throw new Error("Add the packing video and the photo of the sealed parcel before shipping.");
       if ((o.delivery === "courier" || o.delivery === "pudo_locker") && !trackingRef) throw new Error("Add the tracking number.");
+      // Kept on this phone, like the private bucket on the server.
+      for (const [k, f] of [[`packing-video-${oid}`, packingVideo], [`packing-photo-${oid}`, packingPhoto]] as const) {
+        keepBlob(k, f); blobUrls.set(k, URL.createObjectURL(f));
+      }
+      o.packingVideo = `packing-video-${oid}`; o.packingPhoto = `packing-photo-${oid}`;
       o.trackingRef = trackingRef || null;
       setStatus(o, "shipped");
-      if (packingVideo && o.paidAt && now().getTime() - new Date(o.paidAt).getTime() <= 48 * 3600e3) trust(o.shopOwnerId, "fast_ship_with_video");
+      if (o.paidAt && now().getTime() - new Date(o.paidAt).getTime() <= 48 * 3600e3) trust(o.shopOwnerId, "fast_ship_with_video");
       save();
     },
     async acceptReturn(oid) {
@@ -1251,6 +1263,56 @@ export function createDemoApi(): Api {
       teamOnly();
       (s.alerts ?? []).forEach((a) => { if (ids.includes(a.id)) a.seen = true; });
       save();
+    },
+    async teamPacking(oid) {
+      teamOnly();
+      const o = s.orders.find((x) => x.id === oid);
+      if (!o) throw new Error("Order not found.");
+      if (o.packingVideo) logTeam("Viewed packing proof", "order", oid);
+      const since = now().getTime() - 90 * 86400e3;
+      return { orderId: oid, code: o.packingCode, videoUrl: o.packingVideo ? blobUrls.get(o.packingVideo) ?? null : null,
+        photoUrl: o.packingPhoto ? blobUrls.get(o.packingPhoto) ?? null : null, shippedAt: o.shippedAt, review: o.packingReview ?? null,
+        reviewedAt: o.packingReviewedAt ?? null, purgedAt: null,
+        strikes90: (s.packingStrikes ?? []).filter((x) => x.shopId === o.shop.id && new Date(x.at).getTime() > since).length };
+    },
+    async teamPackingReview(oid, ok, note) {
+      teamOnly();
+      const o = s.orders.find((x) => x.id === oid);
+      if (!o) throw new Error("Order not found.");
+      if (!o.packingVideo) throw new Error("This order has no packing video.");
+      o.packingReviewedAt = now().toISOString();
+      if (ok) { o.packingReview = "ok"; logTeam("Packing video OK", "order", oid); save(); return 0; }
+      if (!note?.trim()) throw new Error("Say what was wrong. The seller sees it.");
+      s.packingStrikes = s.packingStrikes ?? [];
+      if (s.packingStrikes.some((x) => x.orderId === oid)) throw new Error("This order already has a strike.");
+      s.packingStrikes.push({ shopId: o.shop.id, orderId: oid, note: note.trim(), at: now().toISOString() });
+      o.packingReview = "strike";
+      const since = now().getTime() - 90 * 86400e3;
+      const n = s.packingStrikes.filter((x) => x.shopId === o.shop.id && new Date(x.at).getTime() > since).length;
+      if (n === 1) notify(o.shopOwnerId, `Packing warning: ${o.product.title}`, `${note.trim()} Show the code, every side of the item and the sealing. 3 strikes in 90 days pauses your listings.`, `/sell/orders/${oid}`);
+      else if (n === 2) { trust(o.shopOwnerId, "packing_strike"); notify(o.shopOwnerId, `Second packing strike: ${o.product.title}`, `${note.trim()} You lost trust points. One more in 90 days pauses your listings.`, `/sell/orders/${oid}`); }
+      else {
+        s.features = s.features ?? {};
+        (s.features[o.shopOwnerId] = s.features[o.shopOwnerId] ?? {}).sell = { state: "off", reason: `${n} packing strikes in 90 days`, at: now().toISOString(), by: me().handle ?? "team" };
+        notify(o.shopOwnerId, "Listings paused: packing rules", `${note.trim()} That is ${n} packing strikes in 90 days. Email help@myhaul.co.za to talk to us.`, `/sell/orders/${oid}`);
+      }
+      logTeam(`Packing strike ${n} of 3`, "order", oid, note.trim());
+      save();
+      return n;
+    },
+    async teamPackingQueue() {
+      teamOnly();
+      // The demo has few orders, so every unchecked shipment shows (the server picks about 1 in 20).
+      return s.orders.filter((o) => o.packingVideo && !o.packingReview && o.shippedAt).map((o) => ({
+        orderId: o.id, title: o.product.title, shopName: o.shop.name, sellerId: o.shopOwnerId, shippedAt: o.shippedAt!, code: o.packingCode }));
+    },
+    async teamPackingShare(oid, note) {
+      teamOnly();
+      const o = s.orders.find((x) => x.id === oid);
+      if (!o) throw new Error("Order not found.");
+      logTeam("Shared packing proof (7 day link)", "order", oid, note?.trim() || null);
+      save();
+      return { video: o.packingVideo ? blobUrls.get(o.packingVideo) ?? null : null, photo: o.packingPhoto ? blobUrls.get(o.packingPhoto) ?? null : null };
     },
     async teamFeatures(uid) {
       teamOnly();

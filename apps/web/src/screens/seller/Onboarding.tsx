@@ -14,7 +14,7 @@ const CATEGORIES: { id: Category; title: string; sub: string }[] = [
 ];
 const BANKS = ["Absa", "Capitec", "FNB", "Nedbank", "Standard Bank", "TymeBank", "African Bank", "Discovery Bank", "Investec"];
 const RULES = [
-  ["Pack every order on video", "It protects you if a buyer says something was missing."],
+  ["Pack every order on video", "Before you can ship: a short video in the app showing the order code, the item from every side and the parcel being sealed, plus a photo of the sealed parcel. No video loses a dispute; 3 bad videos in 90 days pauses your listings."],
   ["Show every flaw", "Items that do not match the listing can be returned."],
   ["Ship within 2 days", "Unshipped orders are refunded automatically after 3 days."],
   ["No fakes or replicas", "Copies of brands are counterfeit goods. Your shop is closed if you sell them."],

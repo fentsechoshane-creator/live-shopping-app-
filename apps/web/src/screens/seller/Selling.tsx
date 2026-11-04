@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import {
-  canUse, DELIVERY_OPTIONS, LISTING_LABELS, rand, TIER_INFO, tierFor, TRUST_POINTS, validateListing,
+  canUse, DELIVERY_OPTIONS, PACKING_KEEP_MONTHS, PACKING_STEPS, PACKING_VIDEO_MAX_S, PACKING_VIDEO_MIN_S, packingVideoProblems, LISTING_LABELS, rand, TIER_INFO, tierFor, TRUST_POINTS, validateListing,
   type Condition, type ListingLabel,
 } from "@app/core";
 import { api, type MyShop } from "../../api";
@@ -56,6 +56,17 @@ export function SellerOrderDetail() {
   const [o, error, reload] = useLoad(() => api.order(id), [id]);
   const [tracking, setTracking] = useState("");
   const [packing, setPacking] = useState<File | null>(null);
+  const [packSecs, setPackSecs] = useState<number | null>(null);
+  const [parcel, setParcel] = useState<File | null>(null);
+  // Read the video's length on the phone, before uploading. Some formats can't be read in a browser: then the server decides.
+  const pickVideo = (f: File | null) => {
+    setPacking(f); setPackSecs(null);
+    if (!f) return;
+    const url = URL.createObjectURL(f); const v = document.createElement("video");
+    v.preload = "metadata"; v.onloadedmetadata = () => { if (isFinite(v.duration)) setPackSecs(Math.round(v.duration)); URL.revokeObjectURL(url); };
+    v.onerror = () => URL.revokeObjectURL(url); v.src = url;
+  };
+  const packProblems = packing ? packingVideoProblems(packSecs, packing.size) : [];
   const { busy, error: actErr, run } = useAction();
   const { toast } = useSession();
   const copy = (text: string) => navigator.clipboard?.writeText(text).then(() => toast("Copied"), () => toast("Couldn't copy"));
@@ -89,11 +100,29 @@ export function SellerOrderDetail() {
             </div>
           )}
           {o.foodDate && <div className="note" style={{ marginBottom: 12 }}>For {o.foodDate}, {o.foodSlot}</div>}
-          <Field label="Packing video" hint="Earns a trust point when you ship within 2 days, and protects you in a dispute.">
-            <input type="file" accept="video/*" capture="environment" onChange={(e) => setPacking(e.target.files?.[0] ?? null)} />
-          </Field>
+          {/* Packing proof: required before any order ships or is handed over. No approval needed. */}
+          <div className="pack">
+            <div className="pack-code"><span>Packing code</span><b>{o.packingCode ?? "—"}</b><small>Write it on the parcel or a slip inside</small></div>
+            <b className="pack-h">Film one video, {PACKING_VIDEO_MIN_S} seconds to {PACKING_VIDEO_MAX_S / 60} minutes:</b>
+            <ol className="pack-steps">{PACKING_STEPS.map((t) => <li key={t}>{t}</li>)}</ol>
+            <p className="small muted">Film only your hands and the item, not your face or your home. We keep it for {PACKING_KEEP_MONTHS} months and only use it if there's a problem with the order. No video, or one that doesn't show the item clearly, means you lose a dispute.</p>
+            <label className={`pack-pick ${packing && !packProblems.length ? "done" : ""}`}>
+              <Icon name={packing && !packProblems.length ? "check" : "play"} size={18} />
+              <span className="grow">{packing ? `Packing video added${packSecs != null ? ` (${packSecs} seconds)` : ""}` : "Film the packing video"}</span>
+              {packing && <span className="link">Redo</span>}
+              <input type="file" accept="video/*" capture="environment" aria-label="Packing video" onChange={(e) => pickVideo(e.target.files?.[0] ?? null)} />
+            </label>
+            {packProblems.map((p) => <div key={p} className="error small">{p}</div>)}
+            <label className={`pack-pick ${parcel ? "done" : ""}`}>
+              <Icon name={parcel ? "check" : "bag"} size={18} />
+              <span className="grow">{parcel ? "Photo of the sealed parcel added" : "Photo of the sealed parcel, label showing"}</span>
+              {parcel && <span className="link">Redo</span>}
+              <input type="file" accept="image/*" capture="environment" aria-label="Photo of the sealed parcel" onChange={(e) => setParcel(e.target.files?.[0] ?? null)} />
+            </label>
+          </div>
           {needsTracking && <Field label="Tracking number"><input value={tracking} onChange={(e) => setTracking(e.target.value.toUpperCase())} autoCapitalize="characters" autoCorrect="off" spellCheck={false} /></Field>}
-          <button className="btn green block" disabled={busy || (needsTracking && !tracking)} onClick={() => act(() => api.shipOrder(o.id, tracking, packing), "Marked as shipped")}>
+          <button className="btn green block" disabled={busy || !packing || !parcel || packProblems.length > 0 || (needsTracking && !tracking)}
+            onClick={() => packing && parcel && act(() => api.shipOrder(o.id, tracking, packing, parcel), "Marked as shipped")}>
             {o.mode === "order_now" ? "Ready, handed over" : "Mark as shipped"}
           </button>
         </div>

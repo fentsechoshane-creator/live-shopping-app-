@@ -2,6 +2,7 @@
 // 1. Refund paid orders that were not shipped within 72 hours.
 // 2. Close the return window on delivered orders with no claim (status completed).
 // 3. Schedule payouts for completed orders by the seller's trust tier.
+// Also: delete packing proof 6 months after delivery.
 // 4. Release payouts that are due (escrow pays the seller).
 // 5. Close ended auctions (winner has 2 hours to pay).
 // 6. Cancel checkouts left unpaid for 24 hours, and accept change of mind returns the seller ignored for 3 days.
@@ -71,6 +72,19 @@ Deno.serve(async (req) => {
     } catch (e) {
       console.error("release failed", p.id, e);
       done.failed++;
+    }
+  }
+
+  // Packing proof older than 6 months after delivery (and no return open) is deleted: files first, then the records.
+  const { data: purge } = await db.rpc("packing_due_purge");
+  const purgeRows = (purge ?? []) as { order_id: string; paths: string[] }[];
+  if (purgeRows.length) {
+    const paths = purgeRows.flatMap((r) => r.paths ?? []);
+    const { error } = paths.length ? await db.storage.from("private").remove(paths) : { error: null };
+    if (error) console.error("packing purge", error.message);
+    else {
+      must(await db.rpc("packing_mark_purged", { p_orders: purgeRows.map((r) => r.order_id) }), "mark packing purged");
+      (done as any).packingPurged = purgeRows.length;
     }
   }
 

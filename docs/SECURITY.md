@@ -39,6 +39,7 @@ Based on the OWASP Top 10 (2025), the OWASP API Security Top 10, Supabase's prod
 | 2.8 | Team functions used by non team members | Every team function checks `is_admin()` first; tested. | [x] |
 | 2.9 | Functions running with a changeable search path | All security definer functions set `search_path = public`. Checked by the Supabase advisor. | [x] |
 | 2.10 | Feature switches (0021) used to skip checks or set by users | Only the team can set them (`admin_set_feature` checks `is_admin()`); users can't write the table and can't read the team's reason. "On" is allowed only for milestones (auctions, Live, feed, payouts), never for ID, bank, food certificate, designer proof, 18+ or suspensions; the database refuses it. Every block is a database trigger, not just the app. Every change is logged. Tested. | [x] 0021 |
+| 2.11 | Packing proof (0023) faked, reused or leaked | Shipping needs a video and a photo that the seller uploaded after payment, checked by the server and again by the database. Files live in the private bucket (seller and team only); buyers only get links that expire in 7 days, sent by the team; views and shares are logged; deleted after 6 months. Sellers are told to film only hands and the item (POPIA). Tested. | [x] 0023 |
 
 ## 3. Accounts and sign in
 

@@ -946,3 +946,18 @@ button.g3 { border: 0; padding: 0; display: block; width: 100%; }
 /* Pull to refresh hint at the top of the Inbox */
 .pull-hint { display: flex; align-items: flex-end; justify-content: center; padding-bottom: 8px; font-size: 13px; color: var(--ink-3); overflow: hidden; }
 .menu-h { font-size: 12.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-3); margin: 16px 4px 6px; }
+/* Packing proof on the seller's order */
+.pack { display: flex; flex-direction: column; gap: 10px; margin: 4px 0 14px; }
+.pack-code { display: flex; flex-direction: column; align-items: center; padding: 12px; border-radius: var(--r); background: var(--surface-2); text-align: center; }
+.pack-code span { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-3); }
+.pack-code b { font-size: 30px; letter-spacing: 0.06em; font-variant-numeric: tabular-nums; }
+.pack-code small { color: var(--ink-3); }
+.pack-h { font-size: 14.5px; }
+.pack-steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+.pack-pick { position: relative; display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 14px; border-radius: var(--r); border: 1.5px dashed var(--hairline-strong, var(--hairline)); font-weight: 650; cursor: pointer; }
+.pack-pick.done { border-style: solid; border-color: var(--green); background: var(--green-soft); color: var(--green-text); }
+.pack-pick input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.team-modal.wide { max-width: 720px; max-height: 92vh; overflow-y: auto; }
+.pack-media { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 10px; margin: 10px 0; }
+.pack-media video, .pack-media img { width: 100%; max-height: 52vh; object-fit: contain; background: #000; border-radius: 12px; }
+@media (max-width: 560px) { .pack-media { grid-template-columns: minmax(0, 1fr); } }

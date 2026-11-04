@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   rand, formatRand, protectionFee, orderTotals, sellerFee, releasableAt, payoutDate, nextFriday, addWorkingDays,
-  reserveFor, scoreFrom, tierFor, canUse, canForceOn, validateListing, canTransition, returnReasonsFor, shipBy,
+  reserveFor, scoreFrom, tierFor, canUse, canForceOn, packingVideoProblems, validateListing, canTransition, returnReasonsFor, shipBy,
   liveStock, goLiveBlockers, MIN_LIVE_STOCK, isRude, looksOffApp, bidStep, nextMinBid, reserveProblem, timeLeft, maskHandle,
 } from "../src/index.ts";
 
@@ -102,6 +102,15 @@ describe("trust score", () => {
     expect(tierFor(70)).toBe("trusted");
     expect(tierFor(40)).toBe("standard");
     expect(tierFor(39)).toBe("restricted");
+  });
+});
+
+describe("packing proof", () => {
+  it("checks the video length and size before upload", () => {
+    expect(packingVideoProblems(30, 20e6)).toEqual([]);
+    expect(packingVideoProblems(8, 5e6)[0]).toMatch(/too short/);
+    expect(packingVideoProblems(150, 20e6)[0]).toMatch(/too long/);
+    expect(packingVideoProblems(60, 200e6)[0]).toMatch(/too big/);
   });
 });
 

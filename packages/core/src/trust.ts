@@ -13,6 +13,7 @@ export type TrustEventKind =
   | "not_shipped"
   | "off_app_payment"
   | "unpaid_auction_win"
+  | "packing_strike"
   | "return_claim_rejected"
   | "fake_reviews_or_shill_bidding";
 
@@ -28,6 +29,7 @@ export const TRUST_POINTS: Record<TrustEventKind, number> = {
   not_shipped: -5,
   off_app_payment: -10,
   unpaid_auction_win: -10,
+  packing_strike: -5,
   return_claim_rejected: -10,
   fake_reviews_or_shill_bidding: -20,
 };

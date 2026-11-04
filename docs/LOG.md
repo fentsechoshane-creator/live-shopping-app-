@@ -65,7 +65,7 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 
 ## Next up
 
-- **Before the store upload:** apply migrations 0017 to 0021 live; deploy and schedule `team-alerts` and `push-notifications` (docs/SETUP.md steps 9 and 10); fill in the company details in `terms.html` and `privacy.html`; set up help@myhaul.co.za; make the reviewer account (docs/STORE.md). [Lehloma, Ofentse]
+- **Before the store upload:** apply migrations 0017 to 0023 live (and redeploy order-action and run-due); deploy and schedule `team-alerts` and `push-notifications` (docs/SETUP.md steps 9 and 10); fill in the company details in `terms.html` and `privacy.html`; set up help@myhaul.co.za; make the reviewer account (docs/STORE.md). [Lehloma, Ofentse]
 - **Alerts:** apply 0019 live, deploy and schedule `team-alerts` (docs/SETUP.md step 9), add the phone (Firebase and Apple), Telegram and email secrets. [Lehloma]
 - **Security:** apply 0018 live with 0017; set `TRADESAFE_MODE=mock` in Supabase secrets while testing (payments are refused without it); deploy the changed functions (checkout, escrow-webhook, run-due, suggest-listing). Then the open items in docs/SECURITY.md: team two step sign in, CAPTCHA at sign up, backups. [Lehloma, Ofentse]
 - **Team dashboard live:** apply migration 0017 to the live database and make Ofentse's account (@shups) a team member. [Ofentse to approve]
@@ -102,6 +102,17 @@ Debug as we go: anyone who finds or fixes a problem updates this list. Highest r
 Fixed in this round: Safari double back on the edge swipe (now only in the installed app), deleting an account now also deletes the person's photos and videos, React Router warnings.
 
 ## Log
+
+### 2026-11-04: Packing proof before shipping
+
+- Decided with Ofentse: every order (courier, locker and collections) needs packing proof before it can be shipped or handed over: one video in the app, 15 seconds to 2 minutes, showing the order's packing code (like MH 4821, written on the parcel), the item from every side with flaws and labels, the item going in and the parcel sealed; plus a photo of the sealed parcel with its label. No approval from us.
+- Enforced by the server and the database (migration 0023): the seller's own files, uploaded after payment. The Ship button stays locked until both are in.
+- Strikes: the team marks a video "Doesn't follow the rules" with a reason the seller sees. 1st a warning, 2nd loses 5 trust points (new trust event `packing_strike`, migration 0022), 3rd in 90 days pauses listing (the "Listing items" switch). A missing or unclear video loses the seller a dispute (Terms of Use section 7).
+- Spot checks: about 1 in 20 shipments from the last 2 weeks show in To do, Packing checks. The proof also opens from Returns and from every order on Orders.
+- Kept 6 months after delivery (longer while a return is open), then run-due deletes the files and records. Buyers get it only by emailing us; the team copies links that expire in 7 days. Views and shares are in the activity log.
+- Terms, Privacy Policy and the seller rules at shop opening are updated.
+- Bug fixed: the private storage bucket only took photos and PDFs up to 10 MB, so packing videos were refused. Now up to 100 MB with video types. [CONFIRM the Supabase plan allows 100 MB files: the free plan stops at 50 MB.]
+- Open: apply 0022 and 0023 live after 0017 to 0021; redeploy order-action and run-due. [Lehloma]
 
 ### 2026-11-04: Navigation round (app and dashboard)
 

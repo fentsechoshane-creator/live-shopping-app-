@@ -67,7 +67,7 @@ Never put secret keys in the web app, in chat, or in git. Only `VITE_` values go
    - Phone (the myHaul app): Android needs `FCM_SERVICE_ACCOUNT` (the whole JSON from Firebase > Project settings > Service accounts). iPhone needs `APNS_KEY` (the .p8 text), `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_BUNDLE_ID`, and `APNS_PRODUCTION=true` for App Store builds. Team members install the app, sign in and allow notifications. The same keys will send order notifications to buyers and sellers later.
    - Telegram: make a bot with @BotFather, add it to a team group, then set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`.
    - Email: `RESEND_API_KEY` (resend.com), `ALERT_EMAILS` (comma separated), `ALERT_FROM` (an address on a domain verified in Resend).
-10. Phone notifications for buyers and sellers (orders, messages, bids) every minute, same secret and the same phone keys as above. Needs migration 0020. (Apply migrations in order up to 0021, the feature switches.)
+10. Phone notifications for buyers and sellers (orders, messages, bids) every minute, same secret and the same phone keys as above. Needs migration 0020. (Apply migrations in order up to 0023: feature switches, then packing proof.) Packing videos can be up to 100 MB: on the Supabase free plan the upload limit is 50 MB, so raise it under Storage settings on a paid plan [CONFIRM plan].
     ```sql
     select cron.schedule('push-notifications', '* * * * *', $$
       select net.http_post(url := 'https://<ref>.supabase.co/functions/v1/push-notifications',
