@@ -65,7 +65,7 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 
 ## Next up
 
-- **Before the store upload:** apply migrations 0017 to 0024 live (and redeploy order-action, run-due and checkout); deploy and schedule `team-alerts` and `push-notifications` (docs/SETUP.md steps 9 and 10); fill in the company details in `terms.html` and `privacy.html`; set up help@myhaul.co.za; make the reviewer account (docs/STORE.md). [Lehloma, Ofentse]
+- **Before the store upload:** apply migrations 0017 to 0025 live and redeploy all server functions; deploy and schedule `team-alerts` and `push-notifications` (docs/SETUP.md steps 9 and 10); fill in the company details in `terms.html` and `privacy.html`; set up help@myhaul.co.za; make the reviewer account (docs/STORE.md). [Lehloma, Ofentse]
 - **Alerts:** apply 0019 live, deploy and schedule `team-alerts` (docs/SETUP.md step 9), add the phone (Firebase and Apple), Telegram and email secrets. [Lehloma]
 - **Security:** apply 0018 live with 0017; set `TRADESAFE_MODE=mock` in Supabase secrets while testing (payments are refused without it); deploy the changed functions (checkout, escrow-webhook, run-due, suggest-listing). Then the open items in docs/SECURITY.md: team two step sign in, CAPTCHA at sign up, backups. [Lehloma, Ofentse]
 - **Team dashboard live:** apply migration 0017 to the live database and make Ofentse's account (@shups) a team member. [Ofentse to approve]
@@ -102,6 +102,15 @@ Debug as we go: anyone who finds or fixes a problem updates this list. Highest r
 Fixed in this round: Safari double back on the edge swipe (now only in the installed app), deleting an account now also deletes the person's photos and videos, React Router warnings.
 
 ## Log
+
+### 2026-11-05: Attacker style security review, swipe lesson
+
+- Welcome now ends with a TikTok style "Swipe up for more" lesson over the feed. Swiping it away (or scrolling, or the down arrow on a laptop) starts the first video the ranking picked; there's no Get started button.
+- Four reviewers attacked local copies as attackers would (database, server functions, app and hosting, fraud). 22 holes found and closed: see docs/SECURITY.md section 10. Biggest: packing proof could be faked with empty rows; trust and rewards could be farmed with cheap fake orders; a stolen seller account could redirect payouts; suspended sellers were still paid; two payers for the last item hurt the seller; rate limits could be dodged by backdating.
+- Changes to the rules decided earlier, for safety: rewards are only earned on courier or locker orders with tracking (not collections) [CONFIRM with Ofentse]; trust and the 5 good orders for auctions only count orders of R100 or more, once per buyer.
+- TradeSafe: only "funds received" (cleared) counts as paid, per TradeSafe's own docs.
+- Packages upgraded and pinned (react-router 7, vite 6, vitest 4): `npm audit` shows 0 vulnerabilities. `.npmrc` sets legacy-peer-deps because of an npm bug with vitest 4's optional add-ons. Server functions pinned by `supabase/functions/deno.lock`.
+- Open: apply 0025 live after 0017 to 0024 and redeploy checkout, order-action, run-due, seller-bank, mux-upload, team-alerts, escrow-webhook. [Lehloma]
 
 ### 2026-11-04: Surprise rewards replace the welcome credit
 

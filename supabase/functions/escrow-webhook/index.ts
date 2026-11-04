@@ -4,9 +4,7 @@
 // We never trust the message itself: we ask TradeSafe for the transaction's real state before marking anything paid.
 import { json, env, sameSecret } from "../_shared/http.ts";
 import { adminClient } from "../_shared/supabase.ts";
-import { escrow } from "../_shared/escrow.ts";
-
-const PAID_STATES = ["FUNDS_RECEIVED", "FUNDS_DEPOSITED"];
+import { escrow, PAID_STATES } from "../_shared/escrow.ts";
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "method" }, 405);

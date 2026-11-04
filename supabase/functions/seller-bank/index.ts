@@ -20,7 +20,11 @@ Deno.serve(handler(async (req, body) => {
   if (!givenName || !familyName) throw new UserError("Add the name on the account.");
   if (idNumber && !/^\d{13}$/.test(String(idNumber))) throw new UserError("A South African ID number has 13 digits.");
 
-  const shop = must(await db.from("shops").select("id, seller_checks(phone)").eq("owner_id", uid).single(), "load shop") as any;
+  const shop = must(await db.from("shops").select("id, status, seller_checks(phone, escrow_token)").eq("owner_id", uid).single(), "load shop") as any;
+  if (shop.status === "banned") throw new UserError("This shop is closed.", 403);
+  const { data: allowed } = await db.rpc("take_usage", { p_user: uid, p_kind: "seller_bank", p_max: 3, p_window: "1 day" });
+  if (allowed !== true) throw new UserError("You've changed bank details too often today. Email help@myhaul.co.za.", 429);
+  const changing = !!shop.seller_checks?.escrow_token;
   const { data: u } = await db.auth.admin.getUserById(uid);
   const token = await escrow().createParty({
     givenName, familyName, email: u.user?.email ?? "", mobile: shop.seller_checks?.phone ?? u.user?.phone ?? "",
@@ -30,5 +34,10 @@ Deno.serve(handler(async (req, body) => {
   must(await db.from("seller_checks").update({
     escrow_token: token, bank_name: bankName, bank_last4: digits.slice(-4), bank_status: "approved",
   }).eq("shop_id", shop.id), "save bank");
+  // A change of account waits for our team (bank_change_guard in 0018), and the owner is told in case it wasn't them.
+  if (changing) {
+    await db.from("notifications").insert({ user_id: uid, kind: "account", title: "Your payout bank account changed",
+      body: `Now ${bankName} ending ${digits.slice(-4)}. Our team checks it before your next payout. If this wasn't you, email help@myhaul.co.za now.`, link: "/sell/payouts" });
+  }
   return json({ ok: true, bankName, last4: digits.slice(-4) });
 }));

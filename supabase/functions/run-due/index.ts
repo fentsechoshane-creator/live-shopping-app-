@@ -8,7 +8,7 @@
 // 6. Cancel checkouts left unpaid for 24 hours, and accept change of mind returns the seller ignored for 3 days.
 import { json } from "../_shared/http.ts";
 import { adminClient, cronAllowed, must } from "../_shared/supabase.ts";
-import { escrow } from "../_shared/escrow.ts";
+import { escrow, PAID_STATES } from "../_shared/escrow.ts";
 import { payoutDate, tierFor } from "../_shared/core/index.ts";
 
 Deno.serve(async (req) => {
@@ -88,15 +88,39 @@ Deno.serve(async (req) => {
     }
   }
 
+  // Oversold: someone paid for an item that had just sold out. Refund in full now (no trust penalty, see 0025).
+  const { data: oversold } = await db.from("orders").select("id, escrow_transaction_id").eq("status", "paid").eq("oversold", true).limit(200);
+  for (const o of oversold ?? []) {
+    try {
+      if (o.escrow_transaction_id) await es.refund(o.escrow_transaction_id);
+      must(await db.from("orders").update({ status: "refunded" }).eq("id", o.id).eq("status", "paid"), "refund oversold");
+      done.refunded++;
+    } catch (e) {
+      console.error("oversold refund failed", o.id, e);
+      done.failed++;
+    }
+  }
+
   // Unpaid checkouts.
   const dayAgo = new Date(now.getTime() - 86400_000).toISOString();
   const { data: stale } = await db.from("orders").select("id, escrow_transaction_id").eq("status", "pending_payment").lt("created_at", dayAgo).limit(200);
   for (const o of stale ?? []) {
     try {
-      if (o.escrow_transaction_id) await es.refund(o.escrow_transaction_id);
-    } catch (_) { /* nothing was paid */ }
-    await db.from("orders").update({ status: "cancelled" }).eq("id", o.id).eq("status", "pending_payment");
-    done.cancelled++;
+      if (o.escrow_transaction_id && es.mode === "live") {
+        // Paid late, or the callback was missed: mark it paid instead of stranding the buyer's money.
+        const st = await es.transactionState(o.escrow_transaction_id);
+        if (st && PAID_STATES.includes(st.state)) {
+          await db.from("orders").update({ status: "paid" }).eq("id", o.id).eq("status", "pending_payment");
+          continue;
+        }
+        await es.refund(o.escrow_transaction_id); // if this fails, we try again next run instead of cancelling
+      }
+      await db.from("orders").update({ status: "cancelled" }).eq("id", o.id).eq("status", "pending_payment");
+      done.cancelled++;
+    } catch (e) {
+      console.error("unpaid order", o.id, e);
+      done.failed++;
+    }
   }
 
   // Change of mind returns the seller has not answered in 3 days are accepted automatically.

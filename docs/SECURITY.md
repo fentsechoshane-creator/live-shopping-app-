@@ -127,6 +127,44 @@ Most real losses on apps like ours come from fraud between people, stolen accoun
 | 9.19 | A data breach (IDs, emails, addresses) | Little data kept, IDs in a private bucket. POPIA says we must tell the Information Regulator and the people affected. Write a short breach plan. | [ ] [Ofentse] |
 | 9.20 | Lost or stolen phone with the app signed in | Sign out, delete account; payments always go through TradeSafe's own page. "Sign out of other devices" not built. | [~] |
 
+## 10. Attacker style review, round 2 (2026-11-05)
+
+Four separate reviewers attacked local copies of everything (database, server functions, app and hosting, fraud and abuse), each acting like an attacker with the full source code and AI help. Every confirmed hole is closed in migration 0025 and the server functions, and the database tests now try each attack ("hardening round 2").
+
+| # | Hole found | Fixed by | Status |
+| --- | --- | --- | --- |
+| 10.1 | Packing proof without a real file (empty media rows), one proof reused for many orders, or someone else's file claimed | Media rows must be in your own folder; proof must be ready, under `<you>/packing-` and `<you>/parcel-`, really in the private bucket, uploaded after payment, and used once (unique indexes). Checked by order-action and again by the database. Purge only deletes the seller's own files. | [x] 0025 |
+| 10.2 | Trust farmed to Top tier with cheap orders from friends, unlocking auctions | Kept orders, 5 star reviews and fast shipping count only on orders of R100 or more, once per buyer per 90 days; auctions need 5 good orders from 5 different buyers. | [x] 0025 |
+| 10.3 | Rewards farmed with fake buyers and collection orders | Only courier or locker orders with tracking earn a reward; a shop can hand out at most 5 buyer rewards in 30 days; rewards only spend on R200 or more (checked by the database too). | [x] 0025 |
+| 10.4 | Stolen seller account changes the bank and keeps selling and getting paid | No new orders and payouts held while a changed bank account waits for our check; the owner is told; 3 bank changes a day at most. | [x] 0025 + seller-bank |
+| 10.5 | Suspended seller still paid, could open a shop or put posts live | Suspension holds all scheduled payouts (lifting doesn't release them); suspended accounts can't open a shop or put listings or posts live. | [x] 0025 |
+| 10.6 | Two people pay for the last item: forced refund, seller penalty, sold item relisted | The later payment is marked oversold and refunded in full by run-due, with no penalty and no relisting; the seller can't ship it. | [x] 0025 + run-due |
+| 10.7 | Rate limits dodged by backdating rows (200 messages, 200 reports, 1000 error rows) | The database sets created_at itself; signed out error reports capped at 300 an hour. | [x] 0025 |
+| 10.8 | Removed posts restored by the seller | Only the team can restore a removed post. | [x] 0025 |
+| 10.9 | Auction sold twice (won auction relisted) or item changed after bids | A won or paid auction can't go live again; title, description, label, condition and sizes are frozen once people bid. | [x] 0025 |
+| 10.10 | Secret auction reserve, proof file path and winner id readable by anyone | Column level access: only public product fields are readable. | [x] 0025 |
+| 10.11 | Anyone could check who is suspended or who blocked whom; team functions callable by signed out visitors | Revoked; blocked_between only answers for the people involved; new functions start locked for everyone. | [x] 0025 |
+| 10.12 | Names posing as us ("myHaul Support"), huge text fields | Reserved words refused in names; length limits on names, bios and city. | [x] 0025 |
+| 10.13 | Unlimited photos per listing in one insert | One photo per position (10 max). | [x] 0025 |
+| 10.14 | "Funds deposited" treated as paid (EFT not cleared yet) | Only "funds received" (cleared) marks an order paid, as TradeSafe's docs say. | [x] escrow.ts |
+| 10.15 | Unpaid orders cancelled even if TradeSafe had the money | run-due asks TradeSafe first: paid late becomes paid; a failed refund retries next run instead of cancelling. | [x] run-due |
+| 10.16 | No limits on checkout, video uploads, bank changes | 10 checkouts an hour, 30 uploads a day (sellers only), 3 bank changes a day. Checkout input types and sizes checked. | [x] functions |
+| 10.17 | Test payments could run on the live site | Mock payments refuse to start when the app address is the real site. | [x] escrow.ts |
+| 10.18 | Telegram bot token could land in logs | Network errors are logged without the address. | [x] alerts.ts |
+| 10.19 | Return disputes could be sent again and again (alert spam) | Once per return. | [x] order-action |
+| 10.20 | No content security rules inside the phone apps; Android backups copied the sign in token | Security policy in index.html for the apps; Android backups off. Netlify policy now names our own Supabase project only; share preview pages carry their own headers. | [x] app |
+| 10.21 | Demo code (sample accounts, code 123456) shipped in the live app | The live build drops the demo. | [x] app |
+| 10.22 | Known vulnerabilities in packages (react-router open redirect, vite, vitest, tar and others) | Upgraded and pinned: `npm audit` shows 0 vulnerabilities (app and tools). Server functions pinned by `supabase/functions/deno.lock`. | [x] |
+
+Still open (need accounts or a decision):
+- Shill bidding with second accounts and fake buyers in general: needs phone number checks at sign up and linked account flags (same phone, device, address). [Lehloma, Ofentse]
+- Orders that never arrive or are never confirmed: automatic "delivered" after a set time, a "not received" claim and team refund buttons for shipped orders. (Feature, next round.)
+- Courier tracking is still typed by the seller until The Courier Guy and PUDO are connected.
+- App and universal link files still have placeholder Team ID and Play SHA256 (apps/web/public/.well-known). [Lehloma]
+- iOS: set aps-environment to production for the App Store build (Xcode does this when archiving for distribution; check). [Lehloma]
+- The TradeSafe callback secret sits in the callback address: rotate it every few months (the payment state is always checked with TradeSafe anyway).
+- Any signed in person can see who is on the team (profiles.role). Low risk; fix with column grants on profiles later.
+
 ## Can people hack us?
 
 Anything on the internet can be attacked; no app is unhackable. The aim is that the easy attacks fail, money can't leave without a check, the damage from any one mistake is small, and we notice quickly. Every rule that protects money or data lives in the database or on the server, so changing the app on a phone gets an attacker nothing.
@@ -139,3 +177,5 @@ Anything on the internet can be attacked; no app is unhackable. The aim is that 
 4. Anything people can send many times: add a limit (see `rate_limit` in migration 0018).
 5. Uploads: own folder, size and type limits.
 6. Add the new rows to this file and to the tests.
+7. Dependencies: pin exact versions, run `npm audit` (it must stay at 0), and keep `supabase/functions/deno.lock` up to date (`npm run check:functions` refuses changed downloads).
+8. Every few months, rerun the attacker style review (section 10) on the whole app.

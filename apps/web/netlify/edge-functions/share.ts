@@ -45,7 +45,10 @@ export default async (req: Request, context: Context) => {
 };
 
 const page = (html: string) => new Response(html, {
-  headers: { "content-type": "text/html; charset=utf-8", "cache-control": "public, max-age=300" },
+  headers: { "content-type": "text/html; charset=utf-8", "cache-control": "public, max-age=300",
+    // Edge function pages don't get netlify.toml's headers, so they carry their own.
+    "content-security-policy": "default-src 'none'; img-src https:; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'",
+    "x-content-type-options": "nosniff", "x-frame-options": "DENY", "referrer-policy": "strict-origin-when-cross-origin" },
 });
 
 export const config: Config = { path: ["/i/*", "/s/*"] };

@@ -176,9 +176,17 @@ class TradeSafe implements Escrow {
 export function escrow(): Escrow {
   const mode = Deno.env.get("TRADESAFE_MODE");
   if (mode === "live") return new TradeSafe();
-  if (mode === "mock") return new MockEscrow();
+  if (mode === "mock") {
+    // Test payments can never run on the real site, even if the setting is left on by mistake.
+    if (/myhaul\.co\.za|netlify\.app/i.test(Deno.env.get("APP_URL") ?? "")) throw new UserError("Payments aren't switched on yet. Please try again later.", 503);
+    return new MockEscrow();
+  }
   throw new UserError("Payments aren't switched on yet. Please try again later.", 503);
 }
+
+/** Only cleared money counts as paid. "Funds deposited" just means the buyer started paying (an EFT can take
+ * up to 36 hours to clear), so sellers must not ship yet. See docs.tradesafe.co.za, Transaction Process. */
+export const PAID_STATES = ["FUNDS_RECEIVED"];
 
 /** Days we give TradeSafe for delivery and inspection, so its own auto release never beats our return window. */
 export const ESCROW_DAYS = {

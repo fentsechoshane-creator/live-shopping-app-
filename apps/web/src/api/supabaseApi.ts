@@ -42,6 +42,8 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
   const avatarUrl = (path: string | null | undefined) => (path ? sb.storage.from("avatars").getPublicUrl(path).data.publicUrl : null);
   const videoUrl = (path: string | null) => (path ? sb.storage.from("videos").getPublicUrl(path).data.publicUrl : null);
 
+  // The product fields anyone may read (0025 hides the auction reserve, proof file path and winner).
+  const PRODUCT_COLS = "id, shop_id, title, description, price_cents, mode, label, condition, sizes, stock, lead_days, allergens, proof_status, status, created_at, held_for, held_until, auction_ends_at, auction_state, auction_round, auction_price_cents, auction_pay_by";
   const toProduct = (p: any): ProductPublic => ({
     id: p.id, title: p.title, description: p.description ?? "", priceCents: p.price_cents, mode: p.mode, label: p.label,
     condition: p.condition, sizes: p.sizes ?? [], stock: p.stock, leadDays: p.lead_days, allergens: p.allergens, status: p.status ?? "live",
@@ -138,7 +140,7 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
         id: s.shop_id, name: s.name, handle: s.handle, category: s.category as Category, bio: s.bio, trustScore: s.trust_score,
         tier: s.tier, sales: s.sales, followers: s.followers, founding: s.founding,
       };
-      const posts = check(await sb.from("posts").select("id, caption, products!inner(*), media(mux_playback_id, storage_path, status)")
+      const posts = check(await sb.from("posts").select(`id, caption, products!inner(${PRODUCT_COLS}), media(mux_playback_id, storage_path, status)`)
         .eq("shop_id", s.shop_id).eq("status", "live").eq("products.status", "live").order("created_at", { ascending: false })) as any[];
       return {
         shop,
@@ -411,7 +413,7 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
       check(await sb.from("messages").insert({ conversation_id: conversationId, sender_id: await uid(), body: body.trim(), product_id: productId ?? null, image_path: imagePath }));
     },
     async productItem(productId) {
-      const p = (await sb.from("products").select("*, shops(id, name, handle, category)").eq("id", productId).maybeSingle()).data as any;
+      const p = (await sb.from("products").select(`${PRODUCT_COLS}, shops(id, name, handle, category)`).eq("id", productId).maybeSingle()).data as any;
       if (!p) return null;
       const post = (await sb.from("posts").select("id, caption, media(mux_playback_id, storage_path)").eq("product_id", productId).order("created_at", { ascending: false }).limit(1).maybeSingle()).data as any;
       const m = post?.media;
@@ -464,7 +466,7 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
 
     async myShop() {
       const me = await uid();
-      const { data: s } = await sb.from("shops").select("*, seller_checks(*), products(*), posts(product_id)").eq("owner_id", me).maybeSingle();
+      const { data: s } = await sb.from("shops").select(`*, seller_checks(*), products(${PRODUCT_COLS}), posts(product_id)`).eq("owner_id", me).maybeSingle();
       if (!s) return null;
       const { data: prof } = await sb.from("profiles").select("trust_score").eq("id", me).single();
       const { data: good } = await sb.rpc("good_orders", { p_shop: s.id });

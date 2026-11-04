@@ -39,12 +39,15 @@ export async function sendNewAlerts(db: SupabaseClient): Promise<{ sent: number;
   }
   const tg = Deno.env.get("TELEGRAM_BOT_TOKEN"), chat = Deno.env.get("TELEGRAM_CHAT_ID");
   if (tg && chat) {
-    const res = await fetch(`https://api.telegram.org/bot${tg}/sendMessage`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ chat_id: chat, text: `${subject}\n\n${lines.join("\n\n")}`.slice(0, 4000), disable_web_page_preview: true }),
-    });
-    if (res.ok) channels.push("telegram"); else console.error("alert telegram", res.status, await res.text());
+    // The bot token is part of the address, so network errors (which repeat the address) are never logged.
+    try {
+      const res = await fetch(`https://api.telegram.org/bot${tg}/sendMessage`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ chat_id: chat, text: `${subject}\n\n${lines.join("\n\n")}`.slice(0, 4000), disable_web_page_preview: true }),
+      });
+      if (res.ok) channels.push("telegram"); else console.error("alert telegram", res.status);
+    } catch { console.error("alert telegram: network error"); }
   }
   // Marked sent even with no channel set up: the alerts are in the dashboard and in the team's notifications either way.
   await db.from("team_alerts").update({ sent_at: new Date().toISOString() }).in("id", alerts.map((a) => a.id));

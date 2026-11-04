@@ -30,11 +30,14 @@ begin
   raise exception 'Expected an error containing "%" for: %', needle, sql;
 end $$;
 -- Packing proof for an order (video and sealed parcel photo by the seller, after payment).
-create function pg_temp.packed(o uuid) returns void language plpgsql as $$
+create function pg_temp.packed(o uuid) returns void language plpgsql security definer as $$
 declare seller uuid := (select s.owner_id from orders x join shops s on s.id = x.shop_id where x.id = o); v uuid; p uuid;
 begin
-  insert into media (owner_id, kind, storage_path, status) values (seller, 'video', seller || '/packing-test.mp4', 'ready') returning id into v;
-  insert into media (owner_id, kind, storage_path, status) values (seller, 'image', seller || '/packing-test.jpg', 'ready') returning id into p;
+  insert into media (owner_id, kind, storage_path, status) values (seller, 'video', seller || '/packing-' || o || '.mp4', 'ready') returning id into v;
+  insert into media (owner_id, kind, storage_path, status) values (seller, 'image', seller || '/parcel-' || o || '.jpg', 'ready') returning id into p;
+  if to_regclass('storage.objects') is not null then
+    execute 'insert into storage.objects (bucket_id, name) values (''private'', $1), (''private'', $2)' using seller || '/packing-' || o || '.mp4', seller || '/parcel-' || o || '.jpg';
+  end if;
   update orders set packing_media_id = v, packing_photo_media_id = p where id = o;
 end $$;
 grant execute on all functions in schema pg_temp to anon, authenticated, service_role;
@@ -209,8 +212,8 @@ select pg_temp.act_as_service();
 update orders set status = 'completed' where id = '10000000-0000-0000-0000-000000000002';
 reset role;
 do $$ begin
-  -- 61 + shipped fast with packing proof (+1) + 5 star (+1) + kept (+2)
-  assert (select trust_score from profiles where id = '00000000-0000-0000-0000-00000000000a') = 65, 'review and kept order add points';
+  -- 61 + 5 star (+1) + kept (+2). No fast shipping point: the same buyer already gave one (once per buyer per 90 days).
+  assert (select trust_score from profiles where id = '00000000-0000-0000-0000-00000000000a') = 64, 'review and kept order add points';
   assert (select good_orders(id) from shops where handle = 'thrift.with.lebo') = 1, 'one good order';
 end $$;
 
@@ -227,6 +230,9 @@ update products set status = 'live' where title = 'Chunky white runner'; -- bann
 reset role;
 do $$ begin assert (select status from products where title = 'Chunky white runner') = 'removed', 'still removed'; end $$;
 -- Reward credit top up: R349 tee, R50 credit, buyer pays R311, we top the seller up R17.06.
+select pg_temp.act_as_service();
+update seller_checks set bank_status = 'approved' where shop_id = (select id from shops where handle = 'other.shop');
+reset role;
 -- A buyer with a finished account and an earned reward that is ready (no credit just for signing up).
 insert into auth.users (id, email) values ('00000000-0000-0000-0000-0000000000a1', 'credit@test.co.za');
 update profiles set handle = 'credit.buyer', adult_confirmed_at = now() where id = '00000000-0000-0000-0000-0000000000a1';
@@ -235,6 +241,9 @@ select pg_temp.expect_error($$insert into orders (buyer_id, shop_id, product_id,
   values ('00000000-0000-0000-0000-0000000000a1', (select id from shops where handle = 'other.shop'), (select id from products limit 1), 'buy_now', 34900, 'collect_cpt', 0, 1200, 5000, 31100, 2094, 32806, 1706)$$, 'credit');
 reset role;
 insert into rewards (user_id, kind, amount_cents, status) values ('00000000-0000-0000-0000-0000000000a1', 'first_buy', 5000, 'ready');
+select pg_temp.act_as_service();
+update seller_checks set bank_status = 'approved' where shop_id = (select id from shops where handle = 'other.shop');
+reset role;
 select pg_temp.act_as_service();
 select pg_temp.expect_error($$insert into orders (buyer_id, shop_id, product_id, mode, item_price_cents, delivery, delivery_fee_cents, protection_fee_cents, credit_cents, total_cents, seller_fee_cents, seller_payout_cents)
   values ('00000000-0000-0000-0000-0000000000a1', (select id from shops where handle = 'other.shop'), (select id from products limit 1), 'buy_now', 34900, 'collect_cpt', 0, 1200, 5000, 31100, 2094, 32806)$$, 'orders_topup_exact');
@@ -606,12 +615,12 @@ update profiles set handle = 'fresh.buyer', adult_confirmed_at = now() where id 
 do $$ begin assert not welcome_credit_ok('00000000-0000-0000-0000-0000000000a2', (select id from shops where handle = 'other.shop')), 'no credit just for signing up'; end $$;
 insert into orders (id, buyer_id, shop_id, product_id, mode, item_price_cents, delivery, delivery_fee_cents, protection_fee_cents, total_cents, seller_fee_cents, seller_payout_cents)
   select ('30000000-0000-0000-0000-00000000000' || i)::uuid, '00000000-0000-0000-0000-0000000000a2', (select id from shops where handle = 'other.shop'),
-    (select id from products limit 1), 'buy_now', 35000, 'collect_cpt', 0, 1200, 36200, 2100, 32900 from generate_series(1, 2) i;
+    (select id from products limit 1), 'buy_now', 35000, 'courier', 0, 1200, 36200, 2100, 32900 from generate_series(1, 2) i;
 create function pg_temp.deliver(o uuid) returns void language plpgsql as $$
 begin
   update orders set status = 'paid' where id = o;
   perform pg_temp.packed(o);
-  update orders set status = 'shipped' where id = o;
+  update orders set status = 'shipped', tracking_ref = 'TCG' || left(o::text, 6) where id = o;
   update orders set status = 'delivered' where id = o;
 end $$;
 -- Budget nearly used: the first delivery gives nothing (silently).
@@ -631,6 +640,15 @@ do $$ begin
   assert (select status from rewards where user_id = '00000000-0000-0000-0000-0000000000a2' and kind = 'first_buy') = 'ready', 'ready after the window';
   assert welcome_credit_ok('00000000-0000-0000-0000-0000000000a2', (select id from shops where handle = 'other.shop')), 'credit ok now';
 end $$;
+-- Collections earn nothing (easy to fake between friends); only courier orders with tracking do.
+insert into auth.users (id, email) values ('00000000-0000-0000-0000-0000000000a3', 'collect@test.co.za');
+insert into orders (id, buyer_id, shop_id, product_id, mode, item_price_cents, delivery, delivery_fee_cents, protection_fee_cents, total_cents, seller_fee_cents, seller_payout_cents)
+  values ('30000000-0000-0000-0000-000000000009', '00000000-0000-0000-0000-0000000000a3', (select id from shops where handle = 'other.shop'), (select id from products limit 1), 'buy_now', 35000, 'collect_cpt', 0, 1200, 36200, 2100, 32900);
+update orders set status = 'paid' where id = '30000000-0000-0000-0000-000000000009';
+select pg_temp.packed('30000000-0000-0000-0000-000000000009');
+update orders set status = 'shipped' where id = '30000000-0000-0000-0000-000000000009';
+update orders set status = 'delivered' where id = '30000000-0000-0000-0000-000000000009';
+do $$ begin assert not exists (select 1 from rewards where user_id = '00000000-0000-0000-0000-0000000000a3'), 'collections earn no reward'; end $$;
 -- Using it on an order that's then cancelled gives it back.
 insert into orders (id, buyer_id, shop_id, product_id, mode, item_price_cents, delivery, delivery_fee_cents, protection_fee_cents, credit_cents, total_cents, seller_fee_cents, seller_payout_cents, credit_topup_cents)
   values ('30000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-0000000000a2', (select id from shops where handle = 'other.shop'), (select id from products limit 1), 'buy_now', 34900, 'collect_cpt', 0, 1200, 5000, 31100, 2094, 32806, 1706);
@@ -814,3 +832,90 @@ end $$;
 reset role;
 do $$ begin assert (select packing_media_id is null and packing_purged_at is not null from orders where id = (select id from pk order by id limit 1)), 'proof deleted and marked'; end $$;
 select 'packing proof tests passed' as result;
+
+-- ===== Hardening round 2 (migration 0025): each attack the reviews found must now fail =====
+-- A product of Other shop with one left, and two orders racing for it.
+select pg_temp.act_as_service();
+update seller_checks set bank_status = 'approved' where shop_id = (select id from shops where handle = 'other.shop');
+reset role;
+insert into products (id, shop_id, title, price_cents, mode, stock, status)
+  values ('40000000-0000-0000-0000-000000000001', (select id from shops where handle = 'other.shop'), 'Last lip kit', 30000, 'buy_now', 1, 'draft');
+insert into orders (id, buyer_id, shop_id, product_id, mode, item_price_cents, delivery, delivery_fee_cents, protection_fee_cents, total_cents, seller_fee_cents, seller_payout_cents)
+  select ('40000000-0000-0000-0000-00000000001' || i)::uuid, '00000000-0000-0000-0000-00000000000b', (select id from shops where handle = 'other.shop'),
+    '40000000-0000-0000-0000-000000000001', 'buy_now', 30000, 'courier', 0, 1200, 31200, 1800, 28200 from generate_series(1, 3) i;
+select pg_temp.act_as_service();
+update orders set status = 'paid' where id = '40000000-0000-0000-0000-000000000011';
+update orders set status = 'paid' where id = '40000000-0000-0000-0000-000000000012';
+reset role;
+do $$ begin
+  assert not (select oversold from orders where id = '40000000-0000-0000-0000-000000000011'), 'first payment gets the item';
+  assert (select oversold from orders where id = '40000000-0000-0000-0000-000000000012'), 'second payment is marked oversold';
+end $$;
+select pg_temp.act_as_service();
+update orders set status = 'refunded' where id = '40000000-0000-0000-0000-000000000012';
+reset role;
+do $$ begin
+  assert (select stock from products where id = '40000000-0000-0000-0000-000000000001') = 0, 'a sold item is not relisted';
+  assert not exists (select 1 from trust_events where order_id = '40000000-0000-0000-0000-000000000012'), 'no penalty for the seller';
+end $$;
+-- Packing proof: someone else's file can't be claimed; files must be real, ready and used once.
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000e');
+select pg_temp.expect_error($$insert into media (owner_id, kind, storage_path, status) values (auth.uid(), 'video', '00000000-0000-0000-0000-00000000000a/packing-x.mp4', 'uploading')$$, 'row-level security');
+insert into media (owner_id, kind, status) values (auth.uid(), 'video', 'uploading'), (auth.uid(), 'image', 'uploading');
+reset role;
+select pg_temp.act_as_service();
+select pg_temp.expect_error($$update orders set packing_media_id = (select id from media where owner_id = '00000000-0000-0000-0000-00000000000e' and kind = 'video' and status = 'uploading' limit 1), packing_photo_media_id = (select id from media where owner_id = '00000000-0000-0000-0000-00000000000e' and kind = 'image' and status = 'uploading' limit 1), status = 'shipped' where id = '40000000-0000-0000-0000-000000000011'$$, 'from the app');
+reset role;
+select pg_temp.packed('40000000-0000-0000-0000-000000000011');
+select pg_temp.act_as_service();
+update orders set status = 'shipped', tracking_ref = 'TCG1' where id = '40000000-0000-0000-0000-000000000011';
+update orders set status = 'paid' where id = '40000000-0000-0000-0000-000000000013';
+select pg_temp.expect_error($$update orders set packing_media_id = (select packing_media_id from orders where id = '40000000-0000-0000-0000-000000000011') where id = '40000000-0000-0000-0000-000000000013'$$, 'orders_packing_video_once');
+reset role;
+-- Removed posts stay removed.
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000a');
+select pg_temp.expect_error($$update posts set status = 'live' where status = 'removed'$$, 'removed by our team');
+reset role;
+-- Backdated rows get today's date, so rate limits can't be dodged.
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000d');
+insert into reports (reporter_id, target_kind, target_id, reason, created_at) values (auth.uid(), 'user', gen_random_uuid(), 'spam', now() - interval '3 days');
+reset role;
+do $$ begin assert (select max(created_at) from reports where reporter_id = '00000000-0000-0000-0000-00000000000d') > now() - interval '1 minute', 'created_at is set by the database'; end $$;
+-- A won auction can't be put back up for sale.
+update products set auction_state = 'won', status = 'sold_out' where title = 'Retro sunglasses';
+select pg_temp.expect_error($$update products set status = 'live', auction_ends_at = now() + interval '2 days' where title = 'Retro sunglasses'$$, 'already has a winner');
+-- Hidden fields, private facts, reserved names.
+select pg_temp.act_as_anon();
+select pg_temp.expect_error($$select reserve_cents from products$$, 'permission denied');
+select pg_temp.expect_error($$select proof_path from products$$, 'permission denied');
+select pg_temp.expect_error($$select is_suspended('00000000-0000-0000-0000-00000000000b')$$, 'permission denied');
+select pg_temp.expect_error($$select admin_rewards('00000000-0000-0000-0000-00000000000b')$$, 'permission denied');
+do $$ begin assert (select count(*) from products) > 0, 'public product fields still readable'; end $$;
+reset role;
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000d');
+select pg_temp.expect_error($$update profiles set display_name = 'myHaul Support' where id = auth.uid()$$, 'reserved');
+select pg_temp.expect_error($$update profiles set display_name = repeat('x', 100) where id = auth.uid()$$, 'profiles_text_sizes');
+do $$ begin assert not blocked_between('00000000-0000-0000-0000-00000000000a', '00000000-0000-0000-0000-00000000000b'), 'others cannot test blocks'; end $$;
+reset role;
+-- At most one photo per position (10 per listing), even in one big insert.
+select pg_temp.expect_error($$insert into listing_photos (product_id, storage_path, position) select '40000000-0000-0000-0000-000000000001', 'x/' || i, 0 from generate_series(1, 2) i$$, 'listing_photos_one_per_position');
+-- Suspending a seller holds their payouts; a changed bank account blocks new orders.
+insert into payouts (order_id, shop_id, amount_cents, releasable_at, pay_on, status)
+  values ('40000000-0000-0000-0000-000000000011', (select id from shops where handle = 'other.shop'), 28200, now(), current_date + 2, 'scheduled');
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000c');
+select admin_suspend('00000000-0000-0000-0000-00000000000e', 'Exit scam suspected');
+reset role;
+do $$ begin assert (select status from payouts where order_id = '40000000-0000-0000-0000-000000000011') = 'held', 'suspension holds payouts'; end $$;
+select pg_temp.act_as_service();
+update seller_checks set bank_status = 'pending' where shop_id = (select id from shops where handle = 'other.shop');
+select pg_temp.expect_error($$insert into orders (buyer_id, shop_id, product_id, mode, item_price_cents, delivery, delivery_fee_cents, protection_fee_cents, total_cents, seller_fee_cents, seller_payout_cents)
+  values ('00000000-0000-0000-0000-00000000000b', (select id from shops where handle = 'other.shop'), '40000000-0000-0000-0000-000000000001', 'buy_now', 30000, 'courier', 0, 1200, 31200, 1800, 28200)$$, 'cannot take payments');
+reset role;
+-- Cheap orders from the same friend don't build trust.
+do $$ declare before int; begin
+  select count(*) into before from trust_events where user_id = '00000000-0000-0000-0000-00000000000e';
+  perform add_trust_event('00000000-0000-0000-0000-00000000000e', 'order_kept', '40000000-0000-0000-0000-000000000011');
+  perform add_trust_event('00000000-0000-0000-0000-00000000000e', 'order_kept', '40000000-0000-0000-0000-000000000013');
+  assert (select count(*) from trust_events where user_id = '00000000-0000-0000-0000-00000000000e') = before + 1, 'once per buyer per 90 days';
+end $$;
+select 'hardening round 2 tests passed' as result;

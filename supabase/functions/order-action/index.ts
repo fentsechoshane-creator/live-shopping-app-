@@ -37,19 +37,25 @@ Deno.serve(handler(async (req, body) => {
     }
     case "ship": {
       if (!isSeller || order.status !== "paid") throw new UserError("Only paid orders can be shipped.");
+      if (order.oversold) throw new UserError("This item sold out before this payment came in. The buyer is being refunded.");
       const { trackingRef, packingMediaId, packingPhotoMediaId } = body;
       // Packing proof is required for every order, courier or collection (migration 0023 checks it again).
-      if (!packingMediaId || !packingPhotoMediaId) throw new UserError("Add the packing video and the photo of the sealed parcel before shipping.");
+      const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!UUID.test(String(packingMediaId ?? "")) || !UUID.test(String(packingPhotoMediaId ?? ""))) throw new UserError("Add the packing video and the photo of the sealed parcel before shipping.");
       if (order.delivery === "courier" || order.delivery === "pudo_locker") {
         if (!trackingRef) throw new UserError("Add the tracking number.");
       }
       // Check the proof before escrow is told the item is on its way (the database checks it again when the status changes).
-      const { data: proof } = await db.from("media").select("id, owner_id, kind, created_at").in("id", [packingMediaId, packingPhotoMediaId]);
+      const { data: proof } = await db.from("media").select("id, owner_id, kind, created_at, status, storage_path").in("id", [packingMediaId, packingPhotoMediaId]);
       const v = proof?.find((m: any) => m.id === packingMediaId), p = proof?.find((m: any) => m.id === packingPhotoMediaId);
-      if (!v || !p || v.owner_id !== uid || p.owner_id !== uid || v.kind !== "video" || p.kind !== "image"
-          || new Date(v.created_at) < new Date(order.paid_at) || new Date(p.created_at) < new Date(order.paid_at)) {
+      const ok = (m: any, kind: string, prefix: string) => m && m.owner_id === uid && m.kind === kind && m.status === "ready"
+        && typeof m.storage_path === "string" && m.storage_path.startsWith(`${uid}/${prefix}-`) && new Date(m.created_at) >= new Date(order.paid_at);
+      if (!ok(v, "video", "packing") || !ok(p, "image", "parcel")) {
         throw new UserError("Film the packing video and photo for this order in the app, after it was paid.");
       }
+      const { count: used } = await db.from("orders").select("id", { count: "exact", head: true })
+        .or(`packing_media_id.in.(${packingMediaId},${packingPhotoMediaId}),packing_photo_media_id.in.(${packingMediaId},${packingPhotoMediaId})`);
+      if (used) throw new UserError("Film new packing proof for each order.");
       must(await db.from("orders").update({ packing_media_id: packingMediaId, packing_photo_media_id: packingPhotoMediaId }).eq("id", orderId).eq("status", "paid"), "packing proof");
       await es.startDelivery(order.escrow_allocation_id);
       await setStatus("shipped", { tracking_ref: trackingRef ?? null });
@@ -79,9 +85,11 @@ Deno.serve(handler(async (req, body) => {
       // Seller disagrees (for example, says the item matched the listing video). Our team decides.
       if (!isSeller || order.status !== "return_requested") throw new UserError("No return to dispute.");
       if (ret?.reason === "changed_mind") throw new UserError("Change of mind returns within 7 days are the buyer's right.");
+      if (ret?.disputed_at) throw new UserError("You've already sent this to our team.");
+      must(await db.from("returns").update({ disputed_at: new Date().toISOString() }).eq("order_id", orderId).is("disputed_at", null), "mark disputed");
       const { data: admins } = await db.from("profiles").select("id").eq("role", "admin");
       for (const a of admins ?? []) {
-        await db.from("notifications").insert({ user_id: a.id, kind: "dispute", title: "Return disputed", body: `Order ${orderId}`, link: `/admin/orders/${orderId}` });
+        await db.from("notifications").insert({ user_id: a.id, kind: "dispute", title: "Return disputed", body: `Order ${orderId}`, link: "/team/todo?f=returns" });
       }
       break;
     }

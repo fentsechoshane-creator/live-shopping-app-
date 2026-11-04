@@ -12,12 +12,21 @@ Deno.serve(handler(async (req, body) => {
   const db = adminClient();
   const uid = await requireUser(req, db);
   const { productId, size, delivery, deliveryDetails = {}, foodDate, foodSlot, foodMessage, offerId } = body ?? {};
-  if (!productId) throw new UserError("Pick an item first.");
+  if (!productId || typeof productId !== "string") throw new UserError("Pick an item first.");
+  // Sizes and types of everything the app sends, so odd input can't break or bloat an order.
+  if (typeof deliveryDetails !== "object" || Array.isArray(deliveryDetails) || JSON.stringify(deliveryDetails).length > 2000
+      || Object.values(deliveryDetails).some((v) => typeof v !== "string")) throw new UserError("Check your delivery details.");
+  if ((size != null && (typeof size !== "string" || size.length > 20)) || (foodMessage != null && String(foodMessage).length > 300)
+      || (foodSlot != null && String(foodSlot).length > 40) || (foodDate != null && !/^\d{4}-\d{2}-\d{2}$/.test(String(foodDate))))
+    throw new UserError("Check your order details.");
+  // At most 10 checkouts an hour per person: stops scripts filling a shop with unpaid orders.
+  const { data: underLimit } = await db.rpc("take_usage", { p_user: uid, p_kind: "checkout", p_max: 10, p_window: "1 hour" });
+  if (underLimit !== true) throw new UserError("Too many checkouts in a short time. Try again in a while.", 429);
   if (!(delivery in DELIVERY_OPTIONS)) throw new UserError("Pick a delivery option.");
 
   const product = must(
     await db.from("products")
-      .select("id, title, price_cents, mode, sizes, stock, status, lead_days, shop_id, held_for, held_until, auction_state, auction_winner, auction_price_cents, auction_pay_by, shops!inner(id, owner_id, status, name, founding_until, seller_checks(escrow_token))")
+      .select("id, title, price_cents, mode, sizes, stock, status, lead_days, shop_id, held_for, held_until, auction_state, auction_winner, auction_price_cents, auction_pay_by, shops!inner(id, owner_id, status, name, founding_until, seller_checks(escrow_token, bank_status))")
       .eq("id", productId).single(),
     "load product",
   ) as any;
@@ -71,7 +80,8 @@ Deno.serve(handler(async (req, body) => {
     if (!foodSlot) throw new UserError("Pick a time slot.");
   }
   const sellerToken = shop.seller_checks?.escrow_token;
-  if (!sellerToken) throw new UserError("This seller cannot take payments yet.");
+  // A changed payout account waits for our team's check before the shop takes new orders (0025).
+  if (!sellerToken || shop.seller_checks?.bank_status !== "approved") throw new UserError("This seller cannot take payments right now.");
 
   // Rewards (migration 0024): a surprise R50 earned after a first delivered order, auction win or sale, usable after the return window.
   // The database checks the same rules again when the order is saved, so this can't be raced or skipped.
