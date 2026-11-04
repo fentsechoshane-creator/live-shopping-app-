@@ -713,6 +713,19 @@ button.g3 { border: 0; padding: 0; display: block; width: 100%; }
 .interest .tick { position: absolute; top: 10px; right: 10px; width: 22px; height: 22px; border-radius: 11px; background: var(--green); color: var(--green-ink);
   display: grid; place-items: center; }
 .welcome-foot { padding-top: 12px; }
+/* Last welcome step: a "swipe up" lesson over the feed, like TikTok. Swiping it away starts watching. */
+.coach { position: absolute; inset: 0; z-index: 60; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  padding: 24px 32px calc(var(--tab-space) + 24px); text-align: center; color: #fff; background: rgba(0, 0, 0, 0.62); animation: up 0.25s ease; touch-action: none; }
+.coach h1 { font-size: 26px; margin: 18px 0 0; letter-spacing: -0.02em; }
+.coach p { margin: 0; font-size: 15.5px; line-height: 1.5; color: rgba(255, 255, 255, 0.82); max-width: 300px; }
+.coach-hand { position: relative; width: 70px; height: 170px; }
+.coach-finger { position: absolute; left: 50%; bottom: 0; width: 46px; height: 46px; margin-left: -23px; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92); box-shadow: 0 0 0 10px rgba(255, 255, 255, 0.18); animation: coach-up 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+.coach-trail { position: absolute; left: 50%; bottom: 23px; width: 6px; margin-left: -3px; height: 0; border-radius: 3px;
+  background: linear-gradient(to top, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0)); animation: coach-trail 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+@keyframes coach-up { 0% { transform: translateY(0); opacity: 0; } 15% { opacity: 1; } 70% { transform: translateY(-120px); opacity: 1; } 100% { transform: translateY(-120px); opacity: 0; } }
+@keyframes coach-trail { 0%, 15% { height: 0; opacity: 1; } 70% { height: 120px; opacity: 1; } 100% { height: 120px; opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .coach-finger, .coach-trail { animation: none; } .coach-trail { height: 120px; } }
 @keyframes welcome-in { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .welcome-body { animation: none; } }
 .wallet-hero { display: flex; flex-direction: column; align-items: center; padding: 8px 0 18px; }

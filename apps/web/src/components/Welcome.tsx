@@ -1,7 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Category } from "../api";
 import { Icon } from "./Icon";
-import { R } from "./ui";
 import { useSwipe } from "./gestures";
 import { useSession } from "../session";
 
@@ -21,25 +20,49 @@ const SLIDES = [
   { icon: "check", title: "Every seller is checked", body: "We check each seller's ID and bank account before they can sell, and every order is filmed when it's packed." },
 ];
 
-/** First open: three short screens, then pick what you like so For You isn't random on day one. */
+/** First open: three short screens, pick what you like (so For You isn't random on day one), then a TikTok style
+ * "swipe up" lesson over the feed. Swiping it away lands on the first video the ranking picked for you. */
 export function Welcome({ onDone }: { onDone: () => void }) {
   const [step, setStep] = useState(0);
   const { interests, setInterests } = useSession();
   const [picked, setPicked] = useState<Category[]>(interests);
-  const last = step === SLIDES.length;
-  const finish = (list: Category[]) => {
-    setInterests(list);
+  const PICK = SLIDES.length, COACH = SLIDES.length + 1;
+  const finish = () => {
     try { localStorage.setItem(WELCOMED, "1"); } catch { /* ignore */ }
     onDone();
   };
-  const swipe = useSwipe({ onLeft: () => !last && setStep(step + 1), onRight: () => step > 0 && setStep(step - 1) });
+  // Saving the interests here re-ranks the feed behind the lesson, so the first video is already the right one.
+  const toCoach = () => { setInterests(picked); setStep(COACH); };
+  const swipe = useSwipe({ onLeft: () => step < PICK && setStep(step + 1), onRight: () => step > 0 && step <= PICK && setStep(step - 1) });
+  const coachSwipe = useSwipe({ onUp: finish, threshold: 40 });
   const toggle = (c: Category) => setPicked((p) => (p.includes(c) ? p.filter((x) => x !== c) : [...p, c]));
+  // Laptops and keyboards: scroll or press down to do the same.
+  useEffect(() => {
+    if (step !== COACH) return;
+    const key = (e: KeyboardEvent) => { if (["ArrowDown", "ArrowUp", " ", "Enter", "PageDown"].includes(e.key)) { e.preventDefault(); finish(); } };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  if (step === COACH) return (
+    <div className="coach" role="dialog" aria-modal="true" aria-label="How to watch" {...coachSwipe}
+      onWheel={(e) => { if (Math.abs(e.deltaY) > 20) finish(); }}>
+      <div className="coach-hand" aria-hidden="true">
+        <span className="coach-trail" />
+        <span className="coach-finger" />
+      </div>
+      <h1>Swipe up for more</h1>
+      <p>Every video is something you can buy. Swipe up to see the next one, and tap Buy now when you find something you love.</p>
+      <button className="visually-hidden" onClick={finish}>Start watching</button>
+    </div>
+  );
+
+  const last = step === PICK;
   return (
     <div className="welcome" role="dialog" aria-modal="true" aria-label="Welcome to myHaul" {...swipe}>
       <div className="welcome-top">
         <span className="welcome-dots" aria-hidden="true">{[...SLIDES, null].map((_, i) => <span key={i} className={i === step ? "on" : ""} />)}</span>
-        {!last && <button className="link on-dark" onClick={() => setStep(SLIDES.length)}>Skip</button>}
+        {!last && <button className="link on-dark" onClick={() => setStep(PICK)}>Skip</button>}
       </div>
       {!last ? (
         <div className="welcome-body" key={step}>
@@ -62,9 +85,9 @@ export function Welcome({ onDone }: { onDone: () => void }) {
         </div>
       )}
       <div className="welcome-foot">
-        {!last
-          ? <button className="btn green block big" onClick={() => setStep(step + 1)}>Next</button>
-          : <button className="btn green block big" onClick={() => finish(picked)}>{picked.length ? "Start watching" : "Show me everything"}</button>}
+        <button className="btn green block big" onClick={() => (last ? toCoach() : setStep(step + 1))}>
+          {!last ? "Next" : picked.length ? "Next" : "Show me everything"}
+        </button>
       </div>
     </div>
   );

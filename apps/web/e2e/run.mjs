@@ -107,8 +107,14 @@ try {
   await welcome.getByRole("button", { name: /Bakes/ }).click();
   await check(welcome.getByRole("button", { name: /Bakes/ }).getAttribute("aria-pressed").then((v) => v === "true"), "interest picked");
   await shot("welcome-interests");
-  await welcome.getByRole("button", { name: "Start watching" }).click();
-  await welcome.waitFor({ state: "detached" });
+  await welcome.getByRole("button", { name: "Next" }).click();
+  // Last step: the swipe up lesson over the feed. No button: swiping it away starts watching.
+  const coach = page.getByRole("dialog", { name: "How to watch" });
+  await coach.getByText("Swipe up for more").waitFor();
+  await page.waitForTimeout(700);
+  await shot("welcome-swipe");
+  await swipe(".coach", 0, -160, 0.5, 0.7);
+  await coach.waitFor({ state: "detached" });
   // Picked Bakes, so the cake comes first in For You.
   await check(page.locator(".video-card").first().getAttribute("aria-label").then((l) => /cake/i.test(l ?? "")), "picked interests come first");
   await page.reload();

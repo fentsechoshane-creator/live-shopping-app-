@@ -85,7 +85,7 @@ async function run([w, h, tag]) {
   await page.evaluate(() => localStorage.clear());
   await page.goto(BASE);
   await step("welcome", async () => { await page.getByText("Shop from short videos").waitFor(); await look("welcome"); });
-  await step("welcome interests", async () => { await page.getByRole("button", { name: "Skip" }).click(); await look("welcome-interests"); await page.getByRole("button", { name: /Show me everything|Start watching/ }).click(); });
+  await step("welcome interests", async () => { await page.getByRole("button", { name: "Skip" }).click(); await look("welcome-interests"); await page.getByRole("button", { name: /Show me everything|Next/ }).click(); await page.keyboard.press("ArrowDown"); });
   await step("feed", async () => { await page.locator(".video-card").first().waitFor(); await look("feed"); });
   await step("item sheet", async () => { await page.getByRole("button", { name: /See details/ }).first().click(); await look("item-sheet"); await esc(); });
   await step("comments", async () => { await page.getByRole("button", { name: /^Comments/ }).first().click(); await look("comments"); await esc(); });
