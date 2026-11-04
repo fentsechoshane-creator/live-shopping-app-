@@ -220,7 +220,7 @@ function Overview() {
     { n: o.reportsOpen, t: "reports to answer (within 24 hours)", to: "/team/todo?f=reports" },
     { n: o.returnsWaiting, t: "returns to decide", to: "/team/todo?f=returns" },
     { n: o.late, t: "orders past their ship by date", to: "/team/todo?f=late" },
-    { n: o.topUpsDue, t: `welcome credit top ups to pay (${R(o.topUpsDueCents)})`, to: "/team/todo?f=topups" },
+    { n: o.topUpsDue, t: `reward top ups to pay (${R(o.topUpsDueCents)})`, to: "/team/todo?f=topups" },
     { n: o.errors7, t: "app errors this week", to: "/team/errors" },
   ].filter((x) => x.n > 0);
   return (
@@ -233,7 +233,7 @@ function Overview() {
       )}
       <section className="team-kpis">
         <Kpi label="Sales" value={R(o.sales30Cents)} sub={`${o.orders30} paid orders`} />
-        <Kpi label="Our fees" value={R(o.fees30Cents)} sub={`Welcome credit given: ${R(o.credit30Cents)}`} />
+        <Kpi label="Our fees" value={R(o.fees30Cents)} sub={`Rewards spent: ${R(o.credit30Cents)}`} />
         <Kpi label="Orders today" value={String(o.ordersToday)} sub={`${o.toShip} waiting to ship`} />
         <Kpi label="People" value={String(o.people)} sub={`${o.peopleNew7} new this week`} />
         <Kpi label="Open shops" value={String(o.shopsOpen)} sub={`${o.shopsOnboarding} setting up, ${o.shopsClosed} paused or closed`} />
@@ -433,6 +433,7 @@ function Person() {
       </section>}
 
       {tab === "history" && <>
+      <PersonRewards userId={p.id} />
       <div className="team-cols">
         <section className="team-card">
           <h2>Trust history</h2>
@@ -739,14 +740,14 @@ function Listings() {
 }
 
 // ===== Money =====
-/** Welcome credit top ups we pay ourselves. On Money and in To do. */
+/** Reward top ups we pay ourselves. On Money and in To do. */
 function TopUps() {
   const [rows, err, reload] = useLoad(() => api.topUpsDue(), []);
   const { busy, error, act } = useTeamAction(reload);
   return (
       <section className="team-card todo-section">
-        <h2>Welcome credit top ups to pay</h2>
-        <p className="small muted">When the R50 credit is more than our cut, we EFT the seller the difference from our account, on the payout date. Check the warning signs first: sellers can make fake buyer accounts to collect top ups. Only pay once the order is finished, and mark it paid once the EFT has gone through.</p>
+        <h2>Reward top ups to pay</h2>
+        <p className="small muted">When a R50 reward is more than our cut, we EFT the seller the difference from our account, on the payout date. Check the warning signs first: sellers can make fake buyer accounts to collect top ups. Only pay once the order is finished, and mark it paid once the EFT has gone through.</p>
         <ErrorNote error={error ?? err} />
         {rows?.length === 0 && <Empty>Nothing to pay.</Empty>}
         {rows && rows.length > 0 && (
@@ -771,12 +772,12 @@ function Money() {
   const { o } = useTeam();
   return (
     <div className="team-page">
-      <Head title="Money" sub="Escrow holds buyers' money and pays sellers. We only pay welcome credit top ups ourselves." />
+      <Head title="Money" sub="Escrow holds buyers' money and pays sellers. We only pay reward top ups ourselves." />
       {o && (
         <section className="team-kpis">
           <Kpi label="Sales, 30 days" value={R(o.sales30Cents)} sub={`${o.orders30} paid orders`} />
           <Kpi label="Our fees, 30 days" value={R(o.fees30Cents)} sub="Seller fee and buyer protection" />
-          <Kpi label="Welcome credit, 30 days" value={R(o.credit30Cents)} sub="Paid from the credit budget" />
+          <Kpi label="Rewards spent, 30 days" value={R(o.credit30Cents)} sub="Paid from the rewards budget" />
           <Kpi label="Top ups to pay" value={R(o.topUpsDueCents)} sub={`${o.topUpsDue} sellers`} />
         </section>
       )}
@@ -897,6 +898,23 @@ function LateOrders() {
               <td data-l="Buyer"><Link to={`/team/accounts/${o.buyerId}`}>@{o.buyer}</Link></td><td data-l="Total">{R(o.totalCents)}</td><td data-l="Ordered" className="small">{dateText(o.createdAt)}</td></tr>
           ))}</tbody>
         </table>
+      )}
+    </section>
+  );
+}
+
+/** Surprise rewards this person earned (never advertised). */
+function PersonRewards({ userId }: { userId: string }) {
+  const [rows] = useLoad(() => api.teamRewards(userId), [userId]);
+  const word: Record<string, string> = { first_buy: "First order", first_auction: "First auction win", first_sale: "First sale" };
+  const st: Record<string, [string, string]> = { pending: ["amber", "Waiting for return window"], ready: ["green", "Ready"], used: ["", "Used"], forfeited: ["red", "Removed (returned)"] };
+  return (
+    <section className="team-card">
+      <h2>Surprise rewards</h2>
+      {!rows ? <div className="muted">Loading…</div> : rows.length === 0 ? <p className="muted">None earned yet.</p> : (
+        <ul className="team-list">{rows.map((r, i) => (
+          <li key={i}><b>{R(r.amountCents)}</b><span className="grow">{word[r.kind]}</span><span className={`pill ${st[r.status][0]}`}>{st[r.status][1]}</span><span className="small muted">{timeAgo(r.createdAt)}</span></li>
+        ))}</ul>
       )}
     </section>
   );

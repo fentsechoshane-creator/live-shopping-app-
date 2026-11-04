@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { canUse, TIER_INFO, tierFor, TRUST_POINTS, WELCOME_CREDIT } from "@app/core";
+import { canUse, TIER_INFO, tierFor, TRUST_POINTS } from "@app/core";
 import { api, type MyProfile, type MyShop, type Order } from "../../api";
 import { useLoad, useSession } from "../../session";
 import { Icon } from "../../components/Icon";
+import { RewardChip } from "../../components/Rewards";
 import { ProductArt } from "../../components/Scene";
 import { ErrorNote, Field, Loading, R, Sheet, dateText, swatch, useAction } from "../../components/ui";
 import { CertUpload } from "../seller/Selling";
@@ -24,7 +25,6 @@ export function Profile() {
   const { user, setMenuOpen, following, toast, refreshProfile } = useSession();
   const [params, setParams] = useSearchParams();
   const [profile, , reloadProfile] = useLoad(() => (user ? api.myProfile() : Promise.resolve(null)), [user?.id]);
-  const [credit] = useLoad(() => (user ? api.welcomeCreditAvailable() : Promise.resolve(false)), [user?.id]);
   const [suspension] = useLoad(() => (user ? api.mySuspension() : Promise.resolve(null)), [user?.id]);
   const [shop, shopError, reloadShop] = useLoad(() => (user ? api.myShop() : Promise.resolve(null)), [user?.id]);
   const [sales] = useLoad(() => (shop && shop.status !== "onboarding" ? api.sellerOrders() : Promise.resolve([] as Order[])), [shop?.id, shop?.status]);
@@ -72,10 +72,7 @@ export function Profile() {
       <div className="pbar">
         <button className="bare" onClick={() => setSheet("edit")} aria-label="Edit profile"><Icon name="edit" /></button>
         <div className="row" style={{ gap: 4 }}>
-          {credit && <button className="wallet-chip label sm" onClick={() => toast(`${R(WELCOME_CREDIT)} off your first order of R200 or more. It comes off by itself.`)}
-            aria-label={`${R(WELCOME_CREDIT)} welcome credit`}>
-            <Icon name="wallet" /><span className="amt">{R(WELCOME_CREDIT)} off</span>
-          </button>}
+          <RewardChip className="sm" />
           <button className="bare" onClick={share} aria-label="Share profile"><Icon name="share" /></button>
           <button className="bare" onClick={() => setMenuOpen(true)} aria-label="Menu and settings"><Icon name="menu" /></button>
         </div>

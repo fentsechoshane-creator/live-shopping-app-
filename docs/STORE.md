@@ -53,7 +53,7 @@ Your money is held safely by an escrow partner and only paid to the seller after
 • Fakes and replicas are not allowed
 • Sell from your phone: take a photo or video, list it in a few steps, and get paid once the return window closes
 
-First order of R200 or more? Get R50 off with welcome credit.
+Every order is filmed when it's packed, so you know what was sent.
 
 **Keywords (Apple, 100 characters):** thrift,resale,secondhand,video shopping,live shopping,south africa,cape town,cakes,beauty,deals
 

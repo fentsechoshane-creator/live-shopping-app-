@@ -73,7 +73,7 @@ Deno.serve(handler(async (req, body) => {
   const sellerToken = shop.seller_checks?.escrow_token;
   if (!sellerToken) throw new UserError("This seller cannot take payments yet.");
 
-  // Welcome credit: one per person, finished accounts only, within the budget and the per seller limit.
+  // Rewards (migration 0024): a surprise R50 earned after a first delivered order, auction win or sale, usable after the return window.
   // The database checks the same rules again when the order is saved, so this can't be raced or skipped.
   const { data: creditOk } = await db.rpc("welcome_credit_ok", { p_buyer: uid, p_shop: shop.id });
 

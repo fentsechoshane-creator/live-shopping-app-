@@ -1,10 +1,9 @@
 import { useMemo, useState } from "react";
-import { WalletSheet } from "./Feed";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { WELCOME_CREDIT } from "@app/core";
 import { api, type Category, type FeedItem } from "../../api";
 import { useLoad, useSession } from "../../session";
 import { Icon } from "../../components/Icon";
+import { RewardChip } from "../../components/Rewards";
 import { ProductArt } from "../../components/Scene";
 import { ErrorNote, Loading, R, swatch } from "../../components/ui";
 
@@ -18,10 +17,8 @@ export function Explore() {
   const [q, setQ] = useState("");
   const [cat, setCat] = useState<Category | "all">("all");
   const { user, following, toggleFollow, withUser } = useSession();
-  const [credit] = useLoad(() => (user ? api.welcomeCreditAvailable() : Promise.resolve(false)), [user?.id]);
   const nav = useNavigate();
   const [params] = useSearchParams();
-  const [wallet, setWallet] = useState(false);
 
   const filtered = useMemo(() => (items ?? []).filter((it) => {
     const text = `${it.product.title} ${it.shop.name} ${it.shop.handle} ${it.caption} ${it.product.description ?? ""} ${it.product.sizes.join(" ")}`.toLowerCase();
@@ -43,10 +40,7 @@ export function Explore() {
           <span className="visually-hidden">Search</span>
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search sellers and items" type="search" enterKeyHint="search" autoFocus={params.get("search") === "1"} />
         </label>
-        <button className="wallet-chip" style={{ background: "var(--ink)", color: "var(--bg)" }} onClick={() => withUser(() => setWallet(true), "Sign in to see your credit")}
-          aria-label={`Wallet, ${credit ? R(WELCOME_CREDIT) : "R0"} credit`}>
-          <Icon name="wallet" /><span className="amt">{credit ? R(WELCOME_CREDIT) : "R0"}</span>
-        </button>
+        <RewardChip className="dark" />
       </div>
       <div className="chips scroll" style={{ margin: "14px -16px 4px" }} role="group" aria-label="Category">
         {CATS.map((c) => <button key={c.id} className="chip" aria-pressed={cat === c.id} onClick={() => setCat(c.id)}>{c.label}</button>)}
@@ -98,7 +92,6 @@ export function Explore() {
           <span className="grow"><b>Auctions are open</b><div className="small muted">Trusted sellers run timed auctions. Bid before the clock runs out.</div></span>
         </div>
       )}
-      {wallet && <WalletSheet credit={!!credit} onClose={() => setWallet(false)} />}
     </div>
   );
 }

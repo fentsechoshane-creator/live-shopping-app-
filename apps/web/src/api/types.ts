@@ -280,6 +280,12 @@ export type MyFeatures = Partial<Record<AccountFeature, "on" | "off">>;
 /** One switch on the dashboard, with what the normal rule says right now. */
 export interface TeamFeature { state: FeatureState; reason: string | null; at: string | null; by: string | null; autoOk: boolean; autoNote: string }
 
+/** A surprise reward: R50 after a first delivered order, auction win or sale. Usable once that order's return window closes. */
+export interface Reward {
+  id: string; kind: "first_buy" | "first_auction" | "first_sale"; amountCents: number;
+  status: "pending" | "ready" | "used" | "forfeited"; usableFrom: string | null; createdAt: string; seen: boolean; orderTitle?: string | null;
+}
+
 /** One order's packing proof, for the team. Links expire in 10 minutes. */
 export interface PackingProof {
   orderId: string; code: string | null; videoUrl: string | null; photoUrl: string | null; shippedAt: string | null;
@@ -332,7 +338,14 @@ export interface Api {
   leaveReview(id: string, stars: number, body: string): Promise<void>;
   notifications(): Promise<Notification[]>;
   markAllRead(): Promise<void>;
+  /** True when a reward is ready to come off your next order. */
   welcomeCreditAvailable(): Promise<boolean>;
+  /** Your surprise rewards, newest first. */
+  myRewards(): Promise<Reward[]>;
+  /** The surprise was shown, so don't show it again. */
+  markRewardsSeen(ids: string[]): Promise<void>;
+  /** Someone's rewards, for the team. */
+  teamRewards(userId: string): Promise<Reward[]>;
   myProfile(): Promise<MyProfile>;
   updateProfile(displayName: string, bio: string): Promise<void>;
   /** Which of these usernames are free (yours counts as free). */

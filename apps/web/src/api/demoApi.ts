@@ -7,7 +7,7 @@ import {
 import { handleProblem } from "../lib/handle";
 import type {
   Api, Category, ReportReason, ReportTarget, CheckoutInput, FeedItem, ListingInput, MyShop, Notification, Order, Payout, PendingReview, ProductPublic, ReviewStatus,
-  ShopPublic, User, SavedDelivery, AppError, AuctionInfo, TeamAlert, TeamOverview, TeamPerson, TeamPersonDetail, TeamOrder, TeamListing, TeamLogEntry, TeamFeature,
+  ShopPublic, User, SavedDelivery, AppError, AuctionInfo, TeamAlert, TeamOverview, TeamPerson, TeamPersonDetail, TeamOrder, TeamListing, TeamLogEntry, TeamFeature, Reward,
 } from "./types";
 
 interface DShop {
@@ -41,6 +41,7 @@ interface State {
   bids?: { id: string; productId: string; round: number; bidderId: string; amountCents: number; at: string }[];
   suspensions?: Record<string, { reason: string; at: string }>;
   packingStrikes?: { shopId: string; orderId: string; note: string; at: string }[];
+  rewards?: (Reward & { userId: string; earnedOrderId: string | null; usedOrderId: string | null })[];
   features?: Record<string, Partial<Record<AccountFeature, { state: "on" | "off"; reason: string; at: string; by: string }>>>;
   teamLog?: TeamLogEntry[];
   trustLog?: { userId: string; kind: string; points: number; at: string }[];
@@ -245,6 +246,18 @@ export function createDemoApi(): Api {
   };
   const canSell = (sh: DShop) => sh.status === "open" && sh.checks.idStatus === "approved" && sh.checks.bankStatus === "approved" && sh.checks.rulesAccepted;
 
+  function grantReward(uid: string, kind: Reward["kind"], o: DOrder) {
+    s.rewards = s.rewards ?? [];
+    if (s.suspensions?.[uid] || featureState(uid, "welcome_credit") === "off") return;
+    if (s.rewards.some((r) => r.userId === uid && r.kind === kind) || o.totals.itemPrice < 10000) return;
+    const given = s.rewards.filter((r) => r.status !== "forfeited").reduce((n, r) => n + r.amountCents, 0);
+    if (given + 5000 > 1_500_000) return;
+    s.rewards.unshift({ id: id(), userId: uid, kind, amountCents: 5000, status: "pending", usableFrom: o.releasableAt, createdAt: now().toISOString(),
+      seen: false, orderTitle: o.product.title, earnedOrderId: o.id, usedOrderId: null });
+    notify(uid, "Surprise! You earned R50", `${kind === "first_buy" ? "A thank you for your first order." : kind === "first_auction" ? "A thank you for your first auction win." : "A thank you for your first sale."} It's yours to spend once the return window closes. One reward comes off an order of R200 or more.`, "/me");
+  }
+  const readyReward = (uid: string) => (s.rewards ?? []).filter((r) => r.userId === uid && r.status === "ready").sort((a, b) => a.createdAt.localeCompare(b.createdAt))[0];
+
   function setStatus(o: DOrder, to: OrderStatus) {
     if (!canTransition(o.status, to)) throw new Error(`Order cannot go from ${o.status} to ${to}`);
     const t = now();
@@ -258,7 +271,6 @@ export function createDemoApi(): Api {
         item.heldFor = null; item.heldUntil = null;
       }
       if (o.offerId) (s.offers ?? []).forEach((of) => { if (of.id === o.offerId) of.status = "used"; });
-      if (o.totals.creditUsed > 0) s.users.find((u) => u.id === o.buyerId)!.welcomeUsed = true;
       notify(o.shopOwnerId, `New order: ${title}`, "Ship within 2 days. The money is held safely until the return window closes.", `/sell/orders/${o.id}`);
       notify(o.buyerId, "Payment received", `Your money is held safely. We will tell you when ${title} ships.`, `/orders/${o.id}`);
     }
@@ -267,8 +279,22 @@ export function createDemoApi(): Api {
       o.deliveredAt = t.toISOString();
       o.releasableAt = releasableAt(o.mode, t).toISOString();
       notify(o.buyerId, `Delivered: ${title}`, o.mode === "buy_now" ? "You have 7 days to return it if you change your mind." : "Tell us within the check period if something is wrong.", `/orders/${o.id}`);
+      // Surprise rewards, same rules as the database (migration 0024).
+      grantReward(o.buyerId, o.mode === "auction" ? "first_auction" : "first_buy", o);
+      grantReward(o.shopOwnerId, "first_sale", o);
     }
-    if (to === "completed") { trust(o.shopOwnerId, "order_kept"); schedulePayout(o); }
+    if (to === "completed") {
+      trust(o.shopOwnerId, "order_kept"); schedulePayout(o);
+      (s.rewards ?? []).filter((r) => r.earnedOrderId === o.id && r.status === "pending").forEach((r) => {
+        r.status = "ready"; notify(r.userId, "Your R50 is ready", "It comes off your next order of R200 or more, by itself.", "/me");
+      });
+    }
+    if (to === "refunded" || to === "cancelled") {
+      (s.rewards ?? []).forEach((r) => {
+        if (r.earnedOrderId === o.id && (r.status === "pending" || r.status === "ready")) r.status = "forfeited";
+        if (r.usedOrderId === o.id && r.status === "used") { r.status = "ready"; r.usedOrderId = null; }
+      });
+    }
     if (to === "refunded") {
       if (o.status === "paid") {
         trust(o.shopOwnerId, "not_shipped");
@@ -458,8 +484,8 @@ export function createDemoApi(): Api {
         if (bundleIds.length) title = `Bundle: ${p.title} + ${bundleIds.length} more`;
         itemPrice = of.priceCents;
       }
-      const paidBefore = s.orders.some((o) => o.buyerId === u.id && !["pending_payment", "cancelled"].includes(o.status));
-      const totals = orderTotals({ itemPrice, delivery: input.delivery, welcomeCreditAvailable: !u.welcomeUsed && !paidBefore && featureState(u.id, "welcome_credit") !== "off",
+      const reward = featureState(u.id, "welcome_credit") !== "off" ? readyReward(u.id) : undefined;
+      const totals = orderTotals({ itemPrice, delivery: input.delivery, welcomeCreditAvailable: !!reward,
         foundingUntil: sh.foundingUntil ? new Date(sh.foundingUntil) : null, at: now() });
       const oid = id();
       const o: DOrder = {
@@ -469,6 +495,7 @@ export function createDemoApi(): Api {
         paidAt: null, shipBy: null, shippedAt: null, deliveredAt: null, releasableAt: null, createdAt: now().toISOString(), ret: null, review: null,
       };
       s.orders.unshift(o);
+      if (reward && totals.creditUsed > 0) { reward.status = "used"; reward.usedOrderId = oid; }
       save();
       return { orderId: oid, checkoutUrl: o.checkoutUrl!, totals };
     },
@@ -914,7 +941,20 @@ export function createDemoApi(): Api {
     },
     async welcomeCreditAvailable() {
       const u = me();
-      return !u.welcomeUsed && featureState(u.id, "welcome_credit") !== "off" && !s.orders.some((o) => o.buyerId === u.id && !["pending_payment", "cancelled"].includes(o.status));
+      return featureState(u.id, "welcome_credit") !== "off" && !!readyReward(u.id);
+    },
+    async myRewards() {
+      if (!s.currentUserId) return [];
+      runDue();
+      return (s.rewards ?? []).filter((r) => r.userId === s.currentUserId).map(({ userId: _u, earnedOrderId: _e, usedOrderId: _x, ...r }) => r);
+    },
+    async markRewardsSeen(ids) {
+      (s.rewards ?? []).forEach((r) => { if (ids.includes(r.id)) r.seen = true; });
+      save();
+    },
+    async teamRewards(uid) {
+      teamOnly();
+      return (s.rewards ?? []).filter((r) => r.userId === uid).map(({ userId: _u, earnedOrderId: _e, usedOrderId: _x, ...r }) => r);
     },
 
     async myShop() {
@@ -1323,7 +1363,7 @@ export function createDemoApi(): Api {
       const ready = !!sh && canSell(sh);
       const rule: Record<AccountFeature, [boolean, string]> = {
         buy: [true, "Allowed"], bid: [true, "Allowed"], comment: [true, "Allowed"], message: [true, "Allowed"], offers: [true, "Allowed"],
-        welcome_credit: [!u.welcomeUsed, u.welcomeUsed ? "Used or not available" : "Can still use it"],
+        welcome_credit: [true, (s.rewards ?? []).filter((r) => r.userId === uid).map((r) => `${r.kind.replace("_", " ")} ${r.status}`).join(", ") || "None earned yet"],
         sell: [ready, !sh ? "No shop yet" : ready ? "Checks done" : "Waiting for ID and bank checks"],
         auctions: [good >= 5, `${good} of 5 good orders`], live: [good >= 5, `${good} of 5 good orders`],
         in_feed: [u.trust >= 40, `Trust ${u.trust}`], payouts: [u.trust >= 40, u.trust >= 40 ? "Paid by trust tier" : "Held: Restricted"],

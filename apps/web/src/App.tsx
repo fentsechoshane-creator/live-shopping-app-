@@ -15,6 +15,7 @@ import { Feed } from "./screens/buyer/Feed";
 import { Explore } from "./screens/buyer/Explore";
 import { MockPay, OrderDetail, Orders } from "./screens/buyer/Orders";
 import { Inbox, ShopPage, SignIn, SignInSheet } from "./screens/buyer/Account";
+import { RewardSurprise } from "./components/Rewards";
 import { Profile } from "./screens/buyer/Profile";
 import { Onboarding } from "./screens/seller/Onboarding";
 import { Payouts, SellerOrderDetail, SellerOrders } from "./screens/seller/Selling";
@@ -255,6 +256,7 @@ export function App() {
         </ErrorBoundary>
         {!loc.pathname.startsWith("/post") && <Tabs />}
         <SideMenu />
+        {user && !welcome && !loc.pathname.startsWith("/post") && !loc.pathname.startsWith("/mock-pay") && <RewardSurprise />}
         <SignInSheet />
         {welcome && <Welcome onDone={() => setWelcome(false)} />}
         {needsSetup && <AccountSetup />}

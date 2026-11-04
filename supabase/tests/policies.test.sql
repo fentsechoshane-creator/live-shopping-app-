@@ -226,10 +226,15 @@ select pg_temp.act_as('00000000-0000-0000-0000-00000000000a');
 update products set status = 'live' where title = 'Chunky white runner'; -- banned shop: matches no rows
 reset role;
 do $$ begin assert (select status from products where title = 'Chunky white runner') = 'removed', 'still removed'; end $$;
--- Welcome credit top up: R349 tee, R50 credit, buyer pays R311, we top the seller up R17.06.
--- A new buyer with a finished account (the credit needs one, and only one credit per person).
+-- Reward credit top up: R349 tee, R50 credit, buyer pays R311, we top the seller up R17.06.
+-- A buyer with a finished account and an earned reward that is ready (no credit just for signing up).
 insert into auth.users (id, email) values ('00000000-0000-0000-0000-0000000000a1', 'credit@test.co.za');
 update profiles set handle = 'credit.buyer', adult_confirmed_at = now() where id = '00000000-0000-0000-0000-0000000000a1';
+select pg_temp.act_as_service();
+select pg_temp.expect_error($$insert into orders (buyer_id, shop_id, product_id, mode, item_price_cents, delivery, delivery_fee_cents, protection_fee_cents, credit_cents, total_cents, seller_fee_cents, seller_payout_cents, credit_topup_cents)
+  values ('00000000-0000-0000-0000-0000000000a1', (select id from shops where handle = 'other.shop'), (select id from products limit 1), 'buy_now', 34900, 'collect_cpt', 0, 1200, 5000, 31100, 2094, 32806, 1706)$$, 'credit');
+reset role;
+insert into rewards (user_id, kind, amount_cents, status) values ('00000000-0000-0000-0000-0000000000a1', 'first_buy', 5000, 'ready');
 select pg_temp.act_as_service();
 select pg_temp.expect_error($$insert into orders (buyer_id, shop_id, product_id, mode, item_price_cents, delivery, delivery_fee_cents, protection_fee_cents, credit_cents, total_cents, seller_fee_cents, seller_payout_cents)
   values ('00000000-0000-0000-0000-0000000000a1', (select id from shops where handle = 'other.shop'), (select id from products limit 1), 'buy_now', 34900, 'collect_cpt', 0, 1200, 5000, 31100, 2094, 32806)$$, 'orders_topup_exact');
@@ -594,13 +599,49 @@ select pg_temp.expect_error($$insert into orders (buyer_id, shop_id, product_id,
   values ((select owner_id from shops where handle = 'other.shop'), (select id from shops where handle = 'other.shop'), (select id from products limit 1), 'buy_now', 35000, 'collect_cpt', 0, 1200, 36200, 2100, 32900)$$, 'your own');
 -- Order amounts can't change once made.
 select pg_temp.expect_error($$update orders set credit_cents = 0, total_cents = 36100 where buyer_id = '00000000-0000-0000-0000-0000000000a1'$$, 'cannot be changed');
--- 1.3 The budget: with only R40 left, no more credit. (Limits are changed by us in the database, not by any app role.)
+-- 1.3 Surprise rewards: nothing for signing up; R50 when an order is delivered; usable once the return window closes;
+-- none when the budget is used up; a reward used on a cancelled order comes back.
 reset role;
-update app_limits set value = (select sum(credit_cents) from orders where credit_cents > 0 and status <> 'cancelled') + 4000 where key = 'welcome_credit_budget_cents';
 update profiles set handle = 'fresh.buyer', adult_confirmed_at = now() where id = '00000000-0000-0000-0000-0000000000a2';
-do $$ begin assert not welcome_credit_ok('00000000-0000-0000-0000-0000000000a2', (select id from shops where handle = 'other.shop')), 'budget used up'; end $$;
+do $$ begin assert not welcome_credit_ok('00000000-0000-0000-0000-0000000000a2', (select id from shops where handle = 'other.shop')), 'no credit just for signing up'; end $$;
+insert into orders (id, buyer_id, shop_id, product_id, mode, item_price_cents, delivery, delivery_fee_cents, protection_fee_cents, total_cents, seller_fee_cents, seller_payout_cents)
+  select ('30000000-0000-0000-0000-00000000000' || i)::uuid, '00000000-0000-0000-0000-0000000000a2', (select id from shops where handle = 'other.shop'),
+    (select id from products limit 1), 'buy_now', 35000, 'collect_cpt', 0, 1200, 36200, 2100, 32900 from generate_series(1, 2) i;
+create function pg_temp.deliver(o uuid) returns void language plpgsql as $$
+begin
+  update orders set status = 'paid' where id = o;
+  perform pg_temp.packed(o);
+  update orders set status = 'shipped' where id = o;
+  update orders set status = 'delivered' where id = o;
+end $$;
+-- Budget nearly used: the first delivery gives nothing (silently).
+update app_limits set value = (select coalesce(sum(amount_cents), 0) from rewards where status <> 'forfeited') + 4000 where key = 'welcome_credit_budget_cents';
+select pg_temp.deliver('30000000-0000-0000-0000-000000000001');
+do $$ begin assert not exists (select 1 from rewards where user_id = '00000000-0000-0000-0000-0000000000a2'), 'no reward past the budget'; end $$;
 update app_limits set value = 1500000 where key = 'welcome_credit_budget_cents';
-do $$ begin assert welcome_credit_ok('00000000-0000-0000-0000-0000000000a2', (select id from shops where handle = 'other.shop')), 'credit ok for a new buyer'; end $$;
+select pg_temp.deliver('30000000-0000-0000-0000-000000000002');
+do $$ begin
+  assert (select status from rewards where user_id = '00000000-0000-0000-0000-0000000000a2' and kind = 'first_buy') = 'pending', 'surprise on delivery, not usable yet';
+  assert exists (select 1 from notifications where user_id = '00000000-0000-0000-0000-0000000000a2' and title = 'Surprise! You earned R50'), 'buyer is surprised';
+  assert exists (select 1 from rewards where user_id = (select owner_id from shops where handle = 'other.shop') and kind = 'first_sale'), 'seller gets one for a first sale';
+  assert not welcome_credit_ok('00000000-0000-0000-0000-0000000000a2', (select id from shops where handle = 'other.shop')), 'not before the return window closes';
+end $$;
+update orders set status = 'completed' where id = '30000000-0000-0000-0000-000000000002';
+do $$ begin
+  assert (select status from rewards where user_id = '00000000-0000-0000-0000-0000000000a2' and kind = 'first_buy') = 'ready', 'ready after the window';
+  assert welcome_credit_ok('00000000-0000-0000-0000-0000000000a2', (select id from shops where handle = 'other.shop')), 'credit ok now';
+end $$;
+-- Using it on an order that's then cancelled gives it back.
+insert into orders (id, buyer_id, shop_id, product_id, mode, item_price_cents, delivery, delivery_fee_cents, protection_fee_cents, credit_cents, total_cents, seller_fee_cents, seller_payout_cents, credit_topup_cents)
+  values ('30000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-0000000000a2', (select id from shops where handle = 'other.shop'), (select id from products limit 1), 'buy_now', 34900, 'collect_cpt', 0, 1200, 5000, 31100, 2094, 32806, 1706);
+do $$ begin assert (select status from rewards where user_id = '00000000-0000-0000-0000-0000000000a2' and kind = 'first_buy') = 'used', 'used on the order'; end $$;
+update orders set status = 'cancelled' where id = '30000000-0000-0000-0000-000000000003';
+do $$ begin assert (select status from rewards where user_id = '00000000-0000-0000-0000-0000000000a2' and kind = 'first_buy') = 'ready', 'back after cancelling'; end $$;
+-- People only see their own rewards.
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000b');
+do $$ begin assert (select count(*) from rewards where user_id = '00000000-0000-0000-0000-0000000000a2') = 0, 'rewards are private'; end $$;
+select pg_temp.expect_error($$update rewards set status = 'ready'$$, 'permission denied');
+reset role;
 select pg_temp.act_as_service();
 -- 1.9 Changing a bank account needs our team again.
 update seller_checks set escrow_token = 'tok_first', bank_status = 'approved' where shop_id = (select id from shops where handle = 'other.shop');

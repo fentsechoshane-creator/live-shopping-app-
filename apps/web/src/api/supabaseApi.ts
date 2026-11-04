@@ -5,7 +5,7 @@ import type {
   ListingSuggestion, Conversation, OpenReport,
   MyProfile, ShopPublic,
   Api, BankInput, Category, CheckoutInput, FeedItem, ListingInput, MyShop, Notification, Order, Payout, PendingReview,
-  ProductPublic, User, TeamPerson, TeamPersonDetail,
+  ProductPublic, User, TeamPerson, TeamPersonDetail, Reward,
 } from "./types";
 
 export function createSupabaseApi(url: string, anonKey: string): Api {
@@ -447,11 +447,19 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
       check(await sb.from("follows").delete().eq("user_id", await uid()).eq("shop_id", shopId));
     },
     async welcomeCreditAvailable() {
-      const me = await uid();
-      const { data } = await sb.from("profiles").select("welcome_credit_used").eq("id", me).single();
-      const { count } = await sb.from("orders").select("id", { count: "exact", head: true }).eq("buyer_id", me)
-        .not("status", "in", "(pending_payment,cancelled)");
-      return !data?.welcome_credit_used && (count ?? 0) === 0;
+      const { data: u } = await sb.auth.getUser();
+      if (!u.user) return false;
+      const { count } = await sb.from("rewards").select("id", { count: "exact", head: true }).eq("user_id", u.user.id).eq("status", "ready");
+      return (count ?? 0) > 0; // the checkout function checks the full rules again
+    },
+    async myRewards() {
+      return ((check(await sb.rpc("my_rewards")) as any[]) ?? []) as Reward[];
+    },
+    async markRewardsSeen(ids) {
+      if (ids.length) check(await sb.from("rewards").update({ seen_at: new Date().toISOString() }).in("id", ids));
+    },
+    async teamRewards(userId) {
+      return ((check(await sb.rpc("admin_rewards", { p_user: userId })) as any[]) ?? []).map((r, i) => ({ id: String(i), seen: true, ...r })) as Reward[];
     },
 
     async myShop() {

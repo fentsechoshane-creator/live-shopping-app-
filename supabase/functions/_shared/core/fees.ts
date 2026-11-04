@@ -22,7 +22,8 @@ export function sellerFee(itemPrice: Cents, opts: { foundingUntil?: Date | null;
   return Math.round(itemPrice * SELLER_FEE_RATE);
 }
 
-/** Welcome credit: R50 off a buyer's first order of R200 or more. */
+/** Reward credit: R50 off an order of R200 or more, one reward per order. Rewards are surprises after a first
+ * delivered order, auction win or sale (migration 0024), not given at sign up. The names stay for history. */
 export const WELCOME_CREDIT: Cents = rand(50);
 export const WELCOME_CREDIT_MIN_ORDER: Cents = rand(200);
 
@@ -39,7 +40,7 @@ export const DELIVERY_OPTIONS: Record<DeliveryOption, { label: string; fee: Cent
 export interface OrderTotalsInput {
   itemPrice: Cents;
   delivery: DeliveryOption;
-  /** True if this is the buyer's first paid order and they have not used the welcome credit. */
+  /** True when the buyer has a reward ready to use. */
   welcomeCreditAvailable?: boolean;
   foundingUntil?: Date | null;
   at?: Date;

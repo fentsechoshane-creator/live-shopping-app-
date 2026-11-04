@@ -46,7 +46,7 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 
 - Money in cents. Seller fee 6%. First 50 sellers pay 0% for 90 days.
 - Buyer protection fee: R5 under R150, R12 from R150 to R500, 3.5% above R500.
-- Welcome credit: full R50 on a first order of R200 or more. If the credit is bigger than our cut, we top up the seller ourselves from the credit budget.
+- Rewards (not advertised): R50 surprise after a first delivered purchase, auction win and sale; usable after the return window; one per order of R200 or more. If the reward is bigger than our cut, we top up the seller ourselves from the budget.
 - Money is held by a registered escrow provider (TradeSafe). Sellers are never paid before the return window closes: Buy now 7 days, auction 2 days, food 1 day. Ship within 72 hours.
 - Payout timing by trust tier after the window: Top next working day, Trusted 2 working days, Standard next Friday, Restricted held.
 - Trust score starts at 50 (0 to 100). Tiers at 90, 70, 40.
@@ -65,7 +65,7 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 
 ## Next up
 
-- **Before the store upload:** apply migrations 0017 to 0023 live (and redeploy order-action and run-due); deploy and schedule `team-alerts` and `push-notifications` (docs/SETUP.md steps 9 and 10); fill in the company details in `terms.html` and `privacy.html`; set up help@myhaul.co.za; make the reviewer account (docs/STORE.md). [Lehloma, Ofentse]
+- **Before the store upload:** apply migrations 0017 to 0024 live (and redeploy order-action, run-due and checkout); deploy and schedule `team-alerts` and `push-notifications` (docs/SETUP.md steps 9 and 10); fill in the company details in `terms.html` and `privacy.html`; set up help@myhaul.co.za; make the reviewer account (docs/STORE.md). [Lehloma, Ofentse]
 - **Alerts:** apply 0019 live, deploy and schedule `team-alerts` (docs/SETUP.md step 9), add the phone (Firebase and Apple), Telegram and email secrets. [Lehloma]
 - **Security:** apply 0018 live with 0017; set `TRADESAFE_MODE=mock` in Supabase secrets while testing (payments are refused without it); deploy the changed functions (checkout, escrow-webhook, run-due, suggest-listing). Then the open items in docs/SECURITY.md: team two step sign in, CAPTCHA at sign up, backups. [Lehloma, Ofentse]
 - **Team dashboard live:** apply migration 0017 to the live database and make Ofentse's account (@shups) a team member. [Ofentse to approve]
@@ -102,6 +102,16 @@ Debug as we go: anyone who finds or fixes a problem updates this list. Highest r
 Fixed in this round: Safari double back on the edge swipe (now only in the installed app), deleting an account now also deletes the person's photos and videos, React Router warnings.
 
 ## Log
+
+### 2026-11-04: Surprise rewards replace the welcome credit
+
+- Decided with Ofentse: no credit at sign up (that rewards making accounts, which gets farmed). The first order is full price.
+- **R50 surprise** the first time each of these is delivered: a Buy now or made to order purchase, an auction win, a sale (sellers get credit to shop with). It appears as a surprise when the order is delivered, with a push notification and a one time celebration screen.
+- Usable once that order's return window closes ("R50 soon", then "R50 off"). If the order is returned or refunded, the reward is removed. One reward per order of R200 or more, taken by itself at checkout. A reward used on a cancelled or refunded order comes back.
+- Never advertised: the welcome slide, the signed out wallet button, the store listing text and the Terms promise nothing. Terms section 8 now says rewards are at our discretion, have no cash value and are removed if the order is returned.
+- Abuse guards: the earning order must be R100 or more [CONFIRM amount]; R15,000 budget caps rewards given; a shop can take 5 reward orders in 30 days; suspended accounts and the "Surprise rewards" switch off get none. The database picks which reward is used, and one reward can only be on one order.
+- Migration 0024 (rewards table, grant on delivery, ready on completion, forfeited on refund; welcome_credit_ok now means "has a ready reward"; budget alert counts rewards given). Team sees rewards on the account page, History tab.
+- Open: apply 0024 live after 0017 to 0023. [Lehloma]
 
 ### 2026-11-04: Packing proof before shipping
 

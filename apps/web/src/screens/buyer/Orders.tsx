@@ -72,7 +72,8 @@ export function OrderDetail() {
   if (o === undefined) return <div className="screen"><Loading /></div>;
   if (!o) return <div className="screen"><div className="empty">Order not found.</div></div>;
 
-  const act = (fn: () => Promise<void>, msg: string) => run(async () => { await fn(); toast(msg); reload(); });
+  // After any change, check for a surprise reward (it arrives when an order is delivered).
+  const act = (fn: () => Promise<void>, msg: string) => run(async () => { await fn(); toast(msg); reload(); window.dispatchEvent(new Event("rewards-check")); });
   const windowOpen = o.status === "delivered" && o.releasableAt && new Date(o.releasableAt) > new Date();
 
   return (
@@ -151,7 +152,7 @@ export function OrderDetail() {
         <div className="row"><span>Item{o.size ? ` (size ${o.size})` : ""}</span><span>{R(o.totals.itemPrice)}</span></div>
         <div className="row"><span>{DELIVERY_OPTIONS[o.delivery].label}</span><span>{o.totals.deliveryFee ? R(o.totals.deliveryFee) : "Free"}</span></div>
         <div className="row"><span>Buyer protection</span><span>{R(o.totals.protectionFee)}</span></div>
-        {o.totals.creditUsed > 0 && <div className="row"><span>Welcome credit</span><span>-{R(o.totals.creditUsed)}</span></div>}
+        {o.totals.creditUsed > 0 && <div className="row"><span>Reward</span><span>-{R(o.totals.creditUsed)}</span></div>}
         <div className="row total"><span>Total</span><span>{R(o.totals.total)}</span></div>
       </div>
       {api.demo && <DemoTools orderId={o.id} onDone={reload} />}
@@ -187,8 +188,8 @@ function DemoTools({ orderId, onDone }: { orderId: string; onDone: () => void })
       <b>Demo tools</b>
       <p className="small muted" style={{ margin: "4px 0 10px" }}>Only in demo mode, to move the order along.</p>
       <div className="row">
-        <button className="btn grow" onClick={() => api.demo!.markDelivered(orderId).then(onDone)}>Ship and deliver</button>
-        <button className="btn grow" onClick={() => api.demo!.skipDays(8).then(onDone)}>Skip 8 days</button>
+        <button className="btn grow" onClick={() => api.demo!.markDelivered(orderId).then(onDone).then(() => window.dispatchEvent(new Event("rewards-check")))}>Ship and deliver</button>
+        <button className="btn grow" onClick={() => api.demo!.skipDays(8).then(onDone).then(() => window.dispatchEvent(new Event("rewards-check")))}>Skip 8 days</button>
       </div>
     </div>
   );

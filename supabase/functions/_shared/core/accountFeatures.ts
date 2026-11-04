@@ -29,7 +29,7 @@ export const ACCOUNT_FEATURES: AccountFeatureInfo[] = [
   { key: "bid", side: "buying", label: "Bidding", auto: "Anyone signed in and set up can bid.", on: null, off: "Can't bid on auctions." },
   { key: "comment", side: "buying", label: "Comments", auto: "Anyone signed in can comment.", on: null, off: "Can't comment." },
   { key: "message", side: "buying", label: "Messages", auto: "Anyone signed in can message shops.", on: null, off: "Can't start chats or send messages." },
-  { key: "welcome_credit", side: "buying", label: "Welcome credit", auto: "R50 once, on a first order of R200 or more.", on: null, off: "Never gets the welcome credit." },
+  { key: "welcome_credit", side: "buying", label: "Surprise rewards", auto: "R50 after a first delivered order, auction win and sale.", on: null, off: "Gets no rewards and can't use any." },
   { key: "sell", side: "selling", label: "Listing items", auto: "After the ID and bank checks.", on: null, off: "Can't put items or videos live." },
   { key: "auctions", side: "selling", label: "Auctions", auto: "After 5 delivered orders with good ratings.", on: "Can run auctions now, before 5 orders.", off: "Can't start auctions." },
   { key: "live", side: "selling", label: "Live selling", auto: "After 5 good orders, once Live is released.", on: "Early access, even before Live is released to everyone.", off: "Can't go live." },

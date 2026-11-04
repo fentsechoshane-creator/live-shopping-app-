@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { WELCOME_CREDIT } from "@app/core";
 import type { Category } from "../api";
 import { Icon } from "./Icon";
 import { R } from "./ui";
@@ -19,7 +18,7 @@ const INTERESTS: { id: Category; label: string; sub: string }[] = [
 const SLIDES = [
   { icon: "play", title: "Shop from short videos", body: "Watch local sellers show the real item. See something you like? Tap Buy now without leaving the video." },
   { icon: "shield", title: "Your money is held safely", body: "We only pay the seller after your return window closes. Change your mind on a Buy now item? Send it back within 7 days." },
-  { icon: "wallet", title: `${R(WELCOME_CREDIT)} off your first order`, body: `Welcome credit comes off by itself on a first order of R200 or more. Nothing to type in.` },
+  { icon: "check", title: "Every seller is checked", body: "We check each seller's ID and bank account before they can sell, and every order is filmed when it's packed." },
 ];
 
 /** First open: three short screens, then pick what you like so For You isn't random on day one. */

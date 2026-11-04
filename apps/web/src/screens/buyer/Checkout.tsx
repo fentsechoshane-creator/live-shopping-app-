@@ -161,7 +161,7 @@ export function CheckoutSheet({ item, onClose, offer, auctionPrice }: { item: Fe
         <div className="row"><span>Item</span><span>{R(t.itemPrice)}</span></div>
         <div className="row"><span>Delivery</span><span>{t.deliveryFee ? R(t.deliveryFee) : "Free"}</span></div>
         <div className="row"><span>Buyer protection</span><span>{R(t.protectionFee)}</span></div>
-        {t.creditUsed > 0 && <div className="row" style={{ color: "#15803d" }}><span>Welcome credit</span><span>-{R(t.creditUsed)}</span></div>}
+        {t.creditUsed > 0 && <div className="row" style={{ color: "#15803d" }}><span>Reward</span><span>-{R(t.creditUsed)}</span></div>}
         <div className="row total"><span>Total</span><span>{R(t.total)}</span></div>
       </div>
     </Sheet>

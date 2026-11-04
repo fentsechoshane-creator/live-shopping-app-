@@ -87,6 +87,9 @@ async function signIn(email) {
   await page.getByLabel("Code").fill("123456"); // signs in by itself once 6 digits are in
   await page.waitForURL((u) => !u.pathname.startsWith("/signin"));
   await maybeSetup();
+  // Someone with a new surprise reward sees it first (for example a seller after a first sale).
+  const surprise = page.getByRole("dialog", { name: "Surprise reward" });
+  if (await surprise.waitFor({ timeout: 1500 }).then(() => true, () => false)) await surprise.getByRole("button", { name: "Nice!" }).click();
 }
 
 try {
@@ -155,11 +158,11 @@ try {
   const sheet = page.getByRole("dialog", { name: "Checkout" });
   await sheet.getByRole("button", { name: "M", exact: true }).click();
   await sheet.getByRole("button", { name: /Free collection/ }).click();
-  await sheet.getByText("Welcome credit").waitFor();
   await shot("checkout");
-  // R349 + R12 protection, minus the full R50 welcome credit = R311. We top the seller up the difference.
-  await check(sheet.getByRole("button", { name: "Pay R311", exact: true }).isVisible(), "total R311 with the R50 welcome credit");
-  await sheet.getByRole("button", { name: "Pay R311", exact: true }).click();
+  // No credit for signing up: the first order is full price, R349 + R12 protection = R361.
+  await check(sheet.getByText("Reward", { exact: true }).count().then((n) => n === 0), "no reward on a first order");
+  await check(sheet.getByRole("button", { name: "Pay R361", exact: true }).isVisible(), "first order is full price");
+  await sheet.getByRole("button", { name: "Pay R361", exact: true }).click();
   await page.waitForURL(/mock-pay/);
   await shot("mock-pay");
   await page.getByRole("button", { name: "Pay now" }).click();
@@ -170,11 +173,24 @@ try {
   await shot("order-paid");
 
   await page.getByRole("button", { name: "Ship and deliver" }).click();
+  // The surprise: R50 for a first delivered order, usable once the return window closes.
+  const surprise = page.getByRole("dialog", { name: "Surprise reward" });
+  await surprise.getByText("R50").waitFor();
+  await surprise.getByText(/once the return window closes/).waitFor();
+  await page.waitForTimeout(1200); // let the pop and confetti finish
+  await shot("reward-surprise");
+  await surprise.getByRole("button", { name: "Nice!" }).click();
   await page.getByText("Something wrong?").waitFor();
   await shot("order-delivered");
   await page.getByRole("button", { name: "Skip 8 days" }).click();
   await page.getByText("Complete", { exact: true }).waitFor();
   await check((await page.getByText("Something wrong?").count()) === 0, "return window closed after 8 days");
+  // Now it's ready: the wallet shows it, and the surprise doesn't show again.
+  await page.goto(BASE);
+  await page.getByRole("button", { name: "R50 reward ready" }).click();
+  await page.getByRole("dialog", { name: "Wallet" }).getByText("Ready. Comes off your next order of R200 or more.").waitFor();
+  await page.keyboard.press("Escape");
+  await check(page.getByRole("dialog", { name: "Surprise reward" }).count().then((n) => n === 0), "surprise shows once");
 
   // A shared item link opens that item straight away.
   await page.goto(`${BASE}/i/p-tee`);
@@ -238,10 +254,10 @@ try {
   await page.waitForURL(/\/orders\//);
   await page.getByText("Order placed.").waitFor();
 
-  // The welcome credit is used, so the wallet button is gone (no "R0").
+  // The reward came off the auction (R900 is over R200), so the wallet button is gone (no "R0").
   await page.goto(BASE);
   await page.getByRole("link", { name: "Home" }).waitFor();
-  await check(page.getByRole("button", { name: /welcome credit/ }).count().then((n) => n === 0), "no wallet once the credit is used");
+  await check(page.getByRole("button", { name: /reward/ }).count().then((n) => n === 0), "no wallet once the reward is used");
 
   // Inbox: tab labels, chats first, updates second. Orders live on the profile.
   await page.getByRole("link", { name: /^Inbox/ }).click();
@@ -516,9 +532,9 @@ try {
   await page.getByRole("heading", { name: "Overview" }).waitFor();
   await page.getByText("Needs you").waitFor();
   await shot("team-overview");
-  // Money: the R349 tee bought with the welcome credit leaves a R17.06 top up for us to pay Lebo's Thrift.
+  // Money: reward top ups (none here: our cut on the R900 auction is bigger than the R50 reward).
   await page.goto(`${BASE}/team/money`);
-  await page.getByText("R17.06").first().waitFor();
+  await page.getByRole("heading", { name: "Reward top ups to pay" }).waitFor();
   // To do: reports, checks and the rest in one list; old alert links land here too.
   await page.goto(`${BASE}/team/alerts`);
   await page.waitForURL(/\/team\/todo/);
