@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { isRude, looksOffApp, ORDER_STATUS_TEXT } from "@app/core";
-import { api, type FeedItem, type MyShop, type Offer, type Order } from "../../api";
+import { api, type Conversation, type FeedItem, type MyShop, type Offer, type Order } from "../../api";
 import { ProductArt } from "../../components/Scene";
 import { useLoad, useSession } from "../../session";
 import { Icon } from "../../components/Icon";
@@ -24,8 +24,9 @@ export function useMessageShop() {
 }
 
 /** List of chats, used in Activity > Messages. */
-export function ConversationList() {
-  const [list, error] = useLoad(() => api.conversations(), []);
+export function ConversationList({ list: given }: { list?: Conversation[] } = {}) {
+  const [loaded, error] = useLoad(() => (given ? Promise.resolve(given) : api.conversations()), [given]);
+  const list = given ?? loaded;
   if (error) return <ErrorNote error={error} />;
   if (!list) return <Loading />;
   if (list.length === 0) return <div className="empty-card"><span className="muted">No messages yet. Tap Message on a shop or item to ask a question.</span></div>;
@@ -80,7 +81,7 @@ export function Thread() {
   const nav = useNavigate();
   const endRef = useRef<HTMLDivElement>(null);
   const photoRef = useRef<HTMLInputElement>(null);
-  const goBack = useGoBack("/activity?tab=messages");
+  const goBack = useGoBack("/inbox?tab=messages");
   const c = data?.conversation;
   const [orders] = useLoad(async () => {
     if (!c) return [] as Order[];
@@ -209,7 +210,7 @@ export function Thread() {
             <button role="menuitem" onClick={() => { setMenu(false); setReporting(true); }}><Icon name="flag" size={16} />Report</button>
             {!c.iAmSeller && (
               <button role="menuitem" style={{ color: "var(--red-text)" }} onClick={() => run(async () => {
-                await api.block({ shopId: c.shopId }); refreshBlocks(); toast(`Blocked @${c.shopHandle}`); nav("/activity?tab=messages");
+                await api.block({ shopId: c.shopId }); refreshBlocks(); toast(`Blocked @${c.shopHandle}`); nav("/inbox?tab=messages");
               })}><Icon name="block" size={16} />Block @{c.shopHandle}</button>
             )}
             <button role="menuitem" onClick={() => setMenu(false)}>Cancel</button>

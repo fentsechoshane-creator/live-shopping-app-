@@ -75,10 +75,11 @@ export function Feed() {
           ...(FEATURES.live ? [{ value: "live" as Tab, label: <><span className="dot-live" />Live</> }] : []),
         ]} />
         <div className="row" style={{ gap: 8 }}>
-          <button className="wallet-chip vglass" onClick={() => withUser(() => setWallet(true), "Sign in to see your credit")}
-            aria-label={`Wallet, ${credit ? R(WELCOME_CREDIT) : "R0"} credit`}>
-            <Icon name="wallet" /><span className="amt">{credit ? R(WELCOME_CREDIT) : "R0"}</span>
-          </button>
+          {/* Shown to new people (signed out, or credit not used yet). Gone once it's used, so there's no R0. */}
+          {(!user || credit) && <button className="wallet-chip label vglass" onClick={() => (user ? setWallet(true) : withUser(() => setWallet(true), "Sign in to get your welcome credit"))}
+            aria-label={`${R(WELCOME_CREDIT)} welcome credit`}>
+            <Icon name="wallet" /><span className="amt">{R(WELCOME_CREDIT)} off</span>
+          </button>}
           <button className="wallet-chip vglass" onClick={() => nav("/explore?search=1")} aria-label="Search"><Icon name="search" /></button>
         </div>
       </div>

@@ -2,7 +2,7 @@
 // Everything here reads and writes the same database as the app (admin_* functions), so what the team does
 // shows in the app straight away, and what people do in the app shows here.
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { Link, NavLink, Route, Routes, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ACCOUNT_FEATURES, ORDER_STATUS_TEXT, REPORT_REASONS, type AccountFeature, type FeatureState, type OrderStatus } from "@app/core";
 import {
   api, type PeopleFilter, type TeamListing, type TeamListingFilter, type TeamOrder, type TeamOrderFilter, type TeamOverview,
@@ -27,18 +27,24 @@ function useTeamAction(reload?: () => void) {
   return { busy, error, act, setError };
 }
 
-const NAV: { to: string; label: string; icon: string; count?: (o: TeamOverview, alerts: TeamAlert[]) => number; urgent?: boolean }[] = [
-  { to: "/team", label: "Overview", icon: "home" },
-  { to: "/team/alerts", label: "Alerts", icon: "bell", count: (_o, a) => a.filter((x) => !x.seen).length, urgent: true },
-  { to: "/team/accounts", label: "Accounts", icon: "team" },
-  { to: "/team/checks", label: "Seller checks", icon: "shield", count: (o) => o.checksWaiting, urgent: true },
-  { to: "/team/reports", label: "Reports", icon: "flag", count: (o) => o.reportsOpen, urgent: true },
-  { to: "/team/returns", label: "Returns", icon: "flip", count: (o) => o.returnsWaiting, urgent: true },
-  { to: "/team/orders", label: "Orders", icon: "bag", count: (o) => o.late, urgent: true },
-  { to: "/team/listings", label: "Listings", icon: "grid" },
-  { to: "/team/money", label: "Money", icon: "payout", count: (o) => o.topUpsDue, urgent: true },
-  { to: "/team/errors", label: "App errors", icon: "help", count: (o) => o.errors7 },
-  { to: "/team/log", label: "Activity log", icon: "clock" },
+type NavItem = { to: string; label: string; icon: string; count?: (o: TeamOverview, alerts: TeamAlert[]) => number; urgent?: boolean };
+const todoCount = (o: TeamOverview) => o.checksWaiting + o.reportsOpen + o.returnsWaiting + o.late + o.topUpsDue;
+/** The menu, grouped by what you're doing: work to do, looking something up, keeping the app running. */
+const NAV: { group: string | null; items: NavItem[] }[] = [
+  { group: null, items: [
+    { to: "/team", label: "Overview", icon: "home" },
+    { to: "/team/todo", label: "To do", icon: "check", count: (o) => todoCount(o), urgent: true },
+  ] },
+  { group: "Look up", items: [
+    { to: "/team/accounts", label: "Accounts", icon: "team" },
+    { to: "/team/orders", label: "Orders", icon: "bag" },
+    { to: "/team/listings", label: "Listings", icon: "grid" },
+    { to: "/team/money", label: "Money", icon: "payout" },
+  ] },
+  { group: "System", items: [
+    { to: "/team/errors", label: "App errors", icon: "help", count: (o) => o.errors7 },
+    { to: "/team/log", label: "Activity log", icon: "clock" },
+  ] },
 ];
 
 export function TeamApp() {
@@ -79,15 +85,20 @@ export function TeamApp() {
         <aside className={`team-nav ${menu ? "open" : ""}`}>
           <div className="team-logo">myHaul <span>Team</span></div>
           <nav onClick={() => setMenu(false)}>
-            {NAV.map((n) => {
-              const c = o && n.count ? n.count(o, alerts) : 0;
-              return (
-                <NavLink key={n.to} to={n.to} end={n.to === "/team"} className={({ isActive }) => `team-link ${isActive ? "on" : ""}`}>
-                  <Icon name={n.icon as any} size={18} /><span className="grow">{n.label}</span>
-                  {c > 0 && <span className={`team-count ${n.urgent ? "urgent" : ""}`}>{c}</span>}
-                </NavLink>
-              );
-            })}
+            {NAV.map((g) => (
+              <div key={g.group ?? "main"} className="team-nav-group">
+                {g.group && <div className="team-nav-h">{g.group}</div>}
+                {g.items.map((n) => {
+                  const c = o && n.count ? n.count(o, alerts) : 0;
+                  return (
+                    <NavLink key={n.to} to={n.to} end={n.to === "/team"} className={({ isActive }) => `team-link ${isActive ? "on" : ""}`}>
+                      <Icon name={n.icon as any} size={18} /><span className="grow">{n.label}</span>
+                      {c > 0 && <span className={`team-count ${n.urgent ? "urgent" : ""}`}>{c}</span>}
+                    </NavLink>
+                  );
+                })}
+              </div>
+            ))}
           </nav>
           <div className="team-nav-foot">
             <Link to="/" className="team-link"><Icon name="back" size={18} /><span className="grow">Back to the app</span></Link>
@@ -99,15 +110,18 @@ export function TeamApp() {
           <div className="team-topbar">
             <button className="team-menu-btn" aria-label="Menu" onClick={() => setMenu(true)}><Icon name="menu" size={22} /></button>
             <div className="team-logo small">myHaul <span>Team</span></div>
+            <GlobalSearch />
           </div>
           <Routes>
             <Route path="/team" element={<Overview />} />
-            <Route path="/team/alerts" element={<Alerts />} />
+            <Route path="/team/todo" element={<Todo />} />
             <Route path="/team/accounts" element={<Accounts />} />
             <Route path="/team/accounts/:id" element={<Person />} />
-            <Route path="/team/checks" element={<Checks />} />
-            <Route path="/team/reports" element={<Reports />} />
-            <Route path="/team/returns" element={<Returns />} />
+            {/* Old addresses (alert links, bookmarks) open the matching part of To do. */}
+            <Route path="/team/alerts" element={<Navigate to="/team/todo" replace />} />
+            <Route path="/team/checks" element={<Navigate to="/team/todo?f=checks" replace />} />
+            <Route path="/team/reports" element={<Navigate to="/team/todo?f=reports" replace />} />
+            <Route path="/team/returns" element={<Navigate to="/team/todo?f=returns" replace />} />
             <Route path="/team/orders" element={<Orders />} />
             <Route path="/team/listings" element={<Listings />} />
             <Route path="/team/money" element={<Money />} />
@@ -201,19 +215,19 @@ function Overview() {
   if (!o) return <div className="team-page"><Head title="Overview" /><div className="muted">Loading…</div></div>;
   const max = Math.max(1, ...o.daily.map((d) => d.orders));
   const todo = [
-    { n: o.checksWaiting, t: "seller checks to approve", to: "/team/checks" },
-    { n: o.reportsOpen, t: "reports to answer (within 24 hours)", to: "/team/reports" },
-    { n: o.returnsWaiting, t: "returns to decide", to: "/team/returns" },
-    { n: o.late, t: "orders past their ship by date", to: "/team/orders?f=late" },
-    { n: o.topUpsDue, t: `welcome credit top ups to pay (${R(o.topUpsDueCents)})`, to: "/team/money" },
+    { n: o.checksWaiting, t: "seller checks to approve", to: "/team/todo?f=checks" },
+    { n: o.reportsOpen, t: "reports to answer (within 24 hours)", to: "/team/todo?f=reports" },
+    { n: o.returnsWaiting, t: "returns to decide", to: "/team/todo?f=returns" },
+    { n: o.late, t: "orders past their ship by date", to: "/team/todo?f=late" },
+    { n: o.topUpsDue, t: `welcome credit top ups to pay (${R(o.topUpsDueCents)})`, to: "/team/todo?f=topups" },
     { n: o.errors7, t: "app errors this week", to: "/team/errors" },
   ].filter((x) => x.n > 0);
   return (
     <div className="team-page">
       <Head title="Overview" sub="The last 30 days, in rand. Updated every time you open this page." />
       {alerts.some((a) => !a.seen && a.severity === "urgent") && (
-        <Link to="/team/alerts" className="team-banner red" style={{ display: "block", textDecoration: "none" }}>
-          <b>{alerts.filter((a) => !a.seen && a.severity === "urgent").length} urgent {alerts.filter((a) => !a.seen && a.severity === "urgent").length === 1 ? "alert" : "alerts"}.</b> {alerts.find((a) => !a.seen && a.severity === "urgent")!.title}. Open alerts.
+        <Link to="/team/todo" className="team-banner red" style={{ display: "block", textDecoration: "none" }}>
+          <b>{alerts.filter((a) => !a.seen && a.severity === "urgent").length} urgent {alerts.filter((a) => !a.seen && a.severity === "urgent").length === 1 ? "alert" : "alerts"}.</b> {alerts.find((a) => !a.seen && a.severity === "urgent")!.title}. Open To do.
         </Link>
       )}
       <section className="team-kpis">
@@ -324,6 +338,8 @@ function Person() {
   const { busy, error, act } = useTeamAction(reload);
   const { user } = useSession();
   const [ask, setAsk] = useState<null | "suspend" | "pause" | "close">(null);
+  const [params, setParams] = useSearchParams();
+  const tab = (params.get("tab") as "overview" | "orders" | "features" | "history") || "overview";
   if (err) return <div className="team-page"><BackTo /><ErrorNote error={err} /></div>;
   if (!p) return <div className="team-page"><BackTo /><div className="muted">Loading…</div></div>;
   const me = user?.id === p.id;
@@ -361,7 +377,10 @@ function Person() {
         {sh && <Link className="btn line" to={`/s/${sh.handle}`} target="_blank">View shop in the app</Link>}
       </div>
 
-      <div className="team-cols">
+      <Filters value={tab} onChange={(v) => setParams(v === "overview" ? {} : { tab: v }, { replace: true })}
+        options={[["overview", "Overview"], ["orders", `Orders (${p.orders.length})`], ["features", "Features"], ["history", "History"]]} />
+
+      {tab === "overview" && <div className="team-cols">
         <section className="team-card">
           <h2>Account</h2>
           <dl className="team-dl">
@@ -395,11 +414,11 @@ function Person() {
             </>
           )}
         </section>
-      </div>
+      </div>}
 
-      <Features userId={p.id} hasShop={!!sh} onChange={reload} />
+      {tab === "features" && <Features userId={p.id} hasShop={!!sh} onChange={reload} />}
 
-      <section className="team-card">
+      {tab === "orders" && <section className="team-card">
         <h2>Orders</h2>
         {p.orders.length === 0 ? <p className="muted">No orders yet.</p> : (
           <table className="tt">
@@ -410,8 +429,9 @@ function Person() {
             ))}</tbody>
           </table>
         )}
-      </section>
+      </section>}
 
+      {tab === "history" && <>
       <div className="team-cols">
         <section className="team-card">
           <h2>Trust history</h2>
@@ -440,6 +460,7 @@ function Person() {
           ))}</ul>
         )}
       </section>
+      </>}
 
       {ask === "suspend" && <ReasonDialog title={`Suspend ${p.name || "this account"}?`} confirm="Suspend" busy={busy} onCancel={() => setAsk(null)}
         body="They can still sign in and see their orders, but can't buy, sell, bid, comment or message. Their shop is paused. You can lift it any time."
@@ -459,6 +480,7 @@ function Features({ userId, hasShop, onChange }: { userId: string; hasShop: bool
   const [f, err, reload] = useLoad(() => api.teamFeatures(userId), [userId]);
   const { busy, error, act } = useTeamAction(() => { reload(); onChange(); });
   const [ask, setAsk] = useState<null | { key: AccountFeature; state: FeatureState }>(null);
+  const [all, setAll] = useState(false);
   const info = ask ? ACCOUNT_FEATURES.find((x) => x.key === ask.key)! : null;
   const set = (key: AccountFeature, state: FeatureState) => {
     if (state === "auto") act(() => api.setAccountFeature(userId, key, "auto"), "Back to the normal rules");
@@ -470,10 +492,11 @@ function Features({ userId, hasShop, onChange }: { userId: string; hasShop: bool
       <div className="row between"><h2>Features</h2>{changed > 0 && <span className="pill amber">{changed} changed</span>}</div>
       <p className="muted small" style={{ marginTop: 0 }}>Auto follows the normal rules. On skips a milestone. Off blocks it. Legal checks (ID, bank, food certificate, designer proof) can't be skipped, so some can only be turned off.</p>
       <ErrorNote error={err ?? error} />
-      {!f ? <div className="muted">Loading…</div> : (["buying", "selling"] as const).map((side) => (
+      {!f ? <div className="muted">Loading…</div> : (["buying", "selling"] as const)
+        .filter((side) => all || changed === 0 || ACCOUNT_FEATURES.some((x) => x.side === side && f[x.key].state !== "auto")).map((side) => (
         <div key={side} className="team-features">
           <h3>{side === "buying" ? "Buying" : "Selling"}{side === "selling" && !hasShop ? " (no shop yet)" : ""}</h3>
-          {ACCOUNT_FEATURES.filter((x) => x.side === side).map((x) => {
+          {ACCOUNT_FEATURES.filter((x) => x.side === side && (all || changed === 0 || f[x.key].state !== "auto")).map((x) => {
             const cur = f[x.key];
             const now = cur.state === "auto" ? cur.autoOk : cur.state === "on";
             return (
@@ -497,6 +520,8 @@ function Features({ userId, hasShop, onChange }: { userId: string; hasShop: bool
           })}
         </div>
       ))}
+      {f && changed > 0 && <button className="btn line small" style={{ marginTop: 12 }} onClick={() => setAll(!all)}>
+        {all ? "Show only changed" : `Show all ${ACCOUNT_FEATURES.length}`}</button>}
       {ask && info && <ReasonDialog title={`${ask.state === "on" ? "Turn on" : "Turn off"} ${info.label.toLowerCase()}?`} confirm={ask.state === "on" ? "Turn on" : "Turn off"}
         danger={ask.state === "off"} busy={busy} onCancel={() => setAsk(null)} body={(ask.state === "on" ? info.on : info.off) ?? ""}
         reasonLabel="Reason (only the team sees this)" placeholder={ask.state === "on" ? "For example: Founding seller, early access." : "For example: Checking a report."}
@@ -527,8 +552,9 @@ function Checks() {
   const [rows, err, reload] = useLoad(() => api.pendingReviews(), []);
   const { busy, error, act } = useTeamAction(reload);
   return (
-    <div className="team-page">
-      <Head title="Seller checks" sub="Compare the ID with the selfie, and the name with the bank account. Approved sellers get 10 trust points." />
+    <section className="todo-section">
+      <h2>Seller checks</h2>
+      <p className="small muted">Compare the ID with the selfie, and the name with the bank account. Approved sellers get 10 trust points.</p>
       <ErrorNote error={error ?? err} />
       {rows?.length === 0 && <Empty>Nothing to check.</Empty>}
       <div className="team-grid">
@@ -546,7 +572,7 @@ function Checks() {
           </section>
         ))}
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -555,8 +581,9 @@ function Reports() {
   const [rows, err, reload] = useLoad(() => api.openReports(), []);
   const { busy, error, act } = useTeamAction(reload);
   return (
-    <div className="team-page">
-      <Head title="Reports" sub="Things people flagged in the app. Answer within 24 hours: the app stores require it." />
+    <section className="todo-section">
+      <h2>Reports</h2>
+      <p className="small muted">Things people flagged in the app. Answer within 24 hours: the app stores require it.</p>
       <ErrorNote error={error ?? err} />
       {rows?.length === 0 && <Empty>No open reports.</Empty>}
       <div className="team-grid">
@@ -576,7 +603,7 @@ function Reports() {
           </section>
         ))}
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -585,8 +612,9 @@ function Returns() {
   const [rows, err, reload] = useLoad(() => api.disputedOrders(), []);
   const { busy, error, act } = useTeamAction(reload);
   return (
-    <div className="team-page">
-      <Head title="Returns" sub="The seller disagreed with a return. Compare the listing video, the packing video and the buyer's photos before deciding." />
+    <section className="todo-section">
+      <h2>Returns</h2>
+      <p className="small muted">The seller disagreed with a return. Compare the listing video, the packing video and the buyer's photos before deciding.</p>
       <ErrorNote error={error ?? err} />
       {rows?.length === 0 && <Empty>No returns to decide.</Empty>}
       <div className="team-grid">
@@ -602,7 +630,7 @@ function Returns() {
           </section>
         ))}
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -610,7 +638,8 @@ function Returns() {
 function Orders() {
   const [params, setParams] = useSearchParams();
   const filter = (params.get("f") as TeamOrderFilter) || "all";
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(params.get("q") ?? "");
+  useEffect(() => { const x = params.get("q"); if (x != null) setQ(x); }, [params.get("q")]); // eslint-disable-line react-hooks/exhaustive-deps
   const dq = useDebounced(q);
   const [rows, setRows] = useState<TeamOrder[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -707,22 +736,12 @@ function Listings() {
 }
 
 // ===== Money =====
-function Money() {
-  const { o } = useTeam();
+/** Welcome credit top ups we pay ourselves. On Money and in To do. */
+function TopUps() {
   const [rows, err, reload] = useLoad(() => api.topUpsDue(), []);
   const { busy, error, act } = useTeamAction(reload);
   return (
-    <div className="team-page">
-      <Head title="Money" sub="Escrow holds buyers' money and pays sellers. We only pay welcome credit top ups ourselves." />
-      {o && (
-        <section className="team-kpis">
-          <Kpi label="Sales, 30 days" value={R(o.sales30Cents)} sub={`${o.orders30} paid orders`} />
-          <Kpi label="Our fees, 30 days" value={R(o.fees30Cents)} sub="Seller fee and buyer protection" />
-          <Kpi label="Welcome credit, 30 days" value={R(o.credit30Cents)} sub="Paid from the credit budget" />
-          <Kpi label="Top ups to pay" value={R(o.topUpsDueCents)} sub={`${o.topUpsDue} sellers`} />
-        </section>
-      )}
-      <section className="team-card">
+      <section className="team-card todo-section">
         <h2>Welcome credit top ups to pay</h2>
         <p className="small muted">When the R50 credit is more than our cut, we EFT the seller the difference from our account, on the payout date. Check the warning signs first: sellers can make fake buyer accounts to collect top ups. Only pay once the order is finished, and mark it paid once the EFT has gone through.</p>
         <ErrorNote error={error ?? err} />
@@ -742,6 +761,23 @@ function Money() {
           </table>
         )}
       </section>
+  );
+}
+
+function Money() {
+  const { o } = useTeam();
+  return (
+    <div className="team-page">
+      <Head title="Money" sub="Escrow holds buyers' money and pays sellers. We only pay welcome credit top ups ourselves." />
+      {o && (
+        <section className="team-kpis">
+          <Kpi label="Sales, 30 days" value={R(o.sales30Cents)} sub={`${o.orders30} paid orders`} />
+          <Kpi label="Our fees, 30 days" value={R(o.fees30Cents)} sub="Seller fee and buyer protection" />
+          <Kpi label="Welcome credit, 30 days" value={R(o.credit30Cents)} sub="Paid from the credit budget" />
+          <Kpi label="Top ups to pay" value={R(o.topUpsDueCents)} sub={`${o.topUpsDue} sellers`} />
+        </section>
+      )}
+      <TopUps />
     </div>
   );
 }
@@ -795,26 +831,116 @@ function Log() {
 }
 
 // ===== Alerts =====
-function Alerts() {
-  const { alerts, refresh } = useTeam();
-  const nav = useNavigate();
-  const unseen = alerts.filter((a) => !a.seen);
-  const seen = (ids: string[]) => api.markAlertsSeen(ids).then(refresh).catch(() => {});
+/** Everything that needs the team, in one list. Handling an item clears it everywhere. Alerts on phones, Telegram and email point here. */
+type TodoFilter = "all" | "checks" | "reports" | "returns" | "late" | "topups";
+function Todo() {
+  const { o, alerts, refresh } = useTeam();
+  const [params, setParams] = useSearchParams();
+  const f = (params.get("f") as TodoFilter) || "all";
+  const set = (v: TodoFilter) => setParams(v === "all" ? {} : { f: v }, { replace: true });
+  // Looking at the list counts as seeing the alerts, so the urgent banner on Overview clears.
+  useEffect(() => {
+    const ids = alerts.filter((a) => !a.seen).map((a) => a.id);
+    if (ids.length) api.markAlertsSeen(ids).then(refresh).catch(() => {});
+  }, [alerts.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  const n = { checks: o?.checksWaiting ?? 0, reports: o?.reportsOpen ?? 0, returns: o?.returnsWaiting ?? 0, late: o?.late ?? 0, topups: o?.topUpsDue ?? 0 };
+  const total = n.checks + n.reports + n.returns + n.late + n.topups;
+  const label = (t: string, c: number) => (c > 0 ? `${t} (${c})` : t);
+  const show = (k: Exclude<TodoFilter, "all">) => f === k || (f === "all" && n[k] > 0);
   return (
     <div className="team-page">
-      <Head title="Alerts" sub="The app checks every few minutes for things that need you, and tells the whole team: here, in your notifications, and on your phone, Telegram and email once those are set up."
-        right={unseen.length > 0 ? <button className="btn line" onClick={() => seen(unseen.map((a) => a.id))}>Mark all as seen</button> : undefined} />
-      {alerts.length === 0 && <Empty>Nothing needs you right now.</Empty>}
+      <Head title="To do" sub="Everything that needs the team. Reports first: the app stores want an answer within 24 hours." />
+      <div className="team-toolbar">
+        <Filters value={f} onChange={set} options={[["all", label("All", total)], ["reports", label("Reports", n.reports)], ["checks", label("Seller checks", n.checks)],
+          ["returns", label("Returns", n.returns)], ["late", label("Late orders", n.late)], ["topups", label("Top ups", n.topups)]]} />
+      </div>
+      {o && f === "all" && total === 0 && <Empty>All caught up.</Empty>}
+      {show("reports") && <Reports />}
+      {show("checks") && <Checks />}
+      {show("returns") && <Returns />}
+      {show("late") && <LateOrders />}
+      {show("topups") && <TopUps />}
       {alerts.length > 0 && (
-        <section className="team-card" style={{ padding: 0 }}>
-          {alerts.map((a) => (
-            <button key={a.id} className={`team-alert ${a.seen ? "seen" : ""}`} onClick={() => { if (!a.seen) seen([a.id]); if (a.link) nav(a.link); }}>
+        <details className="team-card todo-sent">
+          <summary><b>Alerts we sent</b> <span className="small muted">to the team's phones, Telegram and email</span></summary>
+          {alerts.slice(0, 30).map((a) => (
+            <div key={a.id} className="team-alert seen">
               <span className={`pill ${a.severity === "urgent" ? "red" : "amber"}`}>{a.severity === "urgent" ? "Urgent" : "To do"}</span>
               <span className="grow"><b>{a.title}</b><span className="small muted" style={{ display: "block" }}>{a.body}</span></span>
               <span className="small muted">{timeAgo(a.createdAt)}</span>
-            </button>
+            </div>
           ))}
-        </section>
+        </details>
+      )}
+    </div>
+  );
+}
+
+/** Orders past their ship by date. They refund by themselves if the seller never ships. */
+function LateOrders() {
+  const [rows, err] = useLoad(() => api.teamOrders("", "late"), []);
+  return (
+    <section className="todo-section">
+      <h2>Late orders</h2>
+      <p className="small muted">Past the ship by date. Remind the seller; unshipped orders refund the buyer automatically.</p>
+      <ErrorNote error={err} />
+      {rows?.length === 0 && <Empty>No late orders.</Empty>}
+      {rows && rows.length > 0 && (
+        <table className="tt">
+          <thead><tr><th>Item</th><th>Shop</th><th>Buyer</th><th>Total</th><th>Ordered</th></tr></thead>
+          <tbody>{rows.map((o) => (
+            <tr key={o.id}><td data-l="Item"><b>{o.title}</b></td><td data-l="Shop"><Link to={`/team/accounts/${o.sellerId}`}>{o.shopName}</Link></td>
+              <td data-l="Buyer"><Link to={`/team/accounts/${o.buyerId}`}>@{o.buyer}</Link></td><td data-l="Total">{R(o.totalCents)}</td><td data-l="Ordered" className="small">{dateText(o.createdAt)}</td></tr>
+          ))}</tbody>
+        </table>
+      )}
+    </section>
+  );
+}
+
+/** Search from every page: people by name, @handle, email or shop, and orders by item or order number. */
+function GlobalSearch() {
+  const [q, setQ] = useState("");
+  const dq = useDebounced(q.trim());
+  const [open, setOpen] = useState(false);
+  const [res, setRes] = useState<{ people: TeamPerson[]; orders: TeamOrder[] } | null>(null);
+  const nav = useNavigate();
+  const loc = useLocation();
+  useEffect(() => { setOpen(false); setQ(""); }, [loc.pathname]);
+  useEffect(() => {
+    if (dq.length < 2) return setRes(null);
+    let live = true;
+    Promise.all([api.teamPeople(dq, "all"), api.teamOrders(dq, "all")])
+      .then(([people, orders]) => live && setRes({ people: people.slice(0, 5), orders: orders.slice(0, 5) })).catch(() => live && setRes({ people: [], orders: [] }));
+    return () => { live = false; };
+  }, [dq]);
+  const first = res?.people[0] ? `/team/accounts/${res.people[0].id}` : res?.orders[0] ? `/team/orders?q=${encodeURIComponent(dq)}` : null;
+  return (
+    <div className="team-gsearch" onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setOpen(false); }}>
+      <label className="team-search">
+        <Icon name="search" size={17} />
+        <input value={q} onChange={(e) => { setQ(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)}
+          onKeyDown={(e) => { if (e.key === "Enter" && first) nav(first); if (e.key === "Escape") setOpen(false); }}
+          placeholder="Search people, shops, emails or orders" aria-label="Search people, shops, emails or orders" />
+        {q && <button aria-label="Clear search" onClick={() => setQ("")}><Icon name="close" size={15} /></button>}
+      </label>
+      {open && dq.length >= 2 && (
+        <div className="team-gresults" role="listbox" aria-label="Search results">
+          {!res && <div className="muted small" style={{ padding: 12 }}>Searching…</div>}
+          {res && res.people.length + res.orders.length === 0 && <div className="muted small" style={{ padding: 12 }}>Nothing found for “{dq}”.</div>}
+          {res && res.people.length > 0 && <div className="team-gh">People</div>}
+          {res?.people.map((p) => (
+            <Link key={p.id} to={`/team/accounts/${p.id}`} className="team-gres" role="option">
+              <b>{p.name || p.handle || "No name"}</b><span className="small muted">{p.handle ? "@" + p.handle : ""}{p.shop ? ` · ${p.shop.name}` : ""}{p.email ? ` · ${p.email}` : ""}</span>
+            </Link>
+          ))}
+          {res && res.orders.length > 0 && <div className="team-gh">Orders</div>}
+          {res?.orders.map((o) => (
+            <Link key={o.id} to={`/team/orders?q=${encodeURIComponent(o.id.slice(0, 8))}`} className="team-gres" role="option">
+              <b>{o.title}</b><span className="small muted">{o.shopName} · @{o.buyer} · {R(o.totalCents)} · {orderStatus(o.status)}</span>
+            </Link>
+          ))}
+        </div>
       )}
     </div>
   );

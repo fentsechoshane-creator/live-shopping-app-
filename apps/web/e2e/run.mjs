@@ -220,7 +220,7 @@ try {
     st.products.find((p) => p.id === "p-auction").auctionEndsAt = new Date(Date.now() - 1000).toISOString();
     localStorage.setItem(k, JSON.stringify(st));
   });
-  await page.goto(`${BASE}/activity`);
+  await page.goto(`${BASE}/inbox?tab=updates`);
   await page.getByText("You won: Vintage 90s denim jacket, rare wash").waitFor();
   await page.getByRole("link", { name: /You won/ }).click();
   await page.getByRole("button", { name: "Pay R900" }).first().click();
@@ -238,16 +238,18 @@ try {
   await page.waitForURL(/\/orders\//);
   await page.getByText("Order placed.").waitFor();
 
-  // The wallet button explains the credit instead of jumping to the profile.
+  // The welcome credit is used, so the wallet button is gone (no "R0").
   await page.goto(BASE);
-  await page.getByRole("button", { name: /^Wallet/ }).click();
-  await page.getByRole("dialog", { name: "Wallet" }).waitFor();
-  await page.keyboard.press("Escape");
+  await page.getByRole("link", { name: "Home" }).waitFor();
+  await check(page.getByRole("button", { name: /welcome credit/ }).count().then((n) => n === 0), "no wallet once the credit is used");
 
-  await page.goto(`${BASE}/activity`);
+  // Inbox: tab labels, chats first, updates second. Orders live on the profile.
+  await page.getByRole("link", { name: /^Inbox/ }).click();
+  await page.getByRole("button", { name: /^Updates/ }).click();
   await page.getByText("Payment received").first().waitFor();
-  await shot("activity");
-  await page.getByRole("button", { name: "Orders", exact: true }).click();
+  await shot("inbox");
+  await page.goto(`${BASE}/me`);
+  await page.getByRole("button", { name: "My orders" }).click();
   await page.getByText("Oversized tee, sand").first().waitFor();
 
   // Follow a seller, then see them in Following and on the profile.
@@ -306,7 +308,7 @@ try {
   await page.getByText(/Payments outside myHaul aren.t protected/).waitFor();
   await page.getByLabel("Message", { exact: true }).fill("");
   await shot("chat");
-  await page.goto(`${BASE}/activity?tab=messages`);
+  await page.goto(`${BASE}/inbox?tab=messages`);
   await page.getByText("Lebo's Thrift").first().waitFor();
 
   // Block a shop: its posts disappear from the feed. Unblock from settings.
@@ -517,13 +519,20 @@ try {
   // Money: the R349 tee bought with the welcome credit leaves a R17.06 top up for us to pay Lebo's Thrift.
   await page.goto(`${BASE}/team/money`);
   await page.getByText("R17.06").first().waitFor();
-  // Alerts: the app has already flagged the open reports and the seller check.
+  // To do: reports, checks and the rest in one list; old alert links land here too.
   await page.goto(`${BASE}/team/alerts`);
+  await page.waitForURL(/\/team\/todo/);
+  await page.getByRole("heading", { name: "Reports" }).waitFor();
+  await page.getByRole("heading", { name: "Seller checks" }).waitFor();
+  await page.getByText("Alerts we sent").click();
   await page.getByText(/New report/).first().waitFor();
-  await page.getByText(/Seller check waiting/).first().waitFor();
-  await shot("team-alerts");
+  await shot("team-todo");
+  // Search from any page: find Zola by name.
+  await page.getByPlaceholder("Search people, shops, emails or orders").fill("zola");
+  await page.getByRole("option", { name: /Zola/ }).first().click();
+  await page.getByRole("heading", { name: "Zola" }).waitFor();
   // Reports: the reported posts are removed.
-  await page.goto(`${BASE}/team/reports`);
+  await page.goto(`${BASE}/team/todo?f=reports`);
   await page.getByText("Fake or counterfeit").first().waitFor();
   for (let i = 0; i < 5 && (await page.getByRole("button", { name: "Remove it" }).count()); i++) {
     await page.getByRole("button", { name: "Remove it" }).first().click();
@@ -537,6 +546,7 @@ try {
   await page.getByRole("button", { name: "Approve" }).click();
   await page.getByText("Approved", { exact: true }).first().waitFor();
   // Features: unlock auctions early for Zola, turn her comments off. Legal checks can't be forced on.
+  await page.getByRole("tab", { name: "Features" }).click();
   const feat = (name) => page.locator(".team-feature").filter({ hasText: name });
   await check(feat("Listing items").getByRole("button", { name: "On" }).isDisabled(), "ID and bank checks can't be skipped");
   await feat("Auctions").getByRole("button", { name: "On" }).click();
@@ -544,6 +554,8 @@ try {
   await sw.getByLabel(/only the team sees this/).fill("Founding seller, early auctions.");
   await sw.getByRole("button", { name: "Turn on" }).click();
   await feat("Auctions").getByText(/Turned on by/).waitFor();
+  await check(feat("Comments").count().then((n) => n === 0), "only changed switches show");
+  await page.getByRole("button", { name: /Show all/ }).click();
   await feat("Comments").getByRole("button", { name: "Off" }).click();
   sw = page.getByRole("dialog", { name: /Turn off comments/ });
   await sw.getByLabel(/only the team sees this/).fill("Spam in comments.");
@@ -591,7 +603,7 @@ try {
 
   // ===== Selling in chat: the shop sends a special price and holds the item; the buyer buys from the chat =====
   await signIn("lebo@shop.demo");
-  await page.goto(`${BASE}/activity?tab=messages`);
+  await page.goto(`${BASE}/inbox?tab=messages`);
   await page.getByRole("link", { name: /Thandi/ }).first().click();
   await page.waitForURL(/\/messages\//);
   await page.getByRole("link", { name: /Oversized tee/ }).first().waitFor(); // the order shows inside the chat too
@@ -610,7 +622,7 @@ try {
   await shot("chat-seller");
   await signOut();
   await signIn("buyer@test.co.za");
-  await page.goto(`${BASE}/activity?tab=messages`);
+  await page.goto(`${BASE}/inbox?tab=messages`);
   await page.getByRole("link", { name: /Lebo's Thrift/ }).first().click();
   await page.getByRole("button", { name: "Buy for R300" }).click();
   await page.getByRole("dialog", { name: "Checkout" }).getByText("special price", { exact: false }).waitFor();

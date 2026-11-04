@@ -54,11 +54,11 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 
 ## Current state
 
-- Buyer: welcome screens with interests on first open, feed (For you ranked by interests, loads more as you scroll; Following; Live), Explore with word search, item sheet, checkout that remembers delivery details, orders with returns and ratings, activity, chats with offers and holds.
+- Buyer: welcome screens with interests on first open, feed (For you ranked by interests, loads more as you scroll; Following), Explore with word search, item sheet, checkout that remembers delivery details, My orders with returns and ratings, Inbox (messages and updates), chats with offers and holds.
 - Signing in happens in a sheet over the current screen and then finishes what you tapped (like, follow, buy, message). The code signs in by itself once 6 digits are in.
 - Profile: TikTok style page with Posts, Likes and Reposts.
 - Seller: onboarding, Create in steps with drafts and photo suggestions, Camera (Live hidden until built), orders to ship (most urgent first, copy address), payouts.
-- Team dashboard at `/team` (laptop first, works on a phone): Overview with sales, fees and what needs doing; Accounts with search, filters and a full page per person (shop, checks, ID files, orders, trust history, reports, what the team did); suspend and lift, pause, close or open shops, add or remove team members; Seller checks; Reports; Returns; Orders; Listings (remove with a reason); Money (top ups); App errors; Activity log of every team action. Suspended people can sign in and see orders but can't buy, sell, bid, comment or message; the database blocks it.
+- Team dashboard at `/team` (laptop first, works on a phone): search on every page; Overview with sales, fees and what needs doing; To do (reports, checks, returns, late orders, top ups); Accounts with search, filters and a full page per person (shop, checks, ID files, orders, trust history, reports, what the team did); suspend and lift, pause, close or open shops, add or remove team members; Seller checks; Reports; Returns; Orders; Listings (remove with a reason); Money (top ups); App errors; Activity log of every team action. Suspended people can sign in and see orders but can't buy, sell, bid, comment or message; the database blocks it.
 - Phone apps: Capacitor in `apps/web/ios` and `apps/web/android`. Links to items and shops open the app once the domain is set up.
 - Ranking: `apps/web/src/lib/rank.ts` is where Lehloma's engine plugs in.
 - Tests: `npm test` (core), `npm run test:db` (security rules on local Postgres), `npm run test:e2e` (full journey, iPhone size, screenshots in `apps/web/e2e/shots`).
@@ -102,6 +102,18 @@ Debug as we go: anyone who finds or fixes a problem updates this list. Highest r
 Fixed in this round: Safari double back on the edge swipe (now only in the installed app), deleting an account now also deletes the person's photos and videos, React Router warnings.
 
 ## Log
+
+### 2026-11-04: Navigation round (app and dashboard)
+
+- App tab bar has labels: Home, Explore, +, Inbox, Me. Activity is now **Inbox** (`/inbox`): Messages first, then Updates. One count on the tab (unread chats plus new updates), and it opens on Updates when only updates are new. Pull down to refresh. Old `/activity` links redirect.
+- Orders left the Inbox. Their one home is My orders (profile button and menu). Order updates still arrive in Updates.
+- Me tab gets a red dot when a seller has orders to ship. Seller tools (List an item, To ship, Payouts) live only on the profile; the menu has one My shop row. Menu grouped: Shopping, Settings, Privacy and legal, Team.
+- Welcome credit button says "R50 off" in words and disappears once the credit is used (no more "R0"). Signed out people still see it.
+- Dashboard: search on every page (people by name, @handle, email or shop; orders by item or number). Menu grouped: Overview, To do, then Look up (Accounts, Orders, Listings, Money) and System (App errors, Activity log).
+- One **To do** page replaces Alerts, Seller checks, Reports and Returns: filters for reports, checks, returns, late orders and top ups; handling an item clears it everywhere. Alerts we sent are listed at the bottom. Opening To do marks alerts seen. Old addresses redirect.
+- Account page has tabs: Overview, Orders, Features, History. Features shows only switches someone changed, with Show all.
+- Store screenshots regenerated with the new tab bar.
+- Decided with Ofentse: one To do page; seller tools on the profile only; hide the wallet at R0.
 
 ### 2026-11-04: Feature switches per account
 

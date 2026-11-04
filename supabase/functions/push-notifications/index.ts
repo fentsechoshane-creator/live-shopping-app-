@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
     const last = list[list.length - 1];
     const msg = list.length === 1
       ? { title: last.title, body: last.body, link: last.link }
-      : { title: `${list.length} new updates on myHaul`, body: `${last.title}: ${last.body}`.slice(0, 140), link: "/activity" };
+      : { title: `${list.length} new updates on myHaul`, body: `${last.title}: ${last.body}`.slice(0, 140), link: "/inbox" };
     try { phones += await sendPush(db, [user], msg); } catch (e) { console.error("push", e); }
   }
   // Marked as handled even without push keys, so nothing piles up. Older ones were skipped above on purpose.

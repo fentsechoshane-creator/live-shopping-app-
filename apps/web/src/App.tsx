@@ -14,7 +14,7 @@ import { BackButton, Loading } from "./components/ui";
 import { Feed } from "./screens/buyer/Feed";
 import { Explore } from "./screens/buyer/Explore";
 import { MockPay, OrderDetail, Orders } from "./screens/buyer/Orders";
-import { Activity, ShopPage, SignIn, SignInSheet } from "./screens/buyer/Account";
+import { Inbox, ShopPage, SignIn, SignInSheet } from "./screens/buyer/Account";
 import { Profile } from "./screens/buyer/Profile";
 import { Onboarding } from "./screens/seller/Onboarding";
 import { Payouts, SellerOrderDetail, SellerOrders } from "./screens/seller/Selling";
@@ -48,14 +48,23 @@ function ItemLink() {
 function Tabs() {
   const { user } = useSession();
   const loc = useLocation();
-  const [unread, setUnread] = useState(0);
+  const [inbox, setInbox] = useState(0);
+  const [toShip, setToShip] = useState(0);
+  const [shop] = useLoad(() => (user ? api.myShop() : Promise.resolve(null)), [user?.id, loc.pathname]);
+  // Inbox count: unread chats plus new updates. Me gets a dot when a seller has orders to ship.
+  const [bump, setBump] = useState(0);
+  useEffect(() => { const on = () => setBump((n) => n + 1); window.addEventListener("inbox-read", on); return () => window.removeEventListener("inbox-read", on); }, []);
   useEffect(() => {
-    if (!user) return setUnread(0);
-    api.notifications().then((n) => setUnread(n.filter((x) => !x.readAt).length)).catch(() => {});
-  }, [user, loc.pathname]);
+    if (!user) { setInbox(0); return setToShip(0); }
+    Promise.all([api.notifications(), api.conversations()]).then(([n, c]) =>
+      setInbox(n.filter((x) => !x.readAt && !(x.link ?? "").startsWith("/messages/")).length + c.reduce((a, x) => a + x.unread, 0))).catch(() => {});
+  }, [user, loc.pathname, bump]);
+  useEffect(() => {
+    if (!shop || shop.status === "onboarding") return setToShip(0);
+    api.sellerOrders().then((o) => setToShip(o.filter((x) => x.status === "paid").length)).catch(() => {});
+  }, [shop?.id, shop?.status, loc.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
   const onVideo = loc.pathname === "/";
   const nav = useNavigate();
-  const [shop] = useLoad(() => (user ? api.myShop() : Promise.resolve(null)), [user?.id, loc.pathname]);
   const [ask, setAsk] = useState(false);
   // Only sellers can post: without an open shop, + asks first instead of opening the post screen.
   const plus = (e: React.MouseEvent) => {
@@ -65,13 +74,13 @@ function Tabs() {
   return (
     <>
     <nav className={`tabs glass ${onVideo ? "on-video" : ""}`} aria-label="Main">
-      <NavLink to="/" end aria-label="Home"><Icon name="home" /></NavLink>
-      <NavLink to="/explore" aria-label="Explore"><Icon name="explore" /></NavLink>
+      <NavLink to="/" end><Icon name="home" /><span>Home</span></NavLink>
+      <NavLink to="/explore"><Icon name="explore" /><span>Explore</span></NavLink>
       <NavLink to="/post" className="create" onClick={plus} aria-label="Post: camera, create a listing or go live"><Icon name="plus" strokeWidth={2.5} /></NavLink>
-      <NavLink to="/activity" aria-label={`Activity${unread ? `, ${unread} new` : ""}`}>
-        <Icon name="bell" />{unread > 0 && <span className="badge">{unread}</span>}
+      <NavLink to="/inbox" aria-label={`Inbox${inbox ? `, ${inbox} new` : ""}`}>
+        <Icon name="chat" /><span>Inbox</span>{inbox > 0 && <span className="badge">{inbox > 99 ? "99+" : inbox}</span>}
       </NavLink>
-      <NavLink to="/me" aria-label="My profile"><Icon name="user" /></NavLink>
+      <NavLink to="/me" aria-label={`Me${toShip ? `, ${toShip} to ship` : ""}`}><Icon name="user" /><span>Me</span>{toShip > 0 && <span className="dot" />}</NavLink>
     </nav>
     <SellerGate open={ask} onClose={() => setAsk(false)} onYes={() => setAsk(false)} unfinished={!!shop} />
     </>
@@ -107,33 +116,35 @@ function SideMenu() {
           </div>
           <button className="icon-btn" onClick={() => setMenuOpen(false)} aria-label="Close menu"><Icon name="close" /></button>
         </div>
-        <button className="cell" style={{ background: "var(--green-soft)", borderRadius: "var(--r)", marginBottom: 14 }}
-          onClick={() => go(shop && shop.status !== "onboarding" ? "/me?tab=selling" : "/sell/start")}>
+        <button className="cell" style={{ background: "var(--green-soft)", borderRadius: "var(--r)", marginBottom: 4 }}
+          onClick={() => go(shop && shop.status !== "onboarding" ? "/me" : "/sell/start")}>
           <span className="icon-btn" style={{ background: "var(--green)", color: "#052e16", width: 36, height: 36, borderRadius: 10 }}><Icon name="store" size={18} /></span>
           <span className="grow"><span className="t" style={{ display: "block" }}>{shop && shop.status !== "onboarding" ? shop.name : "Start selling"}</span>
-            <span className="s" style={{ display: "block" }}>{shop && shop.status !== "onboarding" ? "Your shop, orders and payouts" : "Open your shop in a few minutes"}</span></span>
+            <span className="s" style={{ display: "block" }}>{shop && shop.status !== "onboarding" ? "My shop: list items, orders to ship, payouts" : "Open your shop in a few minutes"}</span></span>
         </button>
+        <div className="menu-h">Shopping</div>
         <div className="group">
-          <MenuRow icon="bag" t="Orders" s="Track, return or rate an order" onClick={() => go("/orders")} />
-          {shop && shop.status !== "onboarding" && <MenuRow icon="truck" t="Orders to ship" s="Ship within 2 days" onClick={() => go("/sell/orders")} />}
-          {shop && shop.status !== "onboarding" && <MenuRow icon="payout" t="Payouts" s="Paid once the return window closes" onClick={() => go("/sell/payouts")} />}
-          <MenuRow icon="bell" t="Notifications" s="Orders, returns and shop updates" onClick={() => go("/activity")} />
+          <MenuRow icon="bag" t="My orders" s="Track, return or rate an order" onClick={() => go("/orders")} />
           <MenuRow icon="help" t="Returns and help" s="7 day returns on Buy now, buyer protection" onClick={() => go("/help")} />
           <MenuRow icon="chat" t="Contact us" s={`${CONTACT}, we reply within 2 working days`} onClick={() => { window.location.href = `mailto:${CONTACT}?subject=${encodeURIComponent("myHaul help")}`; }} />
-          {admin && <MenuRow icon="team" t="Team dashboard" s="Accounts, checks, reports, orders and money" onClick={() => go("/team")} />}
         </div>
-        <div className="group" style={{ marginTop: 14 }}>
-          <MenuRow icon="chat" t="Messages" s="Chats with buyers and sellers" onClick={() => go("/activity?tab=messages")} />
-          <MenuRow icon="block" t="Blocked accounts" s="People you blocked" onClick={() => go("/settings/blocked")} />
-          <MenuRow icon="lock" t="Terms of Use" s="The rules for buying, selling and returns" onClick={() => go("/terms")} />
-          <MenuRow icon="shield" t="Privacy Policy" s="How we use and protect your data" onClick={() => go("/privacy")} />
-        </div>
-        <div className="group" style={{ marginTop: 14 }}>
+        <div className="menu-h">Settings</div>
+        <div className="group">
           <div className="cell">
             <span className="grow"><span className="t" style={{ display: "block" }}>Data saver</span><span className="s" style={{ display: "block" }}>Lower video quality on mobile data</span></span>
             <button className="switch" role="switch" aria-checked={dataSaver} aria-label="Data saver" onClick={() => setDataSaver(!dataSaver)} />
           </div>
+          <MenuRow icon="block" t="Blocked accounts" s="People you blocked" onClick={() => go("/settings/blocked")} />
         </div>
+        <div className="menu-h">Privacy and legal</div>
+        <div className="group">
+          <MenuRow icon="lock" t="Terms of Use" s="The rules for buying, selling and returns" onClick={() => go("/terms")} />
+          <MenuRow icon="shield" t="Privacy Policy" s="How we use and protect your data" onClick={() => go("/privacy")} />
+        </div>
+        {admin && <>
+          <div className="menu-h">Team</div>
+          <div className="group"><MenuRow icon="team" t="Team dashboard" s="To do, accounts, orders and money" onClick={() => go("/team")} /></div>
+        </>}
         <div style={{ flex: 1 }} />
         <button className="btn danger block" style={{ marginTop: 18 }} onClick={() => { setMenuOpen(false); api.signOut().then(() => nav("/")); }}>
           <Icon name="logout" size={18} />Log out
@@ -177,12 +188,18 @@ function Help() {
 
 const guard = (el: ReactNode) => <RequireUser>{el}</RequireUser>;
 
+/** Old links and notifications to /activity still land in the right place. */
+function OldActivity() {
+  const tab = new URLSearchParams(useLocation().search).get("tab");
+  return <Navigate to={tab === "orders" ? "/orders" : tab === "messages" ? "/inbox?tab=messages" : "/inbox?tab=updates"} replace />;
+}
+
 export function App() {
   const loc = useLocation();
   const nav = useNavigate();
   // Swipe in from the left edge to go back, like iPhone apps. Not on the main tabs.
   const edgeStart = useRef<{ x: number; y: number } | null>(null);
-  const isTabRoot = ["/", "/explore", "/activity", "/me", "/post"].includes(loc.pathname);
+  const isTabRoot = ["/", "/explore", "/inbox", "/me", "/post"].includes(loc.pathname);
   // Only in the installed app: Safari and Chrome already swipe back from the edge, and doing it too would go back two screens.
   const standalone = isNative || (typeof window !== "undefined" && (window.matchMedia?.("(display-mode: standalone)").matches || (navigator as any).standalone === true));
   const { user, needsSetup } = useSession();
@@ -218,7 +235,8 @@ export function App() {
           <Route path="/orders" element={guard(<Orders />)} />
           <Route path="/orders/:id" element={guard(<OrderDetail />)} />
           <Route path="/mock-pay/:id" element={guard(<MockPay />)} />
-          <Route path="/activity" element={guard(<Activity />)} />
+          <Route path="/inbox" element={guard(<Inbox />)} />
+          <Route path="/activity" element={<OldActivity />} />
           <Route path="/me" element={guard(<Profile />)} />
           <Route path="/sell" element={<Navigate to="/me?tab=selling" replace />} />
           <Route path="/sell/start" element={guard(<Onboarding />)} />

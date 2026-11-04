@@ -72,10 +72,10 @@ export function Profile() {
       <div className="pbar">
         <button className="bare" onClick={() => setSheet("edit")} aria-label="Edit profile"><Icon name="edit" /></button>
         <div className="row" style={{ gap: 4 }}>
-          <button className="wallet-chip sm" onClick={() => toast(credit ? `${R(WELCOME_CREDIT)} welcome credit on your first order of R200 or more` : "No credit right now")}
-            aria-label={`Wallet, ${credit ? R(WELCOME_CREDIT) : "R0"} credit`}>
-            <Icon name="wallet" /><span className="amt">{credit ? R(WELCOME_CREDIT) : "R0"}</span>
-          </button>
+          {credit && <button className="wallet-chip label sm" onClick={() => toast(`${R(WELCOME_CREDIT)} off your first order of R200 or more. It comes off by itself.`)}
+            aria-label={`${R(WELCOME_CREDIT)} welcome credit`}>
+            <Icon name="wallet" /><span className="amt">{R(WELCOME_CREDIT)} off</span>
+          </button>}
           <button className="bare" onClick={share} aria-label="Share profile"><Icon name="share" /></button>
           <button className="bare" onClick={() => setMenuOpen(true)} aria-label="Menu and settings"><Icon name="menu" /></button>
         </div>
@@ -108,6 +108,16 @@ export function Profile() {
         ? <p className="pbio">{profile.bio}</p>
         : <button className="pbio add" onClick={() => setSheet("edit")}>Add a bio</button>}
 
+      {/* Everything you do here, in one row: your orders, and for sellers the shop tools. */}
+      <div className="ppills">
+        <button className="pill-btn" onClick={() => nav("/orders")}><Icon name="bag" size={14} />My orders</button>
+        {hasShop && <>
+          <button className="pill-btn green" onClick={() => nav("/post?mode=create")}><Icon name="plus" size={14} strokeWidth={2.5} />List an item</button>
+          <button className="pill-btn" onClick={() => nav("/sell/orders")}><Icon name="truck" size={14} />To ship{toShip > 0 && <span className="count">{toShip}</span>}</button>
+          <button className="pill-btn" onClick={() => nav("/sell/payouts")}><Icon name="payout" size={14} />Payouts</button>
+        </>}
+      </div>
+
       <div className="ptabs" role="tablist" aria-label="Profile">
         <button role="tab" aria-selected={tab === "posts"} onClick={() => setTab("posts")}>Posts</button>
         <button role="tab" aria-selected={tab === "likes"} onClick={() => setTab("likes")}>Likes</button>
@@ -116,11 +126,6 @@ export function Profile() {
 
       {tab === "posts" && hasShop && (
         <>
-          <div className="ppills">
-            <button className="pill-btn green" onClick={() => nav("/post?mode=create")}><Icon name="plus" size={14} strokeWidth={2.5} />List an item</button>
-            <button className="pill-btn" onClick={() => nav("/sell/orders")}><Icon name="truck" size={14} />Orders{toShip > 0 && <span className="count">{toShip}</span>}</button>
-            <button className="pill-btn" onClick={() => nav("/sell/payouts")}><Icon name="payout" size={14} />Payouts</button>
-          </div>
           {founding
             ? <div className="pnote">{shop!.name} · Founding seller, 0% fee until {dateText(shop!.foundingUntil)}</div>
             : <div className="pnote muted">{shop!.name} · {categoryText}</div>}

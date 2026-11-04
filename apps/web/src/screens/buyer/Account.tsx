@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { WELCOME_CREDIT } from "@app/core";
 import { api, authMethod } from "../../api";
@@ -10,7 +10,6 @@ import { shareOrCopy } from "../../native";
 import { useTabSwipe } from "../../components/gestures";
 import { ConversationList, replyText, useMessageShop } from "./Messages";
 import { MoreSheet } from "../../components/Safety";
-import { OrderList } from "./Orders";
 import { Avatar } from "../../components/Avatar";
 
 export function SignIn() {
@@ -87,39 +86,61 @@ export function SignInForm({ onDone }: { onDone: () => void }) {
   );
 }
 
-type ActivityTab = "notifications" | "messages" | "orders";
+type InboxTab = "messages" | "updates";
+const isChat = (n: { link: string | null }) => !!n.link && n.link.startsWith("/messages/");
 
-/** Activity: notifications, messages and orders in one place, like the prototype. */
-export function Activity() {
+/** Pull down at the top of a list to reload it, like every phone app. */
+export function usePullRefresh(onRefresh: () => void) {
+  const start = useRef<number | null>(null);
+  const [pull, setPull] = useState(0);
+  return {
+    pull,
+    handlers: {
+      onTouchStart: (e: React.TouchEvent) => { start.current = window.scrollY <= 0 ? e.touches[0].clientY : null; },
+      onTouchMove: (e: React.TouchEvent) => { if (start.current != null) setPull(Math.max(0, Math.min(90, e.touches[0].clientY - start.current))); },
+      onTouchEnd: () => { if (pull >= 70) onRefresh(); start.current = null; setPull(0); },
+    },
+  };
+}
+
+/** Inbox: chats first, then updates (payments, shipping, returns, auctions, shop checks). Orders live on your profile. */
+export function Inbox() {
   const [params, setParams] = useSearchParams();
-  const tab = (params.get("tab") as ActivityTab) || "notifications";
-  const swipeTabs = useTabSwipe(["notifications", "messages", "orders"] as const, tab, (v) => setParams({ tab: v }));
-  const [items, error, reload] = useLoad(() => api.notifications(), []);
-  const [orders] = useLoad(() => api.myOrders(), []);
-  const unread = items?.filter((n) => !n.readAt).length ?? 0;
+  const [items, error, reloadItems] = useLoad(() => api.notifications(), []);
+  const [chats, , reloadChats] = useLoad(() => api.conversations(), []);
+  const updates = items?.filter((n) => !isChat(n));
+  const unreadUpdates = updates?.filter((n) => !n.readAt).length ?? 0;
+  const unreadChats = chats?.reduce((n, c) => n + c.unread, 0) ?? 0;
+  // Open on what's new: Messages unless only updates are waiting.
+  const asked = params.get("tab") as InboxTab | null;
+  const tab: InboxTab = asked === "messages" || asked === "updates" ? asked : unreadChats === 0 && unreadUpdates > 0 ? "updates" : "messages";
+  const setTab = (v: InboxTab) => setParams({ tab: v }, { replace: true });
+  const swipeTabs = useTabSwipe(["messages", "updates"] as const, tab, setTab);
+  const reload = () => { reloadItems(); reloadChats(); };
+  const { pull, handlers } = usePullRefresh(reload);
   useEffect(() => {
-    if (tab === "notifications" && unread) api.markAllRead().catch(() => {});
-  }, [tab, unread]);
+    if (tab === "updates" && unreadUpdates) api.markAllRead().then(() => window.dispatchEvent(new Event("inbox-read"))).catch(() => {});
+  }, [tab, unreadUpdates]);
   const iconFor = (title: string) => (/refund|return/i.test(title) ? "payout" : /way|deliver|ship/i.test(title) ? "truck" : /order|payment/i.test(title) ? "bag" : /check|approved/i.test(title) ? "shield" : "bell");
 
   return (
-    <div className="screen">
-      <div className="title-row"><h1 className="large-title">Activity</h1><button className="link" onClick={reload}>Refresh</button></div>
-      <Segmented<ActivityTab> label="Activity" value={tab} onChange={(v) => setParams({ tab: v })} options={[
-        { value: "notifications", label: <>Notifications{unread > 0 && <span className="count">{unread}</span>}</> },
-        { value: "messages", label: "Messages" },
-        { value: "orders", label: "Orders" },
+    <div className="screen" {...handlers}>
+      {pull > 0 && <div className="pull-hint" style={{ height: pull }}>{pull >= 70 ? "Let go to refresh" : "Pull to refresh"}</div>}
+      <h1 className="large-title">Inbox</h1>
+      <Segmented<InboxTab> label="Inbox" value={tab} onChange={setTab} options={[
+        { value: "messages", label: <>Messages{unreadChats > 0 && <span className="count">{unreadChats}</span>}</> },
+        { value: "updates", label: <>Updates{unreadUpdates > 0 && <span className="count">{unreadUpdates}</span>}</> },
       ]} />
-      {tab === "orders" && orders && <div className="tiny-count">{orders.length} {orders.length === 1 ? "order" : "orders"} in total</div>}
-      <div style={{ marginTop: tab === "orders" ? 10 : 16 }} {...swipeTabs} className="swipe-area">
-        {tab === "notifications" && (
+      <div style={{ marginTop: 16 }} {...swipeTabs} className="swipe-area">
+        {tab === "messages" && (chats ? <ConversationList list={chats} /> : <Loading />)}
+        {tab === "updates" && (
           <>
             <ErrorNote error={error} />
-            {!items && !error && <Loading />}
-            {items?.length === 0 && <div className="empty-card"><span className="muted">Nothing yet. Orders, returns and shop updates show here.</span></div>}
-            {items && items.length > 0 && (
+            {!updates && !error && <Loading />}
+            {updates?.length === 0 && <div className="empty-card"><span className="muted">Nothing yet. Payments, shipping, returns and shop updates show here.</span></div>}
+            {updates && updates.length > 0 && (
               <div className="group">
-                {items.map((n) => (
+                {updates.map((n) => (
                   <Link key={n.id} to={n.link ? safePath(n.link) : "#"} className="cell" style={{ alignItems: "flex-start", background: n.readAt ? undefined : "var(--green-soft)" }}>
                     <span className="icon-btn" style={{ width: 38, height: 38 }}><Icon name={iconFor(n.title)} size={18} /></span>
                     <span className="grow"><span className="t" style={{ display: "block" }}>{n.title}</span><span className="s" style={{ display: "block" }}>{n.body}</span></span>
@@ -130,8 +151,6 @@ export function Activity() {
             )}
           </>
         )}
-        {tab === "messages" && <ConversationList />}
-        {tab === "orders" && <OrderList orders={orders} />}
       </div>
     </div>
   );
