@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { AUCTION_DAYS, canUse, LISTING_LABELS, rand, reserveProblem, validateListing, type Condition, type ListingLabel } from "@app/core";
 import { api, type ListingSuggestion, type MyShop } from "../../api";
 import { clearDraft, loadDraft, loadDraftMedia, saveDraft, saveDraftMedia, snapshot, type DraftFields } from "../../lib/draft";
-import { useSession } from "../../session";
+import { useLoad, useSession } from "../../session";
 import { Icon } from "../../components/Icon";
 import { ErrorNote, R, useAction } from "../../components/ui";
 
@@ -51,8 +51,10 @@ export function CreateListing({ shop, media, onMedia, onCamera, onStep, startAtD
   const [auctionDays, setAuctionDays] = useState<number>(3);
   const [reserve, setReserve] = useState("");
   const reserveCents = reserve ? rand(Number(reserve) || 0) : null;
+  // Team switches can unlock auctions early or turn them off for this shop.
+  const [features] = useLoad(() => api.myFeatures(), []);
   const auctionUnlock = canUse("timed_auction", { verified: shop.checks.idStatus === "approved" && shop.checks.bankStatus === "approved",
-    goodOrders: shop.goodOrders, trustScore: shop.trustScore, category: shop.category });
+    goodOrders: shop.goodOrders, trustScore: shop.trustScore, category: shop.category, overrides: features });
   const mode = food ? "order_now" : auction ? "auction" : "buy_now";
   const cover = media[0] ?? null;
   const urls = useMemo(() => media.map((m) => URL.createObjectURL(m)), [media]);
@@ -273,7 +275,7 @@ export function CreateListing({ shop, media, onMedia, onCamera, onStep, startAtD
               <div className="seg-choice" role="radiogroup" aria-label="How it sells">
                 <button role="radio" aria-checked={!auction} onClick={() => setAuction(false)}><b>Buy now</b><span>Fixed price</span></button>
                 <button role="radio" aria-checked={auction} disabled={!auctionUnlock.ok} onClick={() => setAuction(true)}>
-                  <b>{auctionUnlock.ok ? "Auction" : <><Icon name="lock" size={13} /> Auction</>}</b><span>{auctionUnlock.ok ? "Buyers bid" : "After 5 good orders"}</span>
+                  <b>{auctionUnlock.ok ? "Auction" : <><Icon name="lock" size={13} /> Auction</>}</b><span>{auctionUnlock.ok ? "Buyers bid" : features?.auctions === "off" ? "Turned off" : "After 5 good orders"}</span>
                 </button>
               </div>
             )}

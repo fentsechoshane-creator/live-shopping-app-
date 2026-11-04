@@ -2,12 +2,12 @@
 // Used when no Supabase keys are set. Sign in with any email or phone and the code 123456.
 import {
   bidStep, maskHandle, canTransition, isRude, orderTotals, payoutDate, releasableAt, returnReasonsFor, shipBy, tierFor, TRUST_POINTS, validateListing,
-  RETURN_POSTAGE_PAYER, type OrderStatus, type TrustEventKind,
+  RETURN_POSTAGE_PAYER, ACCOUNT_FEATURE_KEYS, canForceOn, featureOffMessage, type AccountFeature, type OrderStatus, type TrustEventKind,
 } from "@app/core";
 import { handleProblem } from "../lib/handle";
 import type {
   Api, Category, ReportReason, ReportTarget, CheckoutInput, FeedItem, ListingInput, MyShop, Notification, Order, Payout, PendingReview, ProductPublic, ReviewStatus,
-  ShopPublic, User, SavedDelivery, AppError, AuctionInfo, TeamAlert, TeamOverview, TeamPerson, TeamPersonDetail, TeamOrder, TeamListing, TeamLogEntry,
+  ShopPublic, User, SavedDelivery, AppError, AuctionInfo, TeamAlert, TeamOverview, TeamPerson, TeamPersonDetail, TeamOrder, TeamListing, TeamLogEntry, TeamFeature,
 } from "./types";
 
 interface DShop {
@@ -39,6 +39,7 @@ interface State {
   errors?: AppError[];
   bids?: { id: string; productId: string; round: number; bidderId: string; amountCents: number; at: string }[];
   suspensions?: Record<string, { reason: string; at: string }>;
+  features?: Record<string, Partial<Record<AccountFeature, { state: "on" | "off"; reason: string; at: string; by: string }>>>;
   teamLog?: TeamLogEntry[];
   trustLog?: { userId: string; kind: string; points: number; at: string }[];
   alerts?: (TeamAlert & { dedupe: string })[];
@@ -222,6 +223,11 @@ export function createDemoApi(): Api {
   const notSuspended = () => {
     if (s.currentUserId && s.suspensions?.[s.currentUserId]) throw new Error("This account is suspended. Email support if you think this is a mistake.");
   };
+  // Team switches, same rules as the database (migration 0021).
+  const featureState = (uid: string | null | undefined, key: AccountFeature) => (uid ? s.features?.[uid]?.[key]?.state : undefined) ?? "auto";
+  const notOff = (key: AccountFeature) => {
+    if (featureState(s.currentUserId, key) === "off") throw new Error(featureOffMessage(key));
+  };
   const goodOrders = (shopId: string) => s.orders.filter((o) => o.shop.id === shopId && o.status === "completed" && (!o.review || o.review.stars >= 4)).length;
   const publicShop = (sh: DShop): ShopPublic => {
     const t = ownerOf(sh.id).trust;
@@ -400,7 +406,10 @@ export function createDemoApi(): Api {
       const sales = (shopId: string) => s.orders.filter((o) => o.shop.id === shopId && !["pending_payment", "cancelled", "refunded"].includes(o.status)).length;
       const bonus = (shopId: string) => ({ top: 10, trusted: 5, standard: 0, restricted: 0 })[tierFor(ownerOf(shopId).trust)];
       const rank = (po: DPost) => 3 * sales(po.shopId) + bonus(po.shopId) - (now().getTime() - new Date(po.createdAt).getTime()) / 86400e3;
-      return s.posts.filter(visible).sort((a, b) => rank(b) - rank(a)).slice(offset, offset + 20).map(toFeed);
+      // Team switch: "off" hides the shop from the feed, "on" shows it even under trust 40.
+      const inFeed = (po: DPost) => { const o = shopOf(po.shopId).ownerId; const st = featureState(o, "in_feed");
+        return st === "on" ? (() => { const p = s.products.find((x) => x.id === po.productId); return p?.status === "live" && shopOf(po.shopId).status === "open"; })() : st !== "off" && visible(po); };
+      return s.posts.filter(inFeed).sort((a, b) => rank(b) - rank(a)).slice(offset, offset + 20).map(toFeed);
     },
     async shop(handle) {
       await mediaReady;
@@ -409,7 +418,7 @@ export function createDemoApi(): Api {
       return { shop: publicShop(sh), items: s.posts.filter((p) => p.shopId === sh.id && visible(p)).map(toFeed) };
     },
     async checkout(input: CheckoutInput) {
-      notSuspended();
+      notSuspended(); notOff("buy");
       await wait();
       const u = me();
       const p = s.products.find((x) => x.id === input.productId);
@@ -444,7 +453,7 @@ export function createDemoApi(): Api {
         itemPrice = of.priceCents;
       }
       const paidBefore = s.orders.some((o) => o.buyerId === u.id && !["pending_payment", "cancelled"].includes(o.status));
-      const totals = orderTotals({ itemPrice, delivery: input.delivery, welcomeCreditAvailable: !u.welcomeUsed && !paidBefore,
+      const totals = orderTotals({ itemPrice, delivery: input.delivery, welcomeCreditAvailable: !u.welcomeUsed && !paidBefore && featureState(u.id, "welcome_credit") !== "off",
         foundingUntil: sh.foundingUntil ? new Date(sh.foundingUntil) : null, at: now() });
       const oid = id();
       const o: DOrder = {
@@ -650,7 +659,7 @@ export function createDemoApi(): Api {
       return out;
     },
     async placeBid(productId, amountCents) {
-      notSuspended();
+      notSuspended(); notOff("bid");
       await wait(200);
       const u = me();
       const p = s.products.find((x) => x.id === productId);
@@ -764,7 +773,7 @@ export function createDemoApi(): Api {
         });
     },
     async addComment(postId, body) {
-      notSuspended();
+      notSuspended(); notOff("comment");
       const u = me();
       const text = body.trim();
       if (!text) throw new Error("Write something first.");
@@ -820,7 +829,7 @@ export function createDemoApi(): Api {
       return post ? toFeed(post) : { postId: p.id, caption: p.title, product: p, shop: publicShop(shopOf(p.shopId)), video: {} };
     },
     async makeOffer(cid, productIds, priceCents, hours) {
-      notSuspended();
+      notSuspended(); notOff("offers");
       const u = me();
       const c = s.conversations.find((x) => x.id === cid);
       if (!c || shopOf(c.shopId).ownerId !== u.id) throw new Error("Only the shop in this chat can make an offer.");
@@ -855,7 +864,7 @@ export function createDemoApi(): Api {
       return times.length ? Math.round(times[Math.floor(times.length / 2)]) : null;
     },
     async sendMessage(cid, body, productId, image) {
-      notSuspended();
+      notSuspended(); notOff("message");
       const u = me();
       const text = body.trim();
       const c = s.conversations.find((x) => x.id === cid);
@@ -899,7 +908,7 @@ export function createDemoApi(): Api {
     },
     async welcomeCreditAvailable() {
       const u = me();
-      return !u.welcomeUsed && !s.orders.some((o) => o.buyerId === u.id && !["pending_payment", "cancelled"].includes(o.status));
+      return !u.welcomeUsed && featureState(u.id, "welcome_credit") !== "off" && !s.orders.some((o) => o.buyerId === u.id && !["pending_payment", "cancelled"].includes(o.status));
     },
 
     async myShop() {
@@ -980,7 +989,7 @@ export function createDemoApi(): Api {
       save();
     },
     async createListing(input: ListingInput, video, proof, onProgress, photos = []) {
-      notSuspended();
+      notSuspended(); notOff("sell");
       const sh = myShopRow();
       if (!sh) throw new Error("Start your shop first.");
       const errors = validateListing({ title: input.title, description: input.description, price: input.priceCents, label: input.label,
@@ -992,7 +1001,8 @@ export function createDemoApi(): Api {
       if (input.mode === "order_now" && sh.checks.certStatus !== "approved") { live = false; message = "Order now needs an approved Certificate of Acceptability."; }
       if (input.label === "authentic_designer") { live = false; message = "We check the proof before designer items go live. This usually takes a day."; }
       if (input.mode === "auction") {
-        if (goodOrders(sh.id) < 5) throw new Error("Auctions unlock after 5 delivered orders with good ratings.");
+        notOff("auctions");
+        if (featureState(sh.ownerId, "auctions") !== "on" && goodOrders(sh.id) < 5) throw new Error("Auctions unlock after 5 delivered orders with good ratings.");
         if (input.reserveCents != null && (input.reserveCents < input.priceCents || input.reserveCents > input.priceCents * 10))
           throw new Error("The reserve must be between the starting bid and 10 times it.");
       }
@@ -1241,6 +1251,48 @@ export function createDemoApi(): Api {
       teamOnly();
       (s.alerts ?? []).forEach((a) => { if (ids.includes(a.id)) a.seen = true; });
       save();
+    },
+    async teamFeatures(uid) {
+      teamOnly();
+      const u = s.users.find((x) => x.id === uid);
+      if (!u) throw new Error("Account not found.");
+      const sh = s.shops.find((x) => x.ownerId === uid);
+      const good = sh ? goodOrders(sh.id) : 0;
+      const ready = !!sh && canSell(sh);
+      const rule: Record<AccountFeature, [boolean, string]> = {
+        buy: [true, "Allowed"], bid: [true, "Allowed"], comment: [true, "Allowed"], message: [true, "Allowed"], offers: [true, "Allowed"],
+        welcome_credit: [!u.welcomeUsed, u.welcomeUsed ? "Used or not available" : "Can still use it"],
+        sell: [ready, !sh ? "No shop yet" : ready ? "Checks done" : "Waiting for ID and bank checks"],
+        auctions: [good >= 5, `${good} of 5 good orders`], live: [good >= 5, `${good} of 5 good orders`],
+        in_feed: [u.trust >= 40, `Trust ${u.trust}`], payouts: [u.trust >= 40, u.trust >= 40 ? "Paid by trust tier" : "Held: Restricted"],
+      };
+      return Object.fromEntries(ACCOUNT_FEATURE_KEYS.map((k) => {
+        const x = s.features?.[uid]?.[k];
+        const f: TeamFeature = { state: x?.state ?? "auto", reason: x?.reason ?? null, at: x?.at ?? null, by: x?.by ?? null, autoOk: rule[k][0], autoNote: rule[k][1] };
+        return [k, f];
+      })) as Record<AccountFeature, TeamFeature>;
+    },
+    async setAccountFeature(uid, key, state, reason) {
+      teamOnly();
+      if (!s.users.find((x) => x.id === uid)) throw new Error("Account not found.");
+      if (state === "on" && !canForceOn(key)) throw new Error("This one can only be turned off. Its checks protect buyers and are required by law.");
+      s.features = s.features ?? {};
+      const mine = (s.features[uid] = s.features[uid] ?? {});
+      const label = key.replace("_", " ");
+      if (state === "auto") {
+        if (!mine[key]) return;
+        delete mine[key];
+      } else {
+        if (!reason?.trim()) throw new Error("Add a reason so the team knows why.");
+        mine[key] = { state, reason: reason.trim(), at: now().toISOString(), by: me().handle ?? "team" };
+        if (state === "off") notify(uid, `${label[0].toUpperCase() + label.slice(1)} is turned off for your account`, "Email help@myhaul.co.za if you think this is a mistake.");
+      }
+      logTeam(`${label[0].toUpperCase() + label.slice(1)}: ${state === "auto" ? "back to normal rules" : state === "on" ? "turned on" : "turned off"}`, "user", uid, reason?.trim() || null);
+      save();
+    },
+    async myFeatures() {
+      const mine = s.currentUserId ? s.features?.[s.currentUserId] ?? {} : {};
+      return Object.fromEntries(Object.entries(mine).map(([k, v]) => [k, v!.state]));
     },
     async mySuspension() {
       const x = s.currentUserId ? s.suspensions?.[s.currentUserId] : undefined;

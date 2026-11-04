@@ -38,6 +38,7 @@ Based on the OWASP Top 10 (2025), the OWASP API Security Top 10, Supabase's prod
 | 2.7 | Private data (IDs, selfies, bank, email, phone, suspension reasons) leaking | Private files bucket; emails only through team functions; bank shows last 4 digits only; suspensions in their own table. | [x] |
 | 2.8 | Team functions used by non team members | Every team function checks `is_admin()` first; tested. | [x] |
 | 2.9 | Functions running with a changeable search path | All security definer functions set `search_path = public`. Checked by the Supabase advisor. | [x] |
+| 2.10 | Feature switches (0021) used to skip checks or set by users | Only the team can set them (`admin_set_feature` checks `is_admin()`); users can't write the table and can't read the team's reason. "On" is allowed only for milestones (auctions, Live, feed, payouts), never for ID, bank, food certificate, designer proof, 18+ or suspensions; the database refuses it. Every block is a database trigger, not just the app. Every change is logged. Tested. | [x] 0021 |
 
 ## 3. Accounts and sign in
 

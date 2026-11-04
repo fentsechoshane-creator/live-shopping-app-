@@ -1,5 +1,5 @@
 import type {
-  Cents, Condition, DeliveryOption, ListingLabel, OrderStatus, OrderTotals, ReturnReason, SaleMode, SellerTier,
+  AccountFeature, FeatureState, Cents, Condition, DeliveryOption, ListingLabel, OrderStatus, OrderTotals, ReturnReason, SaleMode, SellerTier,
 } from "@app/core";
 
 export type Category = "clothes" | "beauty" | "food" | "designer";
@@ -273,6 +273,11 @@ export interface TeamPerson {
   shop: { id: string; name: string; handle: string; status: MyShop["status"]; category: Category; idStatus: ReviewStatus; bankStatus: ReviewStatus; certStatus: ReviewStatus } | null;
   ordersBought: number; ordersSold: number; reportsAgainst: number;
 }
+/** Switches the team set for your account. Missing means the normal rules apply. */
+export type MyFeatures = Partial<Record<AccountFeature, "on" | "off">>;
+/** One switch on the dashboard, with what the normal rule says right now. */
+export interface TeamFeature { state: FeatureState; reason: string | null; at: string | null; by: string | null; autoOk: boolean; autoNote: string }
+
 export interface TeamPersonDetail extends TeamPerson {
   bio: string; city: string; adultConfirmedAt: string | null; termsAcceptedAt: string | null; phone: string | null; bank: string | null;
   files: { label: string; url: string }[]; liveListings: number;
@@ -427,6 +432,12 @@ export interface Api {
   teamLog(): Promise<TeamLogEntry[]>;
   teamAlerts(): Promise<TeamAlert[]>;
   markAlertsSeen(ids: string[]): Promise<void>;
+  /** Every feature switch for one account. */
+  teamFeatures(userId: string): Promise<Record<AccountFeature, TeamFeature>>;
+  /** Auto removes the switch. On and off need a reason (team only, not shown to the person). */
+  setAccountFeature(userId: string, feature: AccountFeature, state: FeatureState, reason?: string): Promise<void>;
+  /** Switches the team set for your own account. */
+  myFeatures(): Promise<MyFeatures>;
   /** Your own suspension, if your account is suspended. */
   mySuspension(): Promise<{ reason: string; at: string } | null>;
   isAdmin(): Promise<boolean>;

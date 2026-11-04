@@ -845,6 +845,13 @@ button.g3 { border: 0; padding: 0; display: block; width: 100%; }
 .team-dl dt { color: var(--ink-3); }
 .team-dl dd { margin: 0; overflow-wrap: anywhere; }
 .team-checks { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+.team-features h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-3); margin: 16px 0 4px; }
+.team-feature { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 0; border-top: 1px solid var(--hairline); }
+.team-feature .grow { min-width: 220px; }
+.team-feature .seg { flex: none; min-width: 180px; }
+.team-feature .seg button { padding: 7px 12px; font-size: 13.5px; }
+.team-feature .seg button:disabled:not([aria-pressed="true"]) { opacity: 0.35; }
+@media (max-width: 560px) { .team-feature .seg { width: 100%; } }
 .team-check { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 0; border-top: 1px solid var(--hairline); }
 .team-files { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
 .team-list { list-style: none; margin: 0; padding: 0; }

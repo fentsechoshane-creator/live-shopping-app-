@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   rand, formatRand, protectionFee, orderTotals, sellerFee, releasableAt, payoutDate, nextFriday, addWorkingDays,
-  reserveFor, scoreFrom, tierFor, canUse, validateListing, canTransition, returnReasonsFor, shipBy,
+  reserveFor, scoreFrom, tierFor, canUse, canForceOn, validateListing, canTransition, returnReasonsFor, shipBy,
   liveStock, goLiveBlockers, MIN_LIVE_STOCK, isRude, looksOffApp, bidStep, nextMinBid, reserveProblem, timeLeft, maskHandle,
 } from "../src/index.ts";
 
@@ -114,6 +114,13 @@ describe("unlocks", () => {
   it("auctions unlock after 5 good orders, live auctions at 70", () => {
     expect(canUse("timed_auction", { ...base, goodOrders: 5 }).ok).toBe(true);
     expect(canUse("live_auction", { ...base, goodOrders: 5 }).ok).toBe(false);
+    // Team switches: "on" skips the milestone only, "off" always wins.
+    expect(canUse("timed_auction", { ...base, overrides: { auctions: "on" } }).ok).toBe(true);
+    expect(canUse("timed_auction", { ...base, verified: false, overrides: { auctions: "on" } }).ok).toBe(false);
+    expect(canUse("timed_auction", { ...base, goodOrders: 9, overrides: { auctions: "off" } }).ok).toBe(false);
+    expect(canUse("buy_now", { ...base, overrides: { sell: "off" } }).reason).toMatch(/turned off for your account/);
+    expect(canForceOn("auctions")).toBe(true);
+    expect(canForceOn("sell")).toBe(false);
     expect(canUse("live_auction", { ...base, goodOrders: 5, trustScore: 72 }).ok).toBe(true);
   });
   it("food needs an approved certificate", () => {

@@ -608,6 +608,18 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
         phone: r.phone, bank: r.bank, files, liveListings: r.liveListings ?? 0, orders: r.orders ?? [], trustEvents: r.trustEvents ?? [], reports: r.reports ?? [], actions: r.actions ?? [] };
       return out;
     },
+    async teamFeatures(userId) {
+      return check(await sb.rpc("admin_features", { p_user: userId })) as any;
+    },
+    async setAccountFeature(userId, feature, state, reason) {
+      check(await sb.rpc("admin_set_feature", { p_user: userId, p_feature: feature, p_state: state, p_reason: reason ?? null }));
+    },
+    async myFeatures() {
+      const { data: u } = await sb.auth.getUser();
+      if (!u.user) return {};
+      const { data } = await sb.from("account_features").select("feature, state").eq("user_id", u.user.id);
+      return Object.fromEntries(((data ?? []) as { feature: string; state: "on" | "off" }[]).map((r) => [r.feature, r.state]));
+    },
     async suspendAccount(userId, reason) {
       check(await sb.rpc("admin_suspend", { p_user: userId, p_reason: reason }));
     },

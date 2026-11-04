@@ -644,3 +644,58 @@ update team_alerts set seen_at = now() where kind = 'report';
 select pg_temp.expect_error($$update team_alerts set title = 'x'$$, 'permission denied');
 reset role;
 select 'alert tests passed' as result;
+
+-- ===== Per account feature switches =====
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000b');
+select pg_temp.expect_error($$select admin_set_feature('00000000-0000-0000-0000-00000000000b', 'buy', 'on', 'x')$$, 'team');
+select pg_temp.expect_error($$insert into account_features (user_id, feature, state, reason) values (auth.uid(), 'auctions', 'on', 'me')$$, 'permission denied');
+reset role;
+select pg_temp.act_as_anon();
+create temp table feed_before as select count(*) n from feed(50, 0) where shop_handle = 'thrift.with.lebo';
+reset role;
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000c');
+-- Legal checks can't be skipped.
+select pg_temp.expect_error($$select admin_set_feature('00000000-0000-0000-0000-00000000000a', 'sell', 'on', 'friend')$$, 'only be turned off');
+select pg_temp.expect_error($$select admin_set_feature('00000000-0000-0000-0000-00000000000a', 'auctions', 'on', '')$$, 'reason');
+select admin_set_feature('00000000-0000-0000-0000-00000000000a', 'auctions', 'on', 'Founding seller, early auctions');
+select admin_set_feature('00000000-0000-0000-0000-00000000000a', 'in_feed', 'off', 'Checking a report');
+select admin_set_feature('00000000-0000-0000-0000-00000000000b', 'comment', 'off', 'Spam comments');
+select admin_set_feature('00000000-0000-0000-0000-0000000000a2', 'welcome_credit', 'off', 'Second account');
+do $$ declare f jsonb := admin_features('00000000-0000-0000-0000-00000000000a'); begin
+  assert f -> 'auctions' ->> 'state' = 'on' and f -> 'auctions' ->> 'reason' like 'Founding%', 'team sees the switch and why';
+  assert f -> 'buy' ->> 'state' = 'auto', 'unset means auto';
+  assert exists (select 1 from admin_log(20) x where x ->> 'action' = 'Auctions: turned on'), 'switches are logged';
+end $$;
+reset role;
+-- On: the 5 good orders milestone is skipped.
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000a');
+insert into products (shop_id, title, price_cents, sizes, status, stock, mode, auction_ends_at) values (my_shop_id(), 'Early auction belt', 25000, '{}', 'live', 1, 'auction', now() + interval '1 day');
+reset role;
+-- Off: hidden from the feed.
+select pg_temp.act_as_anon();
+do $$ begin assert (select count(*) from feed(50, 0) where shop_handle = 'thrift.with.lebo') = 0, 'hidden from the feed'; end $$;
+reset role;
+-- Off: the action is refused, and the person only sees the state, not the reason.
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000b');
+select pg_temp.expect_error($$insert into comments (post_id, user_id, body) values ((select id from posts limit 1), auth.uid(), 'buy from me')$$, 'turned off for your account');
+do $$ begin assert (select state from account_features where feature = 'comment') = 'off', 'you see your own switch'; end $$;
+select pg_temp.expect_error($$select reason from account_features$$, 'permission denied');
+reset role;
+do $$ begin assert not welcome_credit_ok('00000000-0000-0000-0000-0000000000a2', (select id from shops where handle = 'other.shop')), 'welcome credit off'; end $$;
+-- Payouts off holds what is scheduled; back to auto pays it again.
+insert into payouts (order_id, shop_id, amount_cents, releasable_at, pay_on, status)
+  select id, shop_id, 1000, now(), current_date + 3, 'scheduled' from orders where shop_id = (select id from shops where handle = 'thrift.with.lebo')
+    and id not in (select order_id from payouts) limit 1;
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000c');
+select admin_set_feature('00000000-0000-0000-0000-00000000000a', 'payouts', 'off', 'Fraud check');
+reset role;
+do $$ begin assert not exists (select 1 from payouts p join shops s on s.id = p.shop_id where s.handle = 'thrift.with.lebo' and p.status = 'scheduled'), 'payouts held'; end $$;
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000c');
+select admin_set_feature('00000000-0000-0000-0000-00000000000a', 'payouts', 'auto');
+select admin_set_feature('00000000-0000-0000-0000-00000000000a', 'in_feed', 'auto');
+reset role;
+do $$ begin assert not exists (select 1 from account_features where user_id = '00000000-0000-0000-0000-00000000000a' and feature in ('payouts', 'in_feed')), 'auto removes the switch'; end $$;
+select pg_temp.act_as_anon();
+do $$ begin assert (select count(*) from feed(50, 0) where shop_handle = 'thrift.with.lebo') = (select n from feed_before), 'back in the feed'; end $$;
+reset role;
+select 'feature switch tests passed' as result;

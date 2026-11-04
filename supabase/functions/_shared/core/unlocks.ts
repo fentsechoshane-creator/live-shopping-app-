@@ -1,5 +1,6 @@
 // GENERATED from packages/core/src by npm run sync-core. Do not edit here.
 import { tierFor } from "./trust.ts";
+import { featureOffMessage, type AccountFeature, type FeatureState } from "./accountFeatures.ts";
 
 export type Feature = "buy_now" | "order_now" | "videos" | "chat" | "timed_auction" | "go_live" | "live_auction";
 
@@ -10,11 +11,21 @@ export interface SellerState {
   trustScore: number;
   category: "clothes" | "beauty" | "food" | "designer";
   foodCertApproved?: boolean;
+  /** Switches the team set for this account on the dashboard. Missing means auto. */
+  overrides?: Partial<Record<AccountFeature, FeatureState>>;
 }
+
+/** Which team switch controls each seller feature. */
+const SWITCH: Record<Feature, AccountFeature[]> = {
+  buy_now: ["sell"], order_now: ["sell"], videos: ["sell"], chat: ["message"],
+  timed_auction: ["sell", "auctions"], go_live: ["sell", "live"], live_auction: ["sell", "live", "auctions"],
+};
 
 export const GOOD_ORDERS_FOR_AUCTIONS = 5;
 
 export function canUse(feature: Feature, s: SellerState): { ok: boolean; reason?: string } {
+  const off = SWITCH[feature].find((k) => s.overrides?.[k] === "off");
+  if (off) return { ok: false, reason: featureOffMessage(off) };
   if (!s.verified) return { ok: false, reason: "Verify your ID and bank account first." };
   if (tierFor(s.trustScore) === "restricted" && feature !== "chat")
     return { ok: false, reason: "Your account is under review." };
@@ -28,10 +39,13 @@ export function canUse(feature: Feature, s: SellerState): { ok: boolean; reason?
       return s.foodCertApproved ? { ok: true } : { ok: false, reason: "Upload your Certificate of Acceptability. We check it within 2 working days." };
     case "timed_auction":
     case "go_live":
+      // The team can switch on auctions or Live early. That skips the 5 orders milestone, never the checks above.
+      if (s.overrides?.[feature === "timed_auction" ? "auctions" : "live"] === "on") return { ok: true };
       return s.goodOrders >= GOOD_ORDERS_FOR_AUCTIONS
         ? { ok: true }
         : { ok: false, reason: `Unlocks after ${GOOD_ORDERS_FOR_AUCTIONS} delivered orders with good ratings (${s.goodOrders} so far).` };
     case "live_auction":
+      if (s.overrides?.live === "on" && s.overrides?.auctions === "on") return { ok: true };
       if (s.goodOrders < GOOD_ORDERS_FOR_AUCTIONS)
         return { ok: false, reason: `Unlocks after ${GOOD_ORDERS_FOR_AUCTIONS} good orders and a trust score of 70.` };
       return s.trustScore >= 70 ? { ok: true } : { ok: false, reason: "Unlocks at a trust score of 70." };

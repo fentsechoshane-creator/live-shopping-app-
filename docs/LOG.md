@@ -25,7 +25,7 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 | Store readiness | Terms of Use, Privacy Policy, Contact us, phone notifications, reviewer notes, screenshots done. Company details [CONFIRM] |
 | Error reports, share previews, welcome, saved delivery | Done (previews need the web host) |
 | Security (docs/SECURITY.md) | Full review done (migration 0018 plus server and app fixes). Live database needs 0017 and 0018 [Ofentse to approve]. Next: two step sign in for the team, CAPTCHA at sign up |
-| Team dashboard (/team) | Built (migration 0017): accounts, suspensions, checks, reports, returns, orders, listings, money, errors, activity log. Live database needs 0017 [Ofentse to approve] |
+| Team dashboard (/team) | Built (migrations 0017 and 0021): feature switches per account, accounts, suspensions, checks, reports, returns, orders, listings, money, errors, activity log. Live database needs 0017 [Ofentse to approve] |
 
 ## Run the current version
 
@@ -65,7 +65,7 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 
 ## Next up
 
-- **Before the store upload:** apply migrations 0017 to 0020 live; deploy and schedule `team-alerts` and `push-notifications` (docs/SETUP.md steps 9 and 10); fill in the company details in `terms.html` and `privacy.html`; set up help@myhaul.co.za; make the reviewer account (docs/STORE.md). [Lehloma, Ofentse]
+- **Before the store upload:** apply migrations 0017 to 0021 live; deploy and schedule `team-alerts` and `push-notifications` (docs/SETUP.md steps 9 and 10); fill in the company details in `terms.html` and `privacy.html`; set up help@myhaul.co.za; make the reviewer account (docs/STORE.md). [Lehloma, Ofentse]
 - **Alerts:** apply 0019 live, deploy and schedule `team-alerts` (docs/SETUP.md step 9), add the phone (Firebase and Apple), Telegram and email secrets. [Lehloma]
 - **Security:** apply 0018 live with 0017; set `TRADESAFE_MODE=mock` in Supabase secrets while testing (payments are refused without it); deploy the changed functions (checkout, escrow-webhook, run-due, suggest-listing). Then the open items in docs/SECURITY.md: team two step sign in, CAPTCHA at sign up, backups. [Lehloma, Ofentse]
 - **Team dashboard live:** apply migration 0017 to the live database and make Ofentse's account (@shups) a team member. [Ofentse to approve]
@@ -102,6 +102,16 @@ Debug as we go: anyone who finds or fixes a problem updates this list. Highest r
 Fixed in this round: Safari double back on the edge swipe (now only in the installed app), deleting an account now also deletes the person's photos and videos, React Router warnings.
 
 ## Log
+
+### 2026-11-04: Feature switches per account
+
+- Every account page on the dashboard (/team/accounts, open a person) has a Features section. Each feature is Auto (the normal rules and milestones), On or Off: buying, bidding, comments, messages, welcome credit, listing items, auctions, live selling, special prices in chat, shown in the feed, payouts.
+- On only skips a milestone: auctions before 5 good orders, Live early access before it's released, the feed under trust 40, payouts for Restricted sellers. Legal and safety checks (ID, bank, food certificate, designer proof, 18+, suspensions) can never be skipped, so the other features can only be turned off.
+- The database enforces every switch (migration 0021), so a changed app can't get around it. The app reads them to unlock auctions in Create and show Live mode early. The person gets a notification when something is turned off; the reason is only for the team. Every change is in the activity log.
+- Payouts off holds what is already scheduled straight away; back on pays it from today.
+- Bug fixed: on the live database, sellers could not create any auction ("permission denied", the end time and reserve were not allowed on a new listing). Fixed in 0021.
+- The list lives in `packages/core/src/accountFeatures.ts`. A new feature needs a line there, in the 0021 check lists and in a trigger.
+- Open: apply 0021 live after 0017 to 0020. [Lehloma]
 
 ### 2026-11-04: Company registered
 

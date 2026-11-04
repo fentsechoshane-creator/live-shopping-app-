@@ -536,6 +536,24 @@ try {
   await page.getByRole("heading", { name: "Zola" }).waitFor();
   await page.getByRole("button", { name: "Approve" }).click();
   await page.getByText("Approved", { exact: true }).first().waitFor();
+  // Features: unlock auctions early for Zola, turn her comments off. Legal checks can't be forced on.
+  const feat = (name) => page.locator(".team-feature").filter({ hasText: name });
+  await check(feat("Listing items").getByRole("button", { name: "On" }).isDisabled(), "ID and bank checks can't be skipped");
+  await feat("Auctions").getByRole("button", { name: "On" }).click();
+  let sw = page.getByRole("dialog", { name: /Turn on auctions/ });
+  await sw.getByLabel(/only the team sees this/).fill("Founding seller, early auctions.");
+  await sw.getByRole("button", { name: "Turn on" }).click();
+  await feat("Auctions").getByText(/Turned on by/).waitFor();
+  await feat("Comments").getByRole("button", { name: "Off" }).click();
+  sw = page.getByRole("dialog", { name: /Turn off comments/ });
+  await sw.getByLabel(/only the team sees this/).fill("Spam in comments.");
+  await sw.getByRole("button", { name: "Turn off" }).click();
+  await feat("Comments").getByText("Blocked").waitFor();
+  await page.getByText("2 changed").waitFor();
+  await page.locator(".team-features").first().scrollIntoViewIfNeeded();
+  await shot("team-features");
+  await feat("Comments").getByRole("button", { name: "Auto" }).click();
+  await page.getByText("1 changed").waitFor();
   await page.goto(`${BASE}/team/accounts`);
   await page.getByPlaceholder(/Search name/).fill("thabo");
   await page.getByRole("row", { name: /Thabo/ }).click();
@@ -547,6 +565,7 @@ try {
   await shot("team-person");
   await page.goto(`${BASE}/team/log`);
   await page.getByText("Suspended account").first().waitFor();
+  await page.getByText("Auctions: turned on").first().waitFor();
   await page.getByText("Approved ID check").first().waitFor();
   await shot("team-log");
   // The suspended person is told why and can't buy.

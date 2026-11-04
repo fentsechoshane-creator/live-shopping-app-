@@ -3,7 +3,7 @@
 // shows in the app straight away, and what people do in the app shows here.
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, NavLink, Route, Routes, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ORDER_STATUS_TEXT, REPORT_REASONS, type OrderStatus } from "@app/core";
+import { ACCOUNT_FEATURES, ORDER_STATUS_TEXT, REPORT_REASONS, type AccountFeature, type FeatureState, type OrderStatus } from "@app/core";
 import {
   api, type PeopleFilter, type TeamListing, type TeamListingFilter, type TeamOrder, type TeamOrderFilter, type TeamOverview,
   type TeamPerson, type TeamPersonDetail, type TeamLogEntry, type TeamAlert,
@@ -161,8 +161,9 @@ function Empty({ children }: { children: ReactNode }) {
 }
 
 /** Asks for a reason before a serious action. The person affected sees the reason. */
-function ReasonDialog({ title, body, confirm, danger = true, busy, onCancel, onConfirm }: {
+function ReasonDialog({ title, body, confirm, danger = true, busy, onCancel, onConfirm, reasonLabel = "Reason (they see this)", placeholder = "For example: Selling copies of branded shoes." }: {
   title: string; body: string; confirm: string; danger?: boolean; busy: boolean; onCancel: () => void; onConfirm: (reason: string) => void;
+  reasonLabel?: string; placeholder?: string;
 }) {
   const [reason, setReason] = useState("");
   return (
@@ -171,9 +172,9 @@ function ReasonDialog({ title, body, confirm, danger = true, busy, onCancel, onC
         <h2>{title}</h2>
         <p className="muted">{body}</p>
         <div className="field">
-          <label htmlFor="team-reason">Reason (they see this)</label>
+          <label htmlFor="team-reason">{reasonLabel}</label>
           <textarea id="team-reason" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={300} autoFocus
-            placeholder="For example: Selling copies of branded shoes." />
+            placeholder={placeholder} />
         </div>
         <div className="row" style={{ justifyContent: "flex-end", gap: 8 }}>
           <button className="btn line" onClick={onCancel}>Cancel</button>
@@ -396,6 +397,8 @@ function Person() {
         </section>
       </div>
 
+      <Features userId={p.id} hasShop={!!sh} onChange={reload} />
+
       <section className="team-card">
         <h2>Orders</h2>
         {p.orders.length === 0 ? <p className="muted">No orders yet.</p> : (
@@ -448,6 +451,57 @@ function Person() {
         body="For serious problems like fakes or scams. All their live listings are removed. Open orders carry on."
         onConfirm={(r) => { setAsk(null); act(() => api.setShopStatus(sh.id, "banned", r), "Shop closed"); }} />}
     </div>
+  );
+}
+
+/** Per account switches: auto follows the normal rules and milestones, on and off override them. The database enforces them. */
+function Features({ userId, hasShop, onChange }: { userId: string; hasShop: boolean; onChange: () => void }) {
+  const [f, err, reload] = useLoad(() => api.teamFeatures(userId), [userId]);
+  const { busy, error, act } = useTeamAction(() => { reload(); onChange(); });
+  const [ask, setAsk] = useState<null | { key: AccountFeature; state: FeatureState }>(null);
+  const info = ask ? ACCOUNT_FEATURES.find((x) => x.key === ask.key)! : null;
+  const set = (key: AccountFeature, state: FeatureState) => {
+    if (state === "auto") act(() => api.setAccountFeature(userId, key, "auto"), "Back to the normal rules");
+    else setAsk({ key, state });
+  };
+  const changed = f ? ACCOUNT_FEATURES.filter((x) => f[x.key].state !== "auto").length : 0;
+  return (
+    <section className="team-card">
+      <div className="row between"><h2>Features</h2>{changed > 0 && <span className="pill amber">{changed} changed</span>}</div>
+      <p className="muted small" style={{ marginTop: 0 }}>Auto follows the normal rules. On skips a milestone. Off blocks it. Legal checks (ID, bank, food certificate, designer proof) can't be skipped, so some can only be turned off.</p>
+      <ErrorNote error={err ?? error} />
+      {!f ? <div className="muted">Loading…</div> : (["buying", "selling"] as const).map((side) => (
+        <div key={side} className="team-features">
+          <h3>{side === "buying" ? "Buying" : "Selling"}{side === "selling" && !hasShop ? " (no shop yet)" : ""}</h3>
+          {ACCOUNT_FEATURES.filter((x) => x.side === side).map((x) => {
+            const cur = f[x.key];
+            const now = cur.state === "auto" ? cur.autoOk : cur.state === "on";
+            return (
+              <div key={x.key} className="team-feature">
+                <div className="grow">
+                  <div className="row" style={{ gap: 8 }}><b>{x.label}</b>
+                    <span className={`pill ${now ? "green" : "red"}`}>{now ? "Allowed" : "Blocked"}</span></div>
+                  <div className="small muted">{cur.state === "auto" ? (cur.autoNote === "Allowed" ? x.auto : `${x.auto} Now: ${cur.autoNote}.`) : cur.state === "on" ? x.on : x.off}</div>
+                  {cur.state !== "auto" && <div className="small">{cur.state === "on" ? "Turned on" : "Turned off"} by {cur.by ?? "team"}{cur.at ? ` ${timeAgo(cur.at)}` : ""}: {cur.reason}</div>}
+                </div>
+                <div className="seg" role="group" aria-label={x.label}>
+                  {(["auto", "on", "off"] as const).map((st) => (
+                    <button key={st} aria-pressed={cur.state === st} disabled={busy || (st === "on" && !x.on) || cur.state === st}
+                      title={st === "on" && !x.on ? "Can only be turned off" : undefined} onClick={() => set(x.key, st)}>
+                      {st === "auto" ? "Auto" : st === "on" ? "On" : "Off"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ))}
+      {ask && info && <ReasonDialog title={`${ask.state === "on" ? "Turn on" : "Turn off"} ${info.label.toLowerCase()}?`} confirm={ask.state === "on" ? "Turn on" : "Turn off"}
+        danger={ask.state === "off"} busy={busy} onCancel={() => setAsk(null)} body={(ask.state === "on" ? info.on : info.off) ?? ""}
+        reasonLabel="Reason (only the team sees this)" placeholder={ask.state === "on" ? "For example: Founding seller, early access." : "For example: Checking a report."}
+        onConfirm={(r) => { const a = ask; setAsk(null); act(() => api.setAccountFeature(userId, a.key, a.state, r), a.state === "on" ? "Turned on" : "Turned off"); }} />}
+    </section>
   );
 }
 

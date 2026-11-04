@@ -17,7 +17,10 @@ type Mode = "camera" | "create" | "live";
  */
 export function Post() {
   const [params, setParams] = useSearchParams();
-  const MODES = (FEATURES.live ? ["camera", "create", "live"] : ["camera", "create"]) as Mode[];
+  // Live shows once it's released to everyone, or early for an account our team switched it on for.
+  const [features] = useLoad(() => api.myFeatures(), []);
+  const liveOn = features?.live === "on" || (FEATURES.live && features?.live !== "off");
+  const MODES = (liveOn ? ["camera", "create", "live"] : ["camera", "create"]) as Mode[];
   const mode: Mode = MODES.find((m) => m === params.get("mode")) ?? "camera";
   const setMode = (m: Mode) => { setSub(false); setParams(m === "camera" ? {} : { mode: m }, { replace: true }); };
   // Cover first (a video or a photo), then extra photos. Only the cover can be a video.
@@ -249,15 +252,16 @@ function Review({ file, onRetake, onUse }: { file: File; onRetake: () => void; o
 /** Live: checks stock first. Streaming itself is coming next. */
 function GoLive({ onCreate }: { onCreate: () => void }) {
   const [shop] = useLoad(() => api.myShop(), []);
+  const [features] = useLoad(() => api.myFeatures(), []);
   const [tried, setTried] = useState(false);
   const nav = useNavigate();
   const stock = shop ? liveStock(shop.products) : 0;
   const blockers = useCallback(() => {
     if (!shop || shop.status !== "open") return ["Open your shop first. Then list at least 5 items to go live."];
     const state = { verified: shop.checks.idStatus === "approved" && shop.checks.bankStatus === "approved", goodOrders: shop.goodOrders,
-      trustScore: shop.trustScore, category: shop.category, foodCertApproved: shop.checks.certStatus === "approved" };
+      trustScore: shop.trustScore, category: shop.category, foodCertApproved: shop.checks.certStatus === "approved", overrides: features };
     return goLiveBlockers(state, stock);
-  }, [shop, stock]);
+  }, [shop, stock, features]);
   if (shop === undefined) return <div className="cam"><div className="cam-msg"><Loading /></div></div>;
   const list = blockers();
 
