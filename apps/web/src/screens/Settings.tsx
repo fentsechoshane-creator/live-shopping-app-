@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 import { useLoad, useSession } from "../session";
 import { BackButton, ErrorNote, Loading, Sheet, useAction } from "../components/ui";
+import { DeliveryDetailsForm } from "../components/DeliveryDetails";
 
 /** People you blocked, with Unblock. */
 export function BlockedAccounts() {
@@ -90,4 +91,21 @@ export function Privacy() {
 
 export function Terms() {
   return <LegalPage file="/terms.html" title="Terms of Use" />;
+}
+
+/** Your saved delivery details: checkout uses them so Buy now is one tap. */
+export function DeliverySettings() {
+  const { toast, user } = useSession();
+  const nav = useNavigate();
+  const { run } = useAction();
+  return (
+    <div className="screen">
+      <BackButton />
+      <h1>Delivery details</h1>
+      <p className="muted" style={{ marginTop: -6 }}>Checkout fills these in for you. Only you can see them; the seller only sees what the courier label needs.</p>
+      <DeliveryDetailsForm initialName={user?.displayName ?? ""} onDone={() => { toast("Saved"); nav(-1); }} />
+      <button className="link block-link" style={{ color: "var(--red, #dc2626)" }}
+        onClick={() => run(async () => { await api.saveDelivery(null); toast("Removed"); nav(-1); })}>Remove my saved details</button>
+    </div>
+  );
 }

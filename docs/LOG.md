@@ -106,6 +106,13 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-06: Delivery details at sign up, one tap checkout
+
+- Ofentse's idea: collect what checkout needs once, with Skip for now. Sign up now ends with "Where should we send your orders?": to my door (name, cell, street, suburb, city, province, postal code) or a locker near me, saved to the account.
+- Checkout uses saved details: the right delivery option is picked and the details show on one line with Change, so Buy now is one tap. The save switch only shows when something new was typed ("Save for next time, so checkout is one tap" or "Update my saved details"), right under the details, before paying.
+- Menu > Settings > Delivery details to change or remove them.
+- Payment method can't be saved: TradeSafe's public docs show no saved cards or preselected method; the buyer picks Instant EFT, card or SnapScan on TradeSafe's page each time. [CONFIRM with TradeSafe whether they offer card tokens or a preselected method.]
+
 ### 2026-11-06: Delivery through Bob Go
 
 - Decided with Ofentse: **myHaul books** every courier and locker parcel through Bob Go (Ofentse has an account). Delivery is priced by the **parcel size** the seller picks when listing, so big parcels can't sink us: Small (up to 2 kg) R90 door / R60 locker, Medium (up to 5 kg) R120 / R80, Large (up to 15 kg) R180 door only. Bigger is collection only. Bundles take the biggest item, and 3 or more items are at least Medium.

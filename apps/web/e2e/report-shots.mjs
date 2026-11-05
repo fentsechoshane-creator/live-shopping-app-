@@ -51,6 +51,7 @@ try {
   await setup.getByRole("button", { name: "Create account" }).click();
   await setup.getByText("Add a profile photo").waitFor();
   await setup.getByRole("button", { name: "Skip for now" }).click();
+  await setup.getByRole("button", { name: "Skip for now" }).click();
   await setup.waitFor({ state: "detached" });
 
   await page.goto(BASE);
@@ -111,7 +112,8 @@ try {
   await s2.getByRole("button", { name: "Create account" }).click();
   await s2.getByText("Add a profile photo").waitFor();
   await s2.locator('input[type="file"]').setInputFiles(here + "fixtures/denim.jpg");
-  await s2.getByRole("button", { name: "Done" }).click();
+  await s2.getByRole("button", { name: "Next" }).click();
+  await s2.getByRole("button", { name: "Skip for now" }).click();
   await s2.waitFor({ state: "detached" });
 
   await page.goto(`${BASE}/me?tab=selling`);

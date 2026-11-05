@@ -23,7 +23,7 @@ import { Payouts, SellerOrderDetail, SellerOrders } from "./screens/seller/Selli
 import { Post, SellerGate } from "./screens/seller/Post";
 import { TeamApp } from "./screens/team/Team";
 import { Thread } from "./screens/buyer/Messages";
-import { BlockedAccounts, DeleteAccountSheet, Privacy, Terms, CONTACT } from "./screens/Settings";
+import { BlockedAccounts, DeliverySettings, DeleteAccountSheet, Privacy, Terms, CONTACT } from "./screens/Settings";
 
 function RequireUser({ children }: { children: ReactNode }) {
   const { user, ready } = useSession();
@@ -136,6 +136,7 @@ function SideMenu() {
             <span className="grow"><span className="t" style={{ display: "block" }}>Data saver</span><span className="s" style={{ display: "block" }}>Lower video quality on mobile data</span></span>
             <button className="switch" role="switch" aria-checked={dataSaver} aria-label="Data saver" onClick={() => setDataSaver(!dataSaver)} />
           </div>
+          <MenuRow icon="pin" t="Delivery details" s="Where we send your orders" onClick={() => go("/settings/delivery")} />
           <MenuRow icon="block" t="Blocked accounts" s="People you blocked" onClick={() => go("/settings/blocked")} />
         </div>
         <div className="menu-h">Privacy and legal</div>
@@ -251,6 +252,7 @@ export function App() {
           <Route path="/admin" element={<Navigate to="/team" replace />} />
           <Route path="/messages/:id" element={guard(<Thread />)} />
           <Route path="/settings/blocked" element={guard(<BlockedAccounts />)} />
+          <Route path="/settings/delivery" element={guard(<DeliverySettings />)} />
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="*" element={<div className="screen"><BackButton /><div className="empty">Page not found.</div></div>} />

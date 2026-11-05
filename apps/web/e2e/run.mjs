@@ -84,6 +84,8 @@ async function maybeSetup(name = "Test Person") {
   await setup.getByRole("button", { name: "Create account" }).click();
   await setup.getByText("Add a profile photo").waitFor();
   await setup.getByRole("button", { name: "Skip for now" }).click();
+  await setup.getByText("Where should we send your orders?").waitFor();
+  await setup.getByRole("button", { name: "Skip for now" }).click();
   await setup.waitFor({ state: "detached" });
   return true;
 }
@@ -156,9 +158,25 @@ try {
   await setup.getByRole("button", { name: "Create account" }).click();
   await setup.getByText("Add a profile photo").waitFor();
   await setup.locator('input[type="file"]').setInputFiles(here + "fixtures/denim.jpg");
-  await setup.getByRole("button", { name: "Done" }).click();
-  await page.getByRole("dialog", { name: "Checkout" }).waitFor();
+  await setup.getByRole("button", { name: "Next" }).click();
+  // Last step, optional: where to send orders. Saved once, checkout is one tap.
+  await setup.getByText("Where should we send your orders?").waitFor();
+  await check(setup.getByRole("button", { name: "Save and finish" }).isDisabled(), "save waits for a full address");
+  await setup.getByLabel("Cell number").fill("0821234567");
+  await setup.getByLabel("Street address").fill("12 Main Road");
+  await setup.getByLabel("Suburb").fill("Rondebosch");
+  await setup.getByLabel("City", { exact: true }).fill("Cape Town");
+  await setup.getByLabel("Province").selectOption("WC");
+  await setup.getByLabel("Postal code").fill("7700");
+  await shot("signup-delivery");
+  await setup.getByRole("button", { name: "Save and finish" }).click();
+  const firstPay = page.getByRole("dialog", { name: "Checkout" });
+  await firstPay.waitFor();
   await check(page.url() === BASE + "/", "still on the feed after signing in");
+  // Saved at sign up: courier picked, the address on one line, nothing to type, and no save switch.
+  await firstPay.getByText("12 Main Road, Rondebosch, Cape Town, 7700").waitFor();
+  await check(firstPay.getByRole("button", { name: /Courier to your door/ }).getAttribute("aria-pressed").then((v) => v === "true"), "courier picked from saved details");
+  await check(firstPay.getByText(/Save for next time|Update my saved details/).count().then((n) => n === 0), "no save switch for saved details");
   await shot("signin-then-checkout");
   await page.keyboard.press("Escape");
   await page.getByRole("dialog", { name: "Checkout" }).waitFor({ state: "detached" });
@@ -696,16 +714,19 @@ try {
   const pay = page.getByRole("dialog", { name: "Checkout" });
   await pay.getByRole("button", { name: /Courier to your door.*R90/ }).click();
   await check(pay.getByRole("button", { name: /PUDO locker.*R60/ }).isVisible(), "small parcels: R90 door, R60 locker");
-  await pay.getByRole("button", { name: /Add your name and cell number|Add your delivery address/ }).waitFor();
+  // Saved at sign up: one line, ready to pay. Change opens the form.
+  await pay.getByRole("button", { name: /^Pay R/ }).waitFor();
+  await pay.getByRole("button", { name: "Change" }).click();
   await pay.getByLabel("Name").fill("Buyer Test");
   await pay.getByLabel("Cell number").fill("0821234567");
   await pay.getByLabel("Street address").fill("12 Main Road");
   await pay.getByLabel("Suburb").fill("Rondebosch");
-  await pay.getByLabel("City").fill("Cape Town");
+  await pay.getByLabel("City", { exact: true }).fill("Cape Town");
   await pay.getByLabel("Province").selectOption("WC");
   await pay.getByLabel("Postal code").fill("770");
   await check(pay.getByRole("button", { name: "Add your delivery address" }).isDisabled(), "a 3 digit postal code isn't enough");
   await pay.getByLabel("Postal code").fill("7700");
+  await check(pay.getByText("Update my saved details").isVisible(), "changed details offer to update what's saved");
   // A locker instead: pick a city, then a locker from Bob Go's list.
   await pay.getByRole("button", { name: /PUDO locker/ }).click();
   await pay.getByLabel("City", { exact: true }).selectOption("Cape Town");

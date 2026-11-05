@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FEATURES } from "../../features";
 import { DELIVERY_OPTIONS, deliveryFee, orderParcelSize, orderTotals, PARCEL_SIZES, type DeliveryOption, type ParcelSize } from "@app/core";
-import { api, type FeedItem, type Offer, type PickupPoint, type StreetAddress } from "../../api";
+import { api, type FeedItem, type Offer, type PickupPoint, type SavedDelivery, type StreetAddress } from "../../api";
 import { AddressFields, addressLine, addressOk, EMPTY_ADDRESS, LockerPicker } from "../../components/Address";
 import { useSession } from "../../session";
 import { Icon } from "../../components/Icon";
@@ -44,6 +44,7 @@ export function CheckoutSheet({ item, onClose, offer, auctionPrice }: { item: Fe
   const { user } = useSession();
   // Saved from the last order: shown as one line with Change, so a repeat order is a couple of taps.
   const [remember, setRemember] = useState(true);
+  const [saved, setSaved] = useState<SavedDelivery | null>(null);
   const [editing, setEditing] = useState(true);
 
   useEffect(() => { api.welcomeCreditAvailable().then(setCredit).catch(() => {}); }, []);
@@ -57,7 +58,9 @@ export function CheckoutSheet({ item, onClose, offer, auctionPrice }: { item: Fe
       if (d.phone) setPhone(d.phone);
       const a = { street: d.street ?? "", suburb: d.suburb ?? "", city: d.city ?? "", province: d.province ?? "", postalCode: d.postalCode ?? "" } as StreetAddress;
       setAddress(a);
-      if (d.name && d.phone && addressOk(a)) setEditing(false);
+      setSaved(d);
+      // Saved at sign up or last time: show it as one line with Change, so Buy now is one tap.
+      if (d.name && d.phone && (addressOk(a) || d.pickupPoint)) setEditing(false);
     }).catch(() => {});
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -72,11 +75,17 @@ export function CheckoutSheet({ item, onClose, offer, auctionPrice }: { item: Fe
     : needsAddress && !addressOk(address) ? "Add your delivery address"
     : null;
   const addressShown = needsContact && (editing || !name || !phoneOk || (needsAddress && !addressOk(address)));
+  // Offer to save only when something new was typed or picked: right under the details, before paying.
+  const changed = !saved || saved.name !== name.trim() || saved.phone !== phone.trim()
+    || (needsAddress && (saved.street !== address.street || saved.suburb !== address.suburb || saved.city !== address.city
+      || saved.province !== address.province || saved.postalCode !== address.postalCode))
+    || (delivery === "pudo_locker" && saved.pickupPoint?.id !== point?.id);
+  const offerSave = needsContact && changed;
   const t = useMemo(() => feeFor(delivery) === null ? null : orderTotals({ itemPrice: price, delivery, parcelSize: parcel, welcomeCreditAvailable: credit }),
     [price, delivery, credit, parcel]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pay = () => run(async () => {
-    if (remember) {
+    if (offerSave && remember) {
       api.saveDelivery({ delivery, name: name.trim() || undefined, phone: phone.trim() || undefined, ...(addressOk(address) ? address : {}), pickupPoint: point }).catch(() => {});
     }
     const contact = { name: name.trim(), phone: phone.trim() };
@@ -160,10 +169,10 @@ export function CheckoutSheet({ item, onClose, offer, auctionPrice }: { item: Fe
           {needsAddress && <AddressFields value={address} onChange={setAddress} />}
         </>
       )}
-      {needsContact && (
+      {offerSave && (
         <label className="check-row">
           <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
-          <span>Save these details for next time</span>
+          <span>{saved ? "Update my saved details" : "Save for next time, so checkout is one tap"}</span>
         </label>
       )}
       {delivery === "collect_cpt" && <div className="note" style={{ marginBottom: 14 }}>We send you a collection code when it is ready at our Cape Town pickup point.</div>}

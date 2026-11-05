@@ -6,6 +6,7 @@ import { squarePhoto } from "../lib/image";
 import { Avatar } from "./Avatar";
 import { Icon } from "./Icon";
 import { ErrorNote, useAction } from "./ui";
+import { DeliveryDetailsForm } from "./DeliveryDetails";
 
 /** How old someone is today, from a yyyy-mm-dd birthday. */
 function ageFrom(birthday: string) {
@@ -20,6 +21,7 @@ function ageFrom(birthday: string) {
  * 1. Birthday (an age check: 18 and over; the date itself isn't saved).
  * 2. Name and a unique @username, checked while you type, with free suggestions. Agreeing to the terms.
  * 3. Profile photo (optional).
+ * 4. Where to deliver your orders (optional, Skip for now), so your first Buy now is one tap.
  */
 export function AccountSetup() {
   const { user, profile, refreshProfile, toast } = useSession();
@@ -69,8 +71,12 @@ export function AccountSetup() {
     await api.completeAccount(name.trim(), handle, !tooYoung && age !== null && age >= 18, true);
     setStep(2);
   });
-  const finish = (withPhoto: boolean) => run(async () => {
+  const savePhoto = (withPhoto: boolean) => run(async () => {
     if (withPhoto && photo) await api.setAvatar(photo.blob);
+    setStep(3);
+  });
+  // Closing the setup (refreshing the profile) only at the very end.
+  const finish = () => run(async () => {
     await refreshProfile();
     toast(`Welcome to myHaul, @${handle}`);
   });
@@ -84,7 +90,7 @@ export function AccountSetup() {
     <div className="setup" role="dialog" aria-modal="true" aria-label="Create your account">
       <div className="setup-top">
         {step === 1 ? <button className="bare" onClick={() => { setError(null); setStep(0); }} aria-label="Back"><Icon name="back" /></button> : <span />}
-        <span className="welcome-dots dark" aria-hidden="true">{[0, 1, 2].map((i) => <span key={i} className={i === step ? "on" : ""} />)}</span>
+        <span className="welcome-dots dark" aria-hidden="true">{[0, 1, 2, 3].map((i) => <span key={i} className={i === step ? "on" : ""} />)}</span>
         {step === 0 ? <button className="link" onClick={() => api.signOut()}>Log out</button> : <span />}
       </div>
 
@@ -149,10 +155,18 @@ export function AccountSetup() {
           <span className="muted">@{handle}</span>
           <div className="setup-foot" style={{ width: "100%" }}>
             {photo
-              ? <button className="btn green block big" disabled={busy} onClick={() => finish(true)}>{busy ? "Saving…" : "Done"}</button>
+              ? <button className="btn green block big" disabled={busy} onClick={() => savePhoto(true)}>{busy ? "Saving…" : "Next"}</button>
               : <button className="btn green block big" onClick={() => fileRef.current?.click()}>Choose a photo</button>}
-            <button className="link" style={{ marginTop: 14 }} disabled={busy} onClick={() => finish(false)}>Skip for now</button>
+            <button className="link" style={{ marginTop: 14 }} disabled={busy} onClick={() => savePhoto(false)}>Skip for now</button>
           </div>
+        </div>
+      )}
+
+      {step === 3 && (
+        <div className="setup-body scroll">
+          <h1>Where should we send your orders?</h1>
+          <p className="muted">Add it once and Buy now is one tap. You can change it any time in the menu, or at checkout.</p>
+          <DeliveryDetailsForm initialName={name} submitLabel="Save and finish" onDone={() => finish()} onSkip={() => finish()} />
         </div>
       )}
     </div>
