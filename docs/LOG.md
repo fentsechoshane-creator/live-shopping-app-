@@ -115,7 +115,7 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 - Server: `_shared/bobgo.ts` (mock, sandbox, live), checkout prices by size and checks the locker with Bob Go, order-action books on ship (once, a retry reuses it) and gives the label, new `delivery` function (lockers near you or a city), new `bobgo-webhook` (HMAC signed, then confirmed by asking Bob Go), run-due checks tracking every 15 minutes as a backup.
 - App: parcel size step when listing; checkout with street, suburb, city, province and postal code, prices by size, a real locker picker; seller pickup address on To ship; "Book courier and mark shipped", then "Print courier label"; tracking steps for buyer and seller; test label page.
 - Terms: Bob Go delivery, parcel size rule, and fixed the seller fee wording (6% of the item price only, which is what the app always charged).
-- Not live yet: migration 0028 and the new functions need deploying, and Bob Go keys in Supabase secrets (docs/SETUP.md, section 4). Start in Bob Go's sandbox.
+- Not live yet: migration 0028 and the new functions need deploying (Claude's live apply was blocked pending Ofentse's yes; the web app is made safe without it: the feed doesn't ask for parcel size and listing falls back), and Bob Go keys in Supabase secrets (docs/SETUP.md, section 4). Start in Bob Go's sandbox.
 - [CONFIRM] Bob Go's status names (we read "delivered" and a delivered time); check them in the sandbox.
 
 ### 2026-11-05: Hold to bid

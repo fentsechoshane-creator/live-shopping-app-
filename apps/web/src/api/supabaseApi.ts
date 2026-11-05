@@ -43,7 +43,7 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
   const videoUrl = (path: string | null) => (path ? sb.storage.from("videos").getPublicUrl(path).data.publicUrl : null);
 
   // The product fields anyone may read (0025 hides the auction reserve, proof file path and winner).
-  const PRODUCT_COLS = "id, shop_id, title, description, price_cents, mode, label, condition, sizes, stock, lead_days, allergens, proof_status, status, created_at, held_for, held_until, auction_ends_at, auction_state, auction_round, auction_price_cents, auction_pay_by, parcel_size";
+  const PRODUCT_COLS = "id, shop_id, title, description, price_cents, mode, label, condition, sizes, stock, lead_days, allergens, proof_status, status, created_at, held_for, held_until, auction_ends_at, auction_state, auction_round, auction_price_cents, auction_pay_by";
   const toProduct = (p: any): ProductPublic => ({
     id: p.id, title: p.title, description: p.description ?? "", priceCents: p.price_cents, mode: p.mode, label: p.label,
     condition: p.condition, sizes: p.sizes ?? [], stock: p.stock, leadDays: p.lead_days, allergens: p.allergens, status: p.status ?? "live",
@@ -558,6 +558,11 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
       let live = true;
       let message: string | undefined;
       let res = await sb.from("products").insert({ ...row, status: "live" }).select("id").single();
+      // Until the delivery update (0028) is on the database, it has no parcel size yet: list without it.
+      if (res.error && /parcel_size/.test(res.error.message)) {
+        delete (row as Record<string, unknown>).parcel_size;
+        res = await sb.from("products").insert({ ...row, status: "live" }).select("id").single();
+      }
       if (res.error) {
         live = false;
         message = cleanError(res.error.message);
