@@ -235,16 +235,16 @@ try {
   // Bid straight from the video: hold the button until the ring closes. Letting go early does nothing.
   const holdBtn = jacket.getByRole("button", { name: /^Hold to bid R720/ });
   await jacket.getByRole("button", { name: "Custom" }).waitFor();
-  await hold(holdBtn, 1500);
+  await hold(holdBtn, 1000);
   await page.waitForTimeout(400);
   await check(await page.getByText("You're the top bidder at R720").count() === 0, "letting go early doesn't bid");
-  await page.mouse.move(0, 0); await hold(holdBtn, 2500, true);
+  await page.mouse.move(0, 0); await hold(holdBtn, 1500, true);
   await shot("hold-to-bid");
   await page.mouse.up();
-  await hold(holdBtn, 5400);
+  await hold(holdBtn, 3400);
   await page.getByText("You're the top bidder at R720").waitFor();
   await jacket.getByRole("button", { name: "Bid placed" }).waitFor();
-  check(true, "holding for 5 seconds places the bid without leaving the video");
+  check(true, "holding for 3 seconds places the bid without leaving the video");
   // Custom: your own amount, in the bid sheet over the video.
   await jacket.getByRole("button", { name: "Custom" }).click();
   const bidSheet = page.getByRole("dialog", { name: /Vintage 90s denim jacket/ });
@@ -256,7 +256,7 @@ try {
   await bidSheet.getByLabel(/Or your own amount/).fill("725");
   await check(bidSheet.getByRole("button", { name: /^Hold to bid R725/ }).isDisabled(), "a bid under the step can't be placed");
   await bidSheet.getByLabel(/Or your own amount/).fill("900");
-  await hold(bidSheet.getByRole("button", { name: /^Hold to bid R900/ }), 5400);
+  await hold(bidSheet.getByRole("button", { name: /^Hold to bid R900/ }), 3400);
   await page.getByText("You're the top bidder at R900").waitFor();
   await bidSheet.getByText("Reserve met").waitFor();
   await page.keyboard.press("Escape");

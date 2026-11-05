@@ -3,7 +3,7 @@ import { confirmFeel, tap } from "../native";
 import { Icon } from "./Icon";
 
 /** How long to hold before a bid goes in. One place to change it. */
-export const HOLD_MS = 5000;
+export const HOLD_MS = 3000;
 
 type Phase = "idle" | "holding" | "sending" | "done";
 
