@@ -65,11 +65,11 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 
 ## Next up
 
-- **Before the store upload:** apply migrations 0017 to 0025 live and redeploy all server functions; deploy and schedule `team-alerts` and `push-notifications` (docs/SETUP.md steps 9 and 10); fill in the company details in `terms.html` and `privacy.html`; set up help@myhaul.co.za; make the reviewer account (docs/STORE.md). [Lehloma, Ofentse]
-- **Alerts:** apply 0019 live, deploy and schedule `team-alerts` (docs/SETUP.md step 9), add the phone (Firebase and Apple), Telegram and email secrets. [Lehloma]
-- **Security:** apply 0018 live with 0017; set `TRADESAFE_MODE=mock` in Supabase secrets while testing (payments are refused without it); deploy the changed functions (checkout, escrow-webhook, run-due, suggest-listing). Then the open items in docs/SECURITY.md: team two step sign in, CAPTCHA at sign up, backups. [Lehloma, Ofentse]
-- **Team dashboard live:** apply migration 0017 to the live database and make Ofentse's account (@shups) a team member. [Ofentse to approve]
-- **Server functions:** deploy `delete-account`, `suggest-listing` and `checkout` after `npm run check:functions`. The live database is up to date. [Lehloma]
+- **Make Ofentse a team member (one line, Ofentse):** Supabase > SQL Editor, run `update profiles set role = 'admin' where id = (select id from auth.users where email = 'fentsechoshane@gmail.com');` Claude was not allowed to grant team access itself.
+- **Secrets (Ofentse or Lehloma, in Supabase > Edge Functions > Secrets):** `TRADESAFE_MODE=mock` and `APP_URL=https://myhaul-app.netlify.app` while testing. Payments are refused until TRADESAFE_MODE is set. Later: Mux, Anthropic, Telegram, Resend, Firebase and Apple push keys.
+- **Supabase settings:** turn on leaked password protection (Authentication > Sign in / Providers > Password). [Ofentse]
+- **Before the store upload:** fill in the company details in `terms.html` and `privacy.html`; set up help@myhaul.co.za; make the reviewer account (docs/STORE.md). [Lehloma, Ofentse]
+- **Security open items** in docs/SECURITY.md: team two step sign in, CAPTCHA at sign up, backups. [Lehloma, Ofentse]
 - **Web host and domain:** connect the repo to Netlify (`netlify.toml` is ready), set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` there, point myhaul.co.za at it. This gives the privacy and help pages, WhatsApp previews and links that open the app. [Ofentse]
 - **Links open the app:** put the Apple Team ID in `public/.well-known/apple-app-site-association` and the Play signing SHA256 in `assetlinks.json`; turn on Associated Domains and Push in Xcode. [Lehloma]
 - Developer accounts, Google's 12 tester 14 day closed test, reviewer test account. [Ofentse]
@@ -102,6 +102,15 @@ Debug as we go: anyone who finds or fixes a problem updates this list. Highest r
 Fixed in this round: Safari double back on the edge swipe (now only in the installed app), deleting an account now also deletes the person's photos and videos, React Router warnings.
 
 ## Log
+
+### 2026-11-05: Live Supabase updated
+
+- Database updates 0017 to 0026 applied to live through the Supabase connector (0026 is new: pins the search path on 4 helpers the Supabase security check flagged).
+- All 11 server functions deployed live with their sign in settings: checkout, order-action, delete-account, seller-bank, mux-upload, suggest-listing need a signed in person; run-due, escrow-webhook, mux-webhook, team-alerts, push-notifications check their own secret.
+- Schedules live: run-due every 15 minutes, team-alerts every 5 minutes, push-notifications every minute.
+- `scripts/push-live.mjs` now knows updates 1 to 26 are live, so a laptop push won't run them twice.
+- Security check after the push: no tables open without rules. Remaining warnings are expected (public read helpers like the feed and shop pages are meant to be callable signed out; trigger functions can't be called directly), plus pg_net in the public schema (Supabase default) and leaked password protection being off (a dashboard switch).
+- Not done: making Ofentse a team member (blocked for Claude, one SQL line in Next up), and the payment secrets.
 
 ### 2026-11-05: Pushing to live
 
