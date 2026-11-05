@@ -50,6 +50,8 @@ export function RewardChip({ className }: { className: string }) {
 /** Every reward, what it was for and when it can be used. */
 export function WalletSheet({ rewards, onClose }: { rewards: Reward[]; onClose: () => void }) {
   const nav = useNavigate();
+  const [stamps, setStamps] = useState(0);
+  useEffect(() => { api.deliveryStamps().then(setStamps).catch(() => {}); }, []);
   const ready = rewards.filter((r) => r.status === "ready");
   return (
     <Sheet title="Wallet" onClose={onClose}>
@@ -67,7 +69,14 @@ export function WalletSheet({ rewards, onClose }: { rewards: Reward[]; onClose: 
               </div>
             ))}
           </div>}
-      <p className="small muted">One reward comes off an order of R200 or more, by itself at checkout. Rewards have no cash value.</p>
+      <div className="note" style={{ marginBottom: 12 }}>
+        <b>Delivery stamps: {Math.min(stamps, 5)} of 5</b>
+        <span className="stamp-row" aria-hidden="true">{[0, 1, 2, 3, 4].map((i) => <span key={i} className={i < stamps ? "on" : ""} />)}</span>
+        <span className="small" style={{ display: "block", marginTop: 6 }}>{stamps >= 5
+          ? "Your next courier or locker delivery is half price."
+          : "Pay with Instant EFT (Ozow) on orders of R200 or more. Each one earns a stamp once its return window closes; 5 stamps give half price delivery."}</span>
+      </div>
+      <p className="small muted">One reward comes off an order of R200 or more, by itself at checkout. Rewards and stamps have no cash value.</p>
       <button className="btn block" onClick={() => { onClose(); nav("/orders"); }}><Icon name="bag" size={18} />My orders</button>
     </Sheet>
   );

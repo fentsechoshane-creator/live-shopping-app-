@@ -105,12 +105,17 @@ Deno.serve(handler(async (req, body) => {
   // Rewards (migration 0024): a surprise R50 earned after a first delivered order, auction win or sale, usable after the return window.
   // The database checks the same rules again when the order is saved, so this can't be raced or skipped.
   const { data: creditOk } = await db.rpc("welcome_credit_ok", { p_buyer: uid, p_shop: shop.id });
+  // Delivery perks (0029): 5 Instant EFT stamps, or a big order. The database checks the stamps again on save.
+  const { data: perksOn } = bookedByUs(delivery) ? await db.rpc("delivery_perk_budget_ok") : { data: false };
+  const { data: stampsReady } = perksOn === true ? await db.rpc("delivery_stamps_ready", { p_buyer: uid }) : { data: false };
 
   const t = orderTotals({
     itemPrice,
     delivery,
     parcelSize,
     welcomeCreditAvailable: creditOk === true,
+    stampsReady: stampsReady === true,
+    perksOn: perksOn === true,
     foundingUntil: shop.founding_until ? new Date(shop.founding_until) : null,
   });
 
@@ -135,6 +140,7 @@ Deno.serve(handler(async (req, body) => {
     delivery_details: deliveryDetails, food_date: foodDate ?? null, food_slot: foodSlot ?? null, food_message: foodMessage ?? null,
     bundle_product_ids: bundleIds, offer_id: offerId ?? null,
     parcel_size: product.mode === "order_now" ? null : parcelSize, delivery_kept_cents: t.deliveryKept, pickup_point: savedPoint,
+    delivery_discount_cents: t.deliveryDiscount, delivery_perk: t.deliveryPerk,
   }), "create order");
 
   const days = ESCROW_DAYS[product.mode as keyof typeof ESCROW_DAYS];

@@ -28,7 +28,7 @@ Deno.serve(handler(async (req, body) => {
     case "mock_pay": {
       if (es.mode !== "mock") throw new UserError("Not available.", 404);
       if (!isBuyer || order.status !== "pending_payment") throw new UserError("Nothing to pay.");
-      await setStatus("paid");
+      await setStatus("paid", { payment_method: await es.paymentMethod(order.escrow_transaction_id ?? "") });
       break;
     }
     case "cancel_unpaid": {

@@ -171,7 +171,7 @@ export interface Order {
   deliveryDetails: Record<string, string>;
   foodDate: string | null;
   foodSlot: string | null;
-  totals: Pick<OrderTotals, "itemPrice" | "deliveryFee" | "protectionFee" | "creditUsed" | "total" | "sellerFee" | "sellerPayout" | "creditTopUp">;
+  totals: Pick<OrderTotals, "itemPrice" | "deliveryFee" | "protectionFee" | "creditUsed" | "total" | "sellerFee" | "sellerPayout" | "creditTopUp"> & { deliveryDiscount?: number };
   checkoutUrl: string | null;
   trackingRef: string | null;
   parcelSize?: ParcelSize | null;
@@ -406,6 +406,8 @@ export interface Api {
   settleAuction(productId: string): Promise<void>;
   /** Delivery details from the last order, to fill in checkout. */
   savedDelivery(): Promise<SavedDelivery | null>;
+  /** Unused Instant EFT delivery stamps (5 give half price delivery). */
+  deliveryStamps(): Promise<number>;
   /** Parcel sizes of these items (checkout prices courier and lockers by size). */
   parcelSizes(productIds: string[]): Promise<Record<string, ParcelSize>>;
   /** Lockers and pickup points near a spot or in a city. */

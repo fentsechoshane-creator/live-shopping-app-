@@ -106,6 +106,18 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-06: Delivery perks (Instant EFT stamps, big order delivery)
+
+- Ofentse asked for incentives instead of only a tip, sustainable, with a minimum if it makes sense ("do whatever works out best"). Built:
+  - **Stamps:** every Instant EFT (Ozow) order of R200 or more earns a stamp once its return window closes. 5 stamps = half price delivery (up to R45) on a courier or locker order. Cost works out to about R6 per Ozow order; Ozow saves us about R4 against card on a R350 order (more against SnapScan) and clears straight away. The R200 minimum stops tiny orders farming stamps.
+  - **Big orders:** half price delivery from R1,000, free locker from R1,500, where our margin covers it.
+  - Perks don't stack (the best one wins), only on deliveries we book, never more than the delivery fee, and pause when this month's R10,000 perk budget is used.
+- Money: the buyer pays less, the seller gets the same, we fund it inside escrow (like the R50 reward); escrow still balances (tested for every mix).
+- Migration 0029: `orders.delivery_discount_cents`, `delivery_perk`, `payment_method` (our server reads it from TradeSafe's `transaction { deposits { method } }`, as their plugin does); `delivery_stamps`; stamps used at order save (or the order is refused), given back on cancel or refund, earned on completed; notifications "Delivery stamp 3 of 5" and "Half price delivery unlocked".
+- App: the Instant EFT tip shows the stamps (5 dots) on orders of R200+; the price list shows the perk; a hint from R700 that R1,000 gets half price delivery; the wallet shows stamps; receipts show the perk. Terms section 8 updated.
+- [CONFIRM] TradeSafe's exact code for Ozow in `deposits.method` (we match "ozow" in it).
+- Not live yet (needs 0028, 0029 and the functions deployed).
+
 ### 2026-11-06: Payment costs and the Instant EFT nudge
 
 - Compared fees from Ofentse's screenshots. PaySafe South Africa (paysafe.co.za, an escrow service, not the international Paysafe) has a R100 minimum plus R15 per settlement: R115 on a R350 order, so it's out for us. No public API found either. Staying with TradeSafe.

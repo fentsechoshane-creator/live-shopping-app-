@@ -43,6 +43,8 @@ export interface Escrow {
   refund(transactionId: string): Promise<void>;
   /** The provider's own record of a transaction, so a callback can't be faked. */
   transactionState(transactionId: string): Promise<{ state: string; reference: string | null } | null>;
+  /** How the buyer paid (like "OZOW"), for Instant EFT delivery stamps. Null if unknown; never throws. */
+  paymentMethod(transactionId: string): Promise<string | null>;
 }
 
 class MockEscrow implements Escrow {
@@ -60,6 +62,7 @@ class MockEscrow implements Escrow {
   async release() {}
   async refund() {}
   async transactionState() { return null; }
+  async paymentMethod() { return "OZOW (test)"; }
 }
 
 // Words that identify each bank in TradeSafe's bank list (UniversalBranchCode descriptions).
@@ -213,6 +216,20 @@ class TradeSafe implements Escrow {
     const d = await this.gql<{ transaction: { state: string; reference: string | null } | null }>(
       `query t($id: ID!) { transaction(id: $id) { state reference } }`, { id: transactionId });
     return d.transaction ?? null;
+  }
+
+  async paymentMethod(transactionId: string) {
+    // Their plugin reads transaction { deposits { method } }. [CONFIRM] the exact Ozow code; we match "ozow" in it.
+    try {
+      const d = await this.gql<{ transaction: { deposits: { method: string | null; processed: boolean | null }[] | null } | null }>(
+        `query m($id: ID!) { transaction(id: $id) { deposits { method processed } } }`, { id: transactionId });
+      const deps = d.transaction?.deposits ?? [];
+      const m = (deps.find((x) => x.processed) ?? deps[0])?.method;
+      return typeof m === "string" ? m.slice(0, 40) : null;
+    } catch (e) {
+      console.error("payment method", e);
+      return null;
+    }
   }
 
   async refund(transactionId: string) {

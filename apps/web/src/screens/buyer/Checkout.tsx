@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FEATURES } from "../../features";
-import { DELIVERY_OPTIONS, deliveryFee, orderParcelSize, orderTotals, PARCEL_SIZES, type DeliveryOption, type ParcelSize } from "@app/core";
+import { bookedByUs, DELIVERY_OPTIONS, DELIVERY_PERKS, deliveryFee, orderParcelSize, orderTotals, PARCEL_SIZES, type DeliveryOption, type ParcelSize } from "@app/core";
 import { api, type FeedItem, type Offer, type PickupPoint, type SavedDelivery, type StreetAddress } from "../../api";
 import { AddressFields, addressLine, addressOk, EMPTY_ADDRESS, LockerPicker } from "../../components/Address";
 import { useSession } from "../../session";
@@ -47,7 +47,9 @@ export function CheckoutSheet({ item, onClose, offer, auctionPrice }: { item: Fe
   const [saved, setSaved] = useState<SavedDelivery | null>(null);
   const [editing, setEditing] = useState(true);
 
-  useEffect(() => { api.welcomeCreditAvailable().then(setCredit).catch(() => {}); }, []);
+  // Instant EFT delivery stamps: 5 give half price delivery.
+  const [stamps, setStamps] = useState(0);
+  useEffect(() => { api.welcomeCreditAvailable().then(setCredit).catch(() => {}); api.deliveryStamps().then(setStamps).catch(() => {}); }, []);
   useEffect(() => {
     if (user?.displayName) setName((n) => n || user.displayName);
     api.savedDelivery().then((d) => {
@@ -81,8 +83,12 @@ export function CheckoutSheet({ item, onClose, offer, auctionPrice }: { item: Fe
       || saved.province !== address.province || saved.postalCode !== address.postalCode))
     || (delivery === "pudo_locker" && saved.pickupPoint?.id !== point?.id);
   const offerSave = needsContact && changed;
-  const t = useMemo(() => feeFor(delivery) === null ? null : orderTotals({ itemPrice: price, delivery, parcelSize: parcel, welcomeCreditAvailable: credit }),
-    [price, delivery, credit, parcel]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Orders of R200 or more paid by Instant EFT earn a stamp (given once the return window closes).
+  const earnsStamp = price >= DELIVERY_PERKS.stampMinOrder && !food;
+  // A nudge when a bigger order would make delivery half price.
+  const toHalf = DELIVERY_PERKS.halfPriceFrom - price;
+  const t = useMemo(() => feeFor(delivery) === null ? null : orderTotals({ itemPrice: price, delivery, parcelSize: parcel, welcomeCreditAvailable: credit, stampsReady: stamps >= DELIVERY_PERKS.stampsNeeded }),
+    [price, delivery, credit, parcel, stamps]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pay = () => run(async () => {
     if (offerSave && remember) {
@@ -153,6 +159,9 @@ export function CheckoutSheet({ item, onClose, offer, auctionPrice }: { item: Fe
             right={fee === null ? "" : fee ? R(fee) : "Free"} />
         );
       })}
+      {bookedByUs(delivery) && !offer && toHalf > 0 && toHalf <= 30000 && t && t.deliveryDiscount === 0 && (
+        <p className="small muted" style={{ margin: "-4px 0 12px" }}>Orders of R1,000 or more get half price delivery, and a free locker from R1,500.</p>
+      )}
       {delivery === "pudo_locker" && feeFor(delivery) !== null && <LockerPicker value={point} onChange={setPoint} />}
       {needsContact && !addressShown && (
         <div className="saved-address">
@@ -181,13 +190,22 @@ export function CheckoutSheet({ item, onClose, offer, auctionPrice }: { item: Fe
       {/* Nudge to Instant EFT (Ozow): cleared straight away, and it costs us far less than card or SnapScan. */}
       <div className="pay-tip">
         <Icon name="spark" size={18} />
-        <span className="grow"><b>Tip: pay with Instant EFT (Ozow)</b>
-          <span className="small">It's confirmed straight away, so the seller can ship today. A normal bank transfer can take up to 2 days.</span></span>
+        <span className="grow"><b>{earnsStamp ? "Pay with Instant EFT (Ozow) to earn a delivery stamp" : "Tip: pay with Instant EFT (Ozow)"}</b>
+          <span className="small">{earnsStamp
+            ? <>5 stamps give you half price delivery. {stamps > 0 && stamps < DELIVERY_PERKS.stampsNeeded ? `You have ${stamps} of 5. ` : ""}It's also confirmed straight away, so the seller can ship today.</>
+            : "It's confirmed straight away, so the seller can ship today. A normal bank transfer can take up to 2 days."}</span>
+          {earnsStamp && <span className="stamp-row" aria-label={`${Math.min(stamps, 5)} of 5 stamps`}>
+            {[0, 1, 2, 3, 4].map((i) => <span key={i} className={i < stamps ? "on" : i === stamps ? "next" : ""} />)}
+          </span>}
+        </span>
       </div>
       <p className="small muted" style={{ margin: "0 0 16px" }}>Card and SnapScan work too. You pay on TradeSafe's secure page next; we never see your card.</p>
       {t && <div className="price-rows" style={{ marginTop: 8 }}>
         <div className="row"><span>Item</span><span>{R(t.itemPrice)}</span></div>
         <div className="row"><span>Delivery</span><span>{t.deliveryFee ? R(t.deliveryFee) : "Free"}</span></div>
+        {t.deliveryDiscount > 0 && <div className="row" style={{ color: "#15803d" }}>
+          <span>{t.deliveryPerk === "stamp" ? "Your 5 stamps: half price delivery" : t.deliveryDiscount === t.deliveryFee ? "Free locker on orders of R1,500 or more" : "Half price delivery on orders of R1,000 or more"}</span>
+          <span>-{R(t.deliveryDiscount)}</span></div>}
         <div className="row"><span>Buyer protection</span><span>{R(t.protectionFee)}</span></div>
         {t.creditUsed > 0 && <div className="row" style={{ color: "#15803d" }}><span>Reward</span><span>-{R(t.creditUsed)}</span></div>}
         <div className="row total"><span>Total</span><span>{R(t.total)}</span></div>

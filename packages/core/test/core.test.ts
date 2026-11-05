@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  deliveryFee, PARCEL_SIZE_IDS,
+  deliveryFee, deliveryPerk, PARCEL_SIZE_IDS,
   rand, formatRand, protectionFee, orderTotals, sellerFee, releasableAt, payoutDate, nextFriday, addWorkingDays,
   reserveFor, scoreFrom, tierFor, canUse, canForceOn, packingVideoProblems, validateListing, canTransition, returnReasonsFor, shipBy,
   liveStock, goLiveBlockers, MIN_LIVE_STOCK, isRude, looksOffApp, bidStep, nextMinBid, reserveProblem, timeLeft, maskHandle,
@@ -90,6 +90,37 @@ describe("delivery by parcel size", () => {
         const t = orderTotals({ itemPrice: rand(p), delivery, parcelSize, welcomeCreditAvailable: credit });
         expect(t.total - t.escrowAgentFee + t.creditTopUp).toBe(t.sellerPayout);
       }
+    }
+  });
+});
+
+describe("delivery perks", () => {
+  it("5 Instant EFT stamps give half price delivery, at most R45", () => {
+    expect(deliveryPerk("courier", rand(90), rand(300), true)).toEqual({ cents: rand(45), perk: "stamp" });
+    expect(deliveryPerk("courier", rand(180), rand(300), true)).toEqual({ cents: rand(45), perk: "stamp" });
+    expect(deliveryPerk("pudo_locker", rand(60), rand(300), true)).toEqual({ cents: rand(30), perk: "stamp" });
+    expect(deliveryPerk("collect_cpt", 0, rand(300), true).perk).toBeNull();
+  });
+  it("big orders: half price from R1,000, a free locker from R1,500, and the best perk wins", () => {
+    expect(deliveryPerk("courier", rand(90), rand(1000), false)).toEqual({ cents: rand(45), perk: "big_order" });
+    expect(deliveryPerk("pudo_locker", rand(60), rand(1500), true)).toEqual({ cents: rand(60), perk: "big_order" });
+    expect(deliveryPerk("courier", rand(90), rand(1500), false)).toEqual({ cents: rand(45), perk: "big_order" });
+    expect(deliveryPerk("courier", rand(90), rand(999), false).perk).toBeNull();
+    expect(deliveryPerk("baker_delivers", rand(40), rand(2000), true).perk).toBeNull();
+  });
+  it("the buyer pays less, the seller gets the same, and escrow still balances", () => {
+    const plain = orderTotals({ itemPrice: rand(350), delivery: "courier", parcelSize: "small" });
+    const perk = orderTotals({ itemPrice: rand(350), delivery: "courier", parcelSize: "small", stampsReady: true });
+    expect(plain.total - perk.total).toBe(rand(45));
+    expect(perk.sellerPayout).toBe(plain.sellerPayout);
+    expect(perk.total - perk.escrowAgentFee + perk.creditTopUp).toBe(perk.sellerPayout);
+    expect(orderTotals({ itemPrice: rand(350), delivery: "courier", stampsReady: true, perksOn: false }).deliveryDiscount).toBe(0);
+  });
+  it("escrow balances with every mix of reward and perk", () => {
+    for (let p = 100; p <= 3000; p += 53) for (const credit of [true, false]) for (const stamps of [true, false]) for (const d of ["courier", "pudo_locker"] as const) {
+      const t = orderTotals({ itemPrice: rand(p), delivery: d, welcomeCreditAvailable: credit, stampsReady: stamps });
+      expect(t.total - t.escrowAgentFee + t.creditTopUp).toBe(t.sellerPayout);
+      expect(t.deliveryDiscount).toBeLessThanOrEqual(t.deliveryFee);
     }
   });
 });

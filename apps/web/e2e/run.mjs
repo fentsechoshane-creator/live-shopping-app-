@@ -221,6 +221,8 @@ try {
   await page.goto(BASE);
   await page.getByRole("button", { name: "R50 reward ready" }).click();
   await page.getByRole("dialog", { name: "Wallet" }).getByText("Ready. Comes off your next order of R200 or more.").waitFor();
+  // That order was paid by Instant EFT (test) and was over R200: once the return window closed it earned a stamp.
+  await page.getByRole("dialog", { name: "Wallet" }).getByText("Delivery stamps: 1 of 5").waitFor();
   await page.keyboard.press("Escape");
   await check(page.getByRole("dialog", { name: "Surprise reward" }).count().then((n) => n === 0), "surprise shows once");
 
@@ -714,6 +716,7 @@ try {
   const pay = page.getByRole("dialog", { name: "Checkout" });
   await pay.getByRole("button", { name: /Courier to your door.*R90/ }).click();
   await check(pay.getByRole("button", { name: /PUDO locker.*R60/ }).isVisible(), "small parcels: R90 door, R60 locker");
+  await pay.getByText("Pay with Instant EFT (Ozow) to earn a delivery stamp").waitFor();
   // Saved at sign up: one line, ready to pay. Change opens the form.
   await pay.getByRole("button", { name: /^Pay R/ }).waitFor();
   await pay.getByRole("button", { name: "Change" }).click();

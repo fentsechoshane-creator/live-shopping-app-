@@ -152,6 +152,7 @@ export function OrderDetail() {
       <div className="price-rows">
         <div className="row"><span>Item{o.size ? ` (size ${o.size})` : ""}</span><span>{R(o.totals.itemPrice)}</span></div>
         <div className="row"><span>{DELIVERY_OPTIONS[o.delivery].label}</span><span>{o.totals.deliveryFee ? R(o.totals.deliveryFee) : "Free"}</span></div>
+        {!!o.totals.deliveryDiscount && <div className="row" style={{ color: "#15803d" }}><span>Delivery perk</span><span>-{R(o.totals.deliveryDiscount)}</span></div>}
         <div className="row"><span>Buyer protection</span><span>{R(o.totals.protectionFee)}</span></div>
         {o.totals.creditUsed > 0 && <div className="row"><span>Reward</span><span>-{R(o.totals.creditUsed)}</span></div>}
         <div className="row total"><span>Total</span><span>{R(o.totals.total)}</span></div>

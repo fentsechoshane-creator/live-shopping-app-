@@ -995,3 +995,35 @@ select pg_temp.act_as_service();
 select pg_temp.expect_error($$update products set parcel_size = null where id = '40000000-0000-0000-0000-000000000001'$$, 'products_parcel_size_needed');
 reset role;
 select 'delivery tests passed' as result;
+
+-- ===== Delivery perks (migration 0029) =====
+select pg_temp.act_as_service();
+update seller_checks set bank_status = 'approved' where shop_id = (select id from shops where handle = 'other.shop');
+-- Not enough stamps: the order isn't saved.
+select pg_temp.expect_error($$insert into orders (id, buyer_id, shop_id, product_id, mode, item_price_cents, delivery, delivery_fee_cents, delivery_kept_cents, delivery_discount_cents, delivery_perk, protection_fee_cents, total_cents, seller_fee_cents, seller_payout_cents)
+  values ('40000000-0000-0000-0000-000000000031', '00000000-0000-0000-0000-00000000000d', (select id from shops where handle = 'other.shop'), '40000000-0000-0000-0000-000000000001', 'buy_now', 30000, 'courier', 9000, 9000, 4500, 'stamp', 1200, 35700, 1800, 28200)$$, '5 delivery stamps');
+-- Five stamps from five old orders, then an order that uses them.
+insert into orders (id, buyer_id, shop_id, product_id, mode, item_price_cents, delivery, delivery_fee_cents, protection_fee_cents, total_cents, seller_fee_cents, seller_payout_cents)
+  select ('40000000-0000-0000-0000-00000000004' || i)::uuid, '00000000-0000-0000-0000-00000000000d', (select id from shops where handle = 'other.shop'),
+    '40000000-0000-0000-0000-000000000001', 'buy_now', 30000, 'collect_cpt', 0, 1200, 31200, 1800, 28200 from generate_series(1, 5) i;
+insert into delivery_stamps (user_id, earned_order_id) select '00000000-0000-0000-0000-00000000000d', ('40000000-0000-0000-0000-00000000004' || i)::uuid from generate_series(1, 5) i;
+do $$ begin assert delivery_stamps_ready('00000000-0000-0000-0000-00000000000d'), '5 stamps are ready'; end $$;
+insert into orders (id, buyer_id, shop_id, product_id, mode, item_price_cents, delivery, delivery_fee_cents, delivery_kept_cents, delivery_discount_cents, delivery_perk, protection_fee_cents, total_cents, seller_fee_cents, seller_payout_cents)
+  values ('40000000-0000-0000-0000-000000000031', '00000000-0000-0000-0000-00000000000d', (select id from shops where handle = 'other.shop'), '40000000-0000-0000-0000-000000000001', 'buy_now', 30000, 'courier', 9000, 9000, 4500, 'stamp', 1200, 35700, 1800, 28200);
+do $$ begin assert not delivery_stamps_ready('00000000-0000-0000-0000-00000000000d'), 'stamps used'; end $$;
+-- The discount must match the total, can't exceed the fee, and needs a perk name.
+select pg_temp.expect_error($$update orders set delivery_discount_cents = 9500 where id = '40000000-0000-0000-0000-000000000031'$$, 'orders_');
+-- Unpaid and cancelled: the stamps come back.
+update orders set status = 'cancelled' where id = '40000000-0000-0000-0000-000000000031';
+do $$ begin assert delivery_stamps_ready('00000000-0000-0000-0000-00000000000d'), 'stamps back after cancel'; end $$;
+reset role;
+-- People can't make stamps or check others' stamps; the budget and ready checks are server only.
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000d');
+select pg_temp.expect_error($$insert into delivery_stamps (user_id, earned_order_id) values ('00000000-0000-0000-0000-00000000000d', '40000000-0000-0000-0000-000000000011')$$, 'permission denied');
+select pg_temp.expect_error($$select delivery_stamps_ready('00000000-0000-0000-0000-00000000000b')$$, 'permission denied');
+do $$ begin assert (select count(*) from delivery_stamps) = 5, 'you see your own stamps'; end $$;
+reset role;
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000b');
+do $$ begin assert (select count(*) from delivery_stamps) = 0, 'you do not see others'' stamps'; end $$;
+reset role;
+select 'delivery perk tests passed' as result;

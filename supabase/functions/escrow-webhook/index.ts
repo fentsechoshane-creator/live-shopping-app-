@@ -39,7 +39,9 @@ Deno.serve(async (req) => {
   if (!real || real.reference !== order.id) return json({ ok: true, ignored: "not confirmed" });
 
   if (order.status === "pending_payment" && PAID_STATES.includes(real.state)) {
-    const { error } = await db.from("orders").update({ status: "paid" }).eq("id", order.id).eq("status", "pending_payment");
+    // How they paid decides Instant EFT delivery stamps later.
+    const method = await es.paymentMethod(order.escrow_transaction_id);
+    const { error } = await db.from("orders").update({ status: "paid", payment_method: method }).eq("id", order.id).eq("status", "pending_payment");
     if (error) {
       console.error(error);
       return json({ error: "update failed" }, 500);

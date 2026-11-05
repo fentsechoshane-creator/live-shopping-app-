@@ -2,7 +2,7 @@
 // Used when no Supabase keys are set. Sign in with any email or phone and the code 123456.
 import {
   bidStep, maskHandle, canTransition, isRude, orderTotals, payoutDate, releasableAt, returnReasonsFor, shipBy, tierFor, TRUST_POINTS, validateListing,
-  RETURN_POSTAGE_PAYER, ACCOUNT_FEATURE_KEYS, canForceOn, featureOffMessage, type AccountFeature, type OrderStatus, type TrustEventKind, bookedByUs, deliveryFee, PARCEL_SIZES, orderParcelSize } from "@app/core";
+  RETURN_POSTAGE_PAYER, ACCOUNT_FEATURE_KEYS, canForceOn, featureOffMessage, type AccountFeature, type OrderStatus, type TrustEventKind, bookedByUs, deliveryFee, PARCEL_SIZES, orderParcelSize, DELIVERY_PERKS } from "@app/core";
 import { handleProblem } from "../lib/handle";
 import type {
   Api, Category, ReportReason, ReportTarget, CheckoutInput, FeedItem, ListingInput, MyShop, Notification, Order, Payout, PendingReview, ProductPublic, ReviewStatus,
@@ -18,7 +18,7 @@ interface DProduct extends ProductPublic { shopId: string; proofStatus: ReviewSt
   auctionEndsAt?: string | null; reserveCents?: number | null; auctionState?: AuctionInfo["state"]; auctionRound?: number;
   auctionWinner?: string | null; auctionPriceCents?: number | null; auctionPayBy?: string | null }
 interface DPost { id: string; shopId: string; productId: string; caption: string; video: FeedItem["video"]; createdAt: string; photos?: string[] }
-interface DOrder extends Order { shopOwnerId: string; bundleIds?: string[]; offerId?: string | null;
+interface DOrder extends Order { shopOwnerId: string; bundleIds?: string[]; offerId?: string | null; paymentMethod?: string | null;
   packingVideo?: string; packingPhoto?: string; packingReview?: "ok" | "strike"; packingReviewedAt?: string }
 interface DUser extends User { trust: number; welcomeUsed: boolean; admin: boolean; createdAt?: string; bio?: string;
   handle?: string | null; avatar?: string | null; handleChangedAt?: string | null; adult?: boolean; terms?: boolean }
@@ -37,6 +37,8 @@ interface State {
   delivery?: Record<string, SavedDelivery>;
   /** Sellers' pickup addresses for courier collections, and tracking events per order. */
   pickup?: Record<string, ShopPickup>;
+  /** Instant EFT delivery stamps (0029). */
+  stamps?: { userId: string; earnedOrderId: string; usedOrderId: string | null }[];
   shipEvents?: Record<string, ShipmentEvent[]>;
   interests?: Record<string, Category[]>;
   errors?: AppError[];
@@ -295,11 +297,19 @@ export function createDemoApi(): Api {
     }
     if (to === "completed") {
       trust(o.shopOwnerId, "order_kept"); schedulePayout(o);
+      // A delivery stamp for an Instant EFT order of R200 or more, like the database (0029).
+      if (/ozow/i.test(o.paymentMethod ?? "") && o.totals.itemPrice >= DELIVERY_PERKS.stampMinOrder && !(s.stamps ?? []).some((x) => x.earnedOrderId === o.id)) {
+        s.stamps = [...(s.stamps ?? []), { userId: o.buyerId, earnedOrderId: o.id, usedOrderId: null }];
+        const n = s.stamps.filter((x) => x.userId === o.buyerId && !x.usedOrderId).length;
+        notify(o.buyerId, n >= 5 ? "Half price delivery unlocked" : `Delivery stamp ${n} of 5`,
+          n >= 5 ? "You have 5 Instant EFT stamps. Your next courier or locker delivery is half price." : `Paying with Instant EFT earned you a stamp. ${5 - n} more for half price delivery.`, "/inbox");
+      }
       (s.rewards ?? []).filter((r) => r.earnedOrderId === o.id && r.status === "pending").forEach((r) => {
         r.status = "ready"; notify(r.userId, "Your R50 is ready", "It comes off your next order of R200 or more, by itself.", "/me");
       });
     }
     if (to === "refunded" || to === "cancelled") {
+      (s.stamps ?? []).forEach((x) => { if (x.usedOrderId === o.id) x.usedOrderId = null; });
       (s.rewards ?? []).forEach((r) => {
         if (r.earnedOrderId === o.id && (r.status === "pending" || r.status === "ready")) r.status = "forfeited";
         if (r.usedOrderId === o.id && r.status === "used") { r.status = "ready"; r.usedOrderId = null; }
@@ -501,7 +511,8 @@ export function createDemoApi(): Api {
       if (deliveryFee(input.delivery, parcelSize) === null) throw new Error(`This parcel is ${PARCEL_SIZES[parcelSize].label.toLowerCase()}, too big for a locker. Pick courier or collection.`);
       const point = input.delivery === "pudo_locker" ? DEMO_POINTS.find((x) => x.id === input.pickupPoint?.id) ?? null : null;
       if (point) dd.locker = point.name;
-      const totals = orderTotals({ itemPrice, delivery: input.delivery, parcelSize, welcomeCreditAvailable: !!reward,
+      const myStamps = (s.stamps ?? []).filter((x) => x.userId === u.id && !x.usedOrderId);
+      const totals = orderTotals({ itemPrice, delivery: input.delivery, parcelSize, welcomeCreditAvailable: !!reward, stampsReady: myStamps.length >= 5,
         foundingUntil: sh.foundingUntil ? new Date(sh.foundingUntil) : null, at: now() });
       const oid = id();
       const o: DOrder = {
@@ -513,6 +524,7 @@ export function createDemoApi(): Api {
       };
       s.orders.unshift(o);
       if (reward && totals.creditUsed > 0) { reward.status = "used"; reward.usedOrderId = oid; }
+      if (totals.deliveryPerk === "stamp") myStamps.slice(0, 5).forEach((x) => { x.usedOrderId = oid; });
       save();
       return { orderId: oid, checkoutUrl: o.checkoutUrl!, totals };
     },
@@ -520,6 +532,7 @@ export function createDemoApi(): Api {
       await wait(400);
       const o = s.orders.find((x) => x.id === orderId && x.buyerId === me().id);
       if (!o || o.status !== "pending_payment") throw new Error("Nothing to pay.");
+      o.paymentMethod = "OZOW (test)";
       setStatus(o, "paid");
       const ap = s.products.find((x) => x.id === o.product.id && x.mode === "auction");
       if (ap) Object.assign(ap, { auctionState: "paid", status: "sold_out", stock: 0 });
@@ -745,6 +758,10 @@ export function createDemoApi(): Api {
       s.delivery = { ...(s.delivery ?? {}) };
       if (d) s.delivery[u.id] = d; else delete s.delivery[u.id];
       save();
+    },
+    async deliveryStamps() {
+      const u = s.users.find((x) => x.id === s.currentUserId);
+      return u ? (s.stamps ?? []).filter((x) => x.userId === u.id && !x.usedOrderId).length : 0;
     },
     async parcelSizes(ids) {
       return Object.fromEntries(ids.map((i) => [i, s.products.find((p) => p.id === i)?.parcelSize ?? "small"]));

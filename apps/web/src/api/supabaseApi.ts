@@ -59,7 +59,7 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
     totals: {
       itemPrice: o.item_price_cents, deliveryFee: o.delivery_fee_cents, protectionFee: o.protection_fee_cents,
       creditUsed: o.credit_cents, total: o.total_cents, sellerFee: o.seller_fee_cents, sellerPayout: o.seller_payout_cents,
-      creditTopUp: o.credit_topup_cents ?? 0,
+      creditTopUp: o.credit_topup_cents ?? 0, deliveryDiscount: o.delivery_discount_cents ?? 0,
     },
     checkoutUrl: o.checkout_url, trackingRef: o.tracking_ref, parcelSize: o.parcel_size ?? null, courierName: o.courier_name ?? null,
     hasLabel: !!o.shipment_id, pickupPoint: o.pickup_point ?? null, trackingStatus: o.tracking_status ?? null, packingCode: o.packing_code ?? null, paidAt: o.paid_at, shipBy: o.ship_by, shippedAt: o.shipped_at,
@@ -317,6 +317,12 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
       return { delivery: d.delivery ?? undefined, locker: d.locker ?? undefined, name: d.name ?? undefined, phone: d.phone ?? undefined,
         street: d.address ?? undefined, suburb: d.suburb ?? undefined, city: d.city ?? undefined, province: d.province ?? undefined,
         postalCode: d.postal_code ?? undefined, pickupPoint: d.pickup_point ?? null };
+    },
+    async deliveryStamps() {
+      const { data: auth } = await sb.auth.getUser();
+      if (!auth.user) return 0;
+      const { count } = await sb.from("delivery_stamps").select("id", { count: "exact", head: true }).eq("user_id", auth.user.id).is("used_order_id", null);
+      return count ?? 0;
     },
     async parcelSizes(ids) {
       if (!ids.length) return {};

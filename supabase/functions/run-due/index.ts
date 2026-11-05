@@ -138,7 +138,7 @@ Deno.serve(async (req) => {
         // Paid late, or the callback was missed: mark it paid instead of stranding the buyer's money.
         const st = await es.transactionState(o.escrow_transaction_id);
         if (st && PAID_STATES.includes(st.state)) {
-          await db.from("orders").update({ status: "paid" }).eq("id", o.id).eq("status", "pending_payment");
+          await db.from("orders").update({ status: "paid", payment_method: await es.paymentMethod(o.escrow_transaction_id) }).eq("id", o.id).eq("status", "pending_payment");
           continue;
         }
         await es.refund(o.escrow_transaction_id); // if this fails, we try again next run instead of cancelling

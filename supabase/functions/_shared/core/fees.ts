@@ -68,6 +68,34 @@ export const DELIVERY_OPTIONS: Record<DeliveryOption, { label: string; fee: Cent
   baker_delivers: { label: "Baker delivers", fee: rand(40), days: "On your date", foodOnly: true },
 };
 
+/**
+ * Delivery perks (decided 6 Nov 2026, paid for by the card fees saved and by our margin on bigger orders):
+ * - Stamps: every Instant EFT (Ozow) order of R200 or more earns a stamp once its return window closes.
+ *   5 stamps = half price delivery (at most R45) on a courier or locker order.
+ * - Big orders: half price delivery from R1,000; a free locker from R1,500.
+ * Only on deliveries we book (courier and locker), never more than the delivery fee, and inside a monthly budget.
+ */
+export const DELIVERY_PERKS = {
+  stampMinOrder: rand(200),
+  stampsNeeded: 5,
+  stampCap: rand(45),
+  halfPriceFrom: rand(1000),
+  freeLockerFrom: rand(1500),
+  monthlyBudget: rand(10000),
+} as const;
+export type DeliveryPerk = "stamp" | "big_order";
+
+/** The best delivery perk for an order (they don't stack). */
+export function deliveryPerk(delivery: DeliveryOption, fee: Cents, itemPrice: Cents, stampsReady: boolean): { cents: Cents; perk: DeliveryPerk | null } {
+  if (!bookedByUs(delivery) || fee <= 0) return { cents: 0, perk: null };
+  let big = 0;
+  if (delivery === "pudo_locker" && itemPrice >= DELIVERY_PERKS.freeLockerFrom) big = fee;
+  else if (itemPrice >= DELIVERY_PERKS.halfPriceFrom) big = Math.round(fee / 2);
+  const stamp = stampsReady ? Math.min(DELIVERY_PERKS.stampCap, Math.round(fee / 2)) : 0;
+  if (big === 0 && stamp === 0) return { cents: 0, perk: null };
+  return big >= stamp ? { cents: big, perk: "big_order" } : { cents: stamp, perk: "stamp" };
+}
+
 export interface OrderTotalsInput {
   itemPrice: Cents;
   delivery: DeliveryOption;
@@ -75,6 +103,10 @@ export interface OrderTotalsInput {
   parcelSize?: ParcelSize;
   /** True when the buyer has a reward ready to use. */
   welcomeCreditAvailable?: boolean;
+  /** True when the buyer has 5 Instant EFT stamps ready (and the perk budget allows it). */
+  stampsReady?: boolean;
+  /** False when this month's perk budget is used up (big order perks then pause too). */
+  perksOn?: boolean;
   foundingUntil?: Date | null;
   at?: Date;
 }
@@ -92,6 +124,9 @@ export interface OrderTotals {
   sellerPayout: Cents;
   /** The part of the delivery fee we keep to pay the courier (courier and locker orders). */
   deliveryKept: Cents;
+  /** Delivery discount we fund (stamps or a big order), and which perk it was. */
+  deliveryDiscount: Cents;
+  deliveryPerk: DeliveryPerk | null;
   /** What we keep before escrow and payment costs (seller fee + protection fee - welcome credit). Can be negative. */
   platformRevenue: Cents;
   /** Our fee taken inside escrow (never below zero). */
@@ -110,9 +145,12 @@ export function orderTotals(input: OrderTotalsInput): OrderTotals {
   // The welcome credit is a discount we fund. Escrow holds what the buyer paid, so if the credit is bigger
   // than our cut on the order, we pay the seller the difference ourselves (creditTopUp).
   const creditUsed = input.welcomeCreditAvailable && input.itemPrice >= WELCOME_CREDIT_MIN_ORDER ? WELCOME_CREDIT : 0;
-  const total = input.itemPrice + deliveryFeeCents + protect - creditUsed;
-  // Inside escrow our share is our fees plus the courier money; the seller gets the rest.
+  const perk = input.perksOn === false ? { cents: 0, perk: null } : deliveryPerk(input.delivery, deliveryFeeCents, input.itemPrice, !!input.stampsReady);
+  const total = input.itemPrice + deliveryFeeCents - perk.cents + protect - creditUsed;
+  // Inside escrow our share is our fees plus the courier money, less what we fund (reward, delivery perk);
+  // if that goes below zero we top the seller up ourselves.
   const ours = fee + protect + deliveryKept;
+  const funded = creditUsed + perk.cents;
   return {
     itemPrice: input.itemPrice,
     deliveryFee: deliveryFeeCents,
@@ -122,8 +160,10 @@ export function orderTotals(input: OrderTotalsInput): OrderTotals {
     sellerFee: fee,
     sellerPayout: input.itemPrice + deliveryFeeCents - deliveryKept - fee,
     deliveryKept,
-    platformRevenue: fee + protect - creditUsed,
-    escrowAgentFee: Math.max(0, ours - creditUsed),
-    creditTopUp: Math.max(0, creditUsed - ours),
+    deliveryDiscount: perk.cents,
+    deliveryPerk: perk.perk,
+    platformRevenue: fee + protect - creditUsed - perk.cents,
+    escrowAgentFee: Math.max(0, ours - funded),
+    creditTopUp: Math.max(0, funded - ours),
   };
 }
