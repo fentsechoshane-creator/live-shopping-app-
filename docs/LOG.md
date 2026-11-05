@@ -65,6 +65,7 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 
 ## Next up
 
+- **Apply migration 0027 live** (live check fixes) once Ofentse says yes. [Claude]
 - **Make Ofentse a team member (one line, Ofentse):** Supabase > SQL Editor, run `update profiles set role = 'admin' where id = (select id from auth.users where email = 'fentsechoshane@gmail.com');` Claude was not allowed to grant team access itself.
 - **Secrets (Ofentse or Lehloma, in Supabase > Edge Functions > Secrets):** `TRADESAFE_MODE=mock` and `APP_URL=https://myhaul-app.netlify.app` while testing. Payments are refused until TRADESAFE_MODE is set. Later: Mux, Anthropic, Telegram, Resend, Firebase and Apple push keys.
 - **Supabase settings:** turn on leaked password protection (Authentication > Sign in / Providers > Password). [Ofentse]
@@ -102,6 +103,17 @@ Debug as we go: anyone who finds or fixes a problem updates this list. Highest r
 Fixed in this round: Safari double back on the edge swipe (now only in the installed app), deleting an account now also deletes the person's photos and videos, React Router warnings.
 
 ## Log
+
+### 2026-11-05: Read only check of live
+
+- The sandbox can't reach the live site or API (network allow list), so the check ran inside the live database as a signed out visitor and as an ordinary signed in user, reading only.
+- Passed: every table has access rules; signed out visitors can only write error reports (capped); both views are locked; storage buckets are right (packing proof and ID files private, videos and avatars public); all 23 team functions refuse non team members; reward functions can't be called directly.
+- Found and fixed in migration 0027 (tested locally, NOT yet applied to live, waiting for Ofentse's yes):
+  1. Signed out visitors could ask whether any two people had blocked each other.
+  2. Every media row was public, including packing proof rows, which show the order number and the seller.
+  3. Reviews showed which buyer bought from which shop, to anyone.
+- Low, left as is [CONFIRM]: a held item shows the user ID of the buyer it's held for; likes and reposts show who liked what (like TikTok's public likes).
+- Not checked: website headers and the built app files (the site couldn't be reached from here).
 
 ### 2026-11-05: Live Supabase updated
 

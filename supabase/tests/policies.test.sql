@@ -919,3 +919,36 @@ do $$ declare before int; begin
   assert (select count(*) from trust_events where user_id = '00000000-0000-0000-0000-00000000000e') = before + 1, 'once per buyer per 90 days';
 end $$;
 select 'hardening round 2 tests passed' as result;
+
+-- ===== Live check fixes (migration 0027) =====
+-- Signed out: can't test who blocked whom; sees media of live posts but not packing proof; can't read reviews.
+select pg_temp.act_as_service();
+insert into reviews (order_id, buyer_id, shop_id, stars, body)
+  select id, buyer_id, shop_id, 5, 'Lovely' from orders where id = '40000000-0000-0000-0000-000000000011'
+  on conflict do nothing;
+update posts set status = 'live' where id = (select id from posts where media_id is not null limit 1);
+reset role;
+select pg_temp.act_as_anon();
+select pg_temp.expect_error($$select blocked_between('00000000-0000-0000-0000-00000000000a', '00000000-0000-0000-0000-00000000000b')$$, 'permission denied');
+do $$ begin
+  assert (select count(*) from media) = (select count(*) from posts where status = 'live' and media_id is not null), 'only media of live posts is public';
+  assert not exists (select 1 from feed() f where f.storage_path is not null and not exists (select 1 from media m where m.storage_path = f.storage_path)), 'every feed video is still readable';
+  assert (select count(*) from media where storage_path like '%packing-%' or storage_path like '%parcel-%') = 0, 'packing proof rows are hidden';
+  assert (select count(*) from reviews) = 0, 'reviews hidden from signed out visitors';
+  assert (select count(*) from media) >= 1, 'media of a live post is public';
+end $$;
+reset role;
+-- The buyer and the seller still see their review; a stranger doesn't.
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000b');
+do $$ begin assert (select count(*) from reviews where order_id = '40000000-0000-0000-0000-000000000011') = 1, 'buyer sees own review'; end $$;
+reset role;
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000e');
+do $$ begin assert (select count(*) from reviews where order_id = '40000000-0000-0000-0000-000000000011') = 1, 'seller sees review'; end $$;
+reset role;
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000d');
+do $$ begin
+  assert (select count(*) from reviews) = 0, 'strangers do not see reviews';
+  assert (select count(*) from media where storage_path like '%packing-%') = 0, 'strangers do not see packing proof rows';
+end $$;
+reset role;
+select 'live check fix tests passed' as result;
