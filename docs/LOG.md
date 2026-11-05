@@ -69,6 +69,7 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 - **Make Ofentse a team member (one line, Ofentse):** Supabase > SQL Editor, run `update profiles set role = 'admin' where id = (select id from auth.users where email = 'fentsechoshane@gmail.com');` Claude was not allowed to grant team access itself.
 - **Secrets (Ofentse or Lehloma, in Supabase > Edge Functions > Secrets):** `TRADESAFE_MODE=mock` and `APP_URL=https://myhaul-app.netlify.app` while testing. Payments are refused until TRADESAFE_MODE is set. Later: Mux, Anthropic, Telegram, Resend, Firebase and Apple push keys.
 - **Supabase settings:** turn on leaked password protection (Authentication > Sign in / Providers > Password). [Ofentse]
+- **Store accounts (start now, slowest part):** CIPC name fix, D-U-N-S number, then Apple and Google accounts as myHaul (Pty) Ltd. Order and details in docs/STORE.md. [Ofentse]
 - **Before the store upload:** fill in the company details in `terms.html` and `privacy.html`; set up help@myhaul.co.za; make the reviewer account (docs/STORE.md). [Lehloma, Ofentse]
 - **Security open items** in docs/SECURITY.md: team two step sign in, CAPTCHA at sign up, backups. [Lehloma, Ofentse]
 - **Web host and domain:** connect the repo to Netlify (`netlify.toml` is ready), set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` there, point myhaul.co.za at it. This gives the privacy and help pages, WhatsApp previews and links that open the app. [Ofentse]
@@ -103,6 +104,14 @@ Debug as we go: anyone who finds or fixes a problem updates this list. Highest r
 Fixed in this round: Safari double back on the edge swipe (now only in the installed app), deleting an account now also deletes the person's photos and videos, React Router warnings.
 
 ## Log
+
+### 2026-11-05: App Store and Google Play prep
+
+- docs/STORE.md rewritten with the rules as checked today: Apple builds need Xcode 26 or later (since April 2026) and the new age rating questions; Google targets API 36 (we already do); iPhone screenshots at 6.9 inch (ours are 1320 x 2868).
+- Decision proposed: company developer accounts as myHaul (Pty) Ltd, not personal [CONFIRM with Ofentse]. Google organisation accounts skip the 12 testers for 14 days rule, and both stores then show the company as the seller. Needs a D-U-N-S number, which needs the CIPC name fixed first.
+- Step by step order with owners and times is at the top of STORE.md. Estimate about 4 to 6 weeks to submission if the accounts start this week [CONFIRM].
+- Screenshots: the framed set is good, but the raw screens use drawn placeholders and one shows "demo". Retake with real sellers before submitting. Claims to confirm: bakers "certified", "our Cape Town pickup point".
+- "Live shopping" removed from the Apple keywords until live selling ships.
 
 ### 2026-11-05: Read only check of live
 
