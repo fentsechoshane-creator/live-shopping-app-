@@ -15,9 +15,9 @@ Deno.serve(handler(async (req) => {
   if (allowed !== true) throw new UserError("That's a lot of uploads today. Try again tomorrow.", 429);
   // Uploads are only accepted from our own app (the website and the phone apps), never any site.
   const app = new URL(Deno.env.get("APP_URL") ?? "https://myhaul-app.netlify.app").origin;
-  const allowed = [app, "https://myhaul.co.za", "capacitor://localhost", "https://localhost", "http://localhost:5173"];
+  const origins = [app, "https://myhaul.co.za", "capacitor://localhost", "https://localhost", "http://localhost:5173"];
   const origin = req.headers.get("origin") ?? "";
-  const upload = await createDirectUpload(allowed.includes(origin) ? origin : app);
+  const upload = await createDirectUpload(origins.includes(origin) ? origin : app);
   const media = must(await db.from("media").insert({ owner_id: uid, kind: "video", mux_upload_id: upload.id, status: "uploading" })
     .select("id").single(), "create media") as any;
   return json({ mediaId: media.id, uploadUrl: upload.url });
