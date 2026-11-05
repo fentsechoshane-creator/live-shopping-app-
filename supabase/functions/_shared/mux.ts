@@ -13,7 +13,8 @@ export async function createDirectUpload(origin: string): Promise<{ id: string; 
     headers: { authorization: auth(), "content-type": "application/json" },
     body: JSON.stringify({
       cors_origin: origin,
-      new_asset_settings: { playback_policy: ["public"], max_resolution_tier: "1080p" },
+      // Basic quality: encoding is free on Mux, and it looks right for short phone videos.
+      new_asset_settings: { playback_policy: ["public"], max_resolution_tier: "1080p", video_quality: "basic" },
     }),
   });
   if (!res.ok) throw new Error(`Mux upload failed: ${res.status} ${await res.text()}`);
