@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import {
-  canUse, DELIVERY_OPTIONS, PACKING_KEEP_MONTHS, PACKING_STEPS, PACKING_VIDEO_MAX_S, PACKING_VIDEO_MIN_S, packingVideoProblems, LISTING_LABELS, rand, TIER_INFO, tierFor, TRUST_POINTS, validateListing,
+  bookedByUs, canUse, DELIVERY_OPTIONS, PARCEL_SIZES, PACKING_KEEP_MONTHS, PACKING_STEPS, PACKING_VIDEO_MAX_S, PACKING_VIDEO_MIN_S, packingVideoProblems, LISTING_LABELS, rand, TIER_INFO, tierFor, TRUST_POINTS, validateListing,
   type Condition, type ListingLabel,
 } from "@app/core";
 import { api, type MyShop } from "../../api";
@@ -9,7 +9,8 @@ import { useLoad, useSession } from "../../session";
 import { ProductArt } from "../../components/Scene";
 import { BackButton, Cell, ErrorNote, Field, Loading, R, TierPill, dateText, dateTimeText, swatch, useAction } from "../../components/ui";
 import { Icon } from "../../components/Icon";
-import { statusPill, Timeline } from "../buyer/Orders";
+import { addressLine, PickupAddressForm } from "../../components/Address";
+import { CourierTracking, statusPill, Timeline } from "../buyer/Orders";
 
 export function CertUpload({ status, onDone }: { status: string; onDone: () => void }) {
   const [file, setFile] = useState<File | null>(null);
@@ -33,6 +34,7 @@ export function SellerOrders() {
       <BackButton to="/me?tab=selling" label="Shop" />
       <h1 style={{ marginTop: 6 }}>Orders</h1>
       <ErrorNote error={error} />
+      <PickupCheck />
       {!orders && !error && <Loading />}
       {orders?.length === 0 && <div className="empty">No orders yet. Post videos to get your first sale.</div>}
       {/* Orders to ship come first, the most urgent at the top. */}
@@ -54,7 +56,6 @@ export function SellerOrders() {
 export function SellerOrderDetail() {
   const { id = "" } = useParams();
   const [o, error, reload] = useLoad(() => api.order(id), [id]);
-  const [tracking, setTracking] = useState("");
   const [packing, setPacking] = useState<File | null>(null);
   const [packSecs, setPackSecs] = useState<number | null>(null);
   const [parcel, setParcel] = useState<File | null>(null);
@@ -74,7 +75,9 @@ export function SellerOrderDetail() {
   if (o === undefined) return <div className="screen"><Loading /></div>;
   if (!o) return <div className="screen"><div className="empty">Order not found.</div></div>;
   const act = (fn: () => Promise<void>, msg: string) => run(async () => { await fn(); toast(msg); reload(); });
-  const needsTracking = o.delivery === "courier" || o.delivery === "pudo_locker";
+  // Courier and locker parcels are booked by us through Bob Go when you mark them shipped.
+  const booked = bookedByUs(o.delivery);
+  const label = () => run(async () => { const url = await api.courierLabel(o.id); window.open(url, "_blank", "noopener"); });
 
   return (
     <div className="screen">
@@ -87,13 +90,14 @@ export function SellerOrderDetail() {
         <div className="card" style={{ marginTop: 14 }}>
           <b>Ship by {dateTimeText(o.shipBy)}</b>
           <p className="small muted">If it is not shipped in time, the buyer is refunded automatically and you lose 5 trust points.</p>
-          {o.deliveryDetails.locker && (
-            <div className="note row between" style={{ marginBottom: 12, alignItems: "flex-start" }}>
-              <span>Send to PUDO locker: <b>{o.deliveryDetails.locker}</b></span>
-              <button className="link" onClick={() => copy(o.deliveryDetails.locker)}>Copy</button>
+          {booked && (
+            <div className="note" style={{ marginBottom: 12 }}>
+              <b>{o.delivery === "pudo_locker" ? `To a locker: ${o.pickupPoint?.name ?? o.deliveryDetails.locker ?? ""}` : `To ${o.deliveryDetails.suburb ?? ""}${o.deliveryDetails.city ? `, ${o.deliveryDetails.city}` : ""}`}</b><br />
+              {PARCEL_SIZES[o.parcelSize ?? "small"].label} parcel: {PARCEL_SIZES[o.parcelSize ?? "small"].hint.toLowerCase()} When you mark it shipped we book the courier, and you print the label.
             </div>
           )}
-          {o.deliveryDetails.address && (
+          {booked && <PickupCheck />}
+          {!booked && o.deliveryDetails.address && (
             <div className="note row between" style={{ marginBottom: 12, alignItems: "flex-start" }}>
               <span>Send to {o.deliveryDetails.name}, {o.deliveryDetails.phone}<br />{o.deliveryDetails.address}</span>
               <button className="link" onClick={() => copy(`${o.deliveryDetails.name}\n${o.deliveryDetails.phone}\n${o.deliveryDetails.address}`)}>Copy</button>
@@ -120,13 +124,21 @@ export function SellerOrderDetail() {
               <input type="file" accept="image/*" capture="environment" aria-label="Photo of the sealed parcel" onChange={(e) => setParcel(e.target.files?.[0] ?? null)} />
             </label>
           </div>
-          {needsTracking && <Field label="Tracking number"><input value={tracking} onChange={(e) => setTracking(e.target.value.toUpperCase())} autoCapitalize="characters" autoCorrect="off" spellCheck={false} /></Field>}
-          <button className="btn green block" disabled={busy || !packing || !parcel || packProblems.length > 0 || (needsTracking && !tracking)}
-            onClick={() => packing && parcel && act(() => api.shipOrder(o.id, tracking, packing, parcel), "Marked as shipped")}>
-            {o.mode === "order_now" ? "Ready, handed over" : "Mark as shipped"}
+          <button className="btn green block" disabled={busy || !packing || !parcel || packProblems.length > 0}
+            onClick={() => packing && parcel && act(() => api.shipOrder(o.id, "", packing, parcel), booked ? "Courier booked. Print the label." : "Marked as shipped")}>
+            {busy && booked ? "Booking the courier…" : o.mode === "order_now" ? "Ready, handed over" : booked ? "Book courier and mark shipped" : "Mark as shipped"}
           </button>
         </div>
       )}
+
+      {o.hasLabel && ["shipped", "delivered"].includes(o.status) && (
+        <div className="card" style={{ marginTop: 14 }}>
+          <b>{o.courierName ?? "Courier"} · {o.trackingRef}</b>
+          <p className="small muted">Print the label and stick it on the parcel. The courier collects from your pickup address{o.delivery === "pudo_locker" ? ", or drop it at any PUDO locker" : ""}.</p>
+          <button className="btn dark block" disabled={busy} onClick={label}><Icon name="share" size={18} />Print courier label</button>
+        </div>
+      )}
+      {o.hasLabel && <CourierTracking o={o} seller />}
 
       {o.status === "return_requested" && o.ret && (
         <div className="card" style={{ marginTop: 14 }}>
@@ -183,6 +195,27 @@ export function Payouts() {
           <span className={`pill ${p.status === "released" ? "green" : p.status === "held" ? "red" : ""}`}>{p.status}</span>
         </div>
       ))}
+    </div>
+  );
+}
+
+/** Courier orders need the seller's pickup address. Shows it with Change, or the form when it's missing. */
+function PickupCheck() {
+  const [p, error, reload] = useLoad(() => api.shopPickup(), []);
+  const [editing, setEditing] = useState(false);
+  if (error) return <ErrorNote error={error} />;
+  if (p === undefined) return null;
+  if (p && !editing) return (
+    <div className="saved-address">
+      <Icon name="pin" size={18} />
+      <span className="grow"><b>Courier collects from</b><span className="small muted" style={{ display: "block" }}>{addressLine(p)}</span></span>
+      <button className="link" onClick={() => setEditing(true)}>Change</button>
+    </div>
+  );
+  return (
+    <div className="card inset" style={{ marginBottom: 12 }}>
+      <b>Your pickup address</b>
+      <PickupAddressForm initial={p} onSaved={() => { setEditing(false); reload(); }} />
     </div>
   );
 }

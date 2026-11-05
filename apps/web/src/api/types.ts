@@ -1,6 +1,19 @@
 import type {
-  AccountFeature, FeatureState, Cents, Condition, DeliveryOption, ListingLabel, OrderStatus, OrderTotals, ReturnReason, SaleMode, SellerTier,
+  AccountFeature, FeatureState, Cents, Condition, DeliveryOption, ListingLabel, OrderStatus, OrderTotals, ParcelSize, ReturnReason, SaleMode, SellerTier,
 } from "@app/core";
+
+export type Province = "EC" | "FS" | "GP" | "KZN" | "LP" | "MP" | "NC" | "NW" | "WC";
+export const PROVINCES: { id: Province; name: string }[] = [
+  { id: "WC", name: "Western Cape" }, { id: "GP", name: "Gauteng" }, { id: "KZN", name: "KwaZulu Natal" }, { id: "EC", name: "Eastern Cape" },
+  { id: "FS", name: "Free State" }, { id: "LP", name: "Limpopo" }, { id: "MP", name: "Mpumalanga" }, { id: "NW", name: "North West" }, { id: "NC", name: "Northern Cape" },
+];
+/** A street address in the parts a courier needs. */
+export interface StreetAddress { street: string; suburb: string; city: string; province: Province | ""; postalCode: string }
+/** A locker or pickup point from Bob Go. */
+export interface PickupPoint { id: number; provider: string; name: string; address: string; lat?: number; lng?: number; type?: string; hours?: string }
+/** Where the courier collects a seller's parcels. Private to the seller and our team. */
+export interface ShopPickup extends StreetAddress { name: string; phone: string }
+export interface ShipmentEvent { at: string; status: string; message: string | null; location: string | null }
 
 export type Category = "clothes" | "beauty" | "food" | "designer";
 export type ReviewStatus = "not_started" | "pending" | "approved" | "rejected";
@@ -96,6 +109,8 @@ export interface ProductPublic {
   /** Held by the seller for one buyer until this time. */
   heldFor?: string | null;
   heldUntil?: string | null;
+  /** For courier and locker prices. Small when not known. */
+  parcelSize?: ParcelSize | null;
 }
 
 /** A timed auction as one person sees it. Bidders other than you are masked (t***a). */
@@ -134,7 +149,9 @@ export interface CheckoutInput {
   productId: string;
   size?: string;
   delivery: DeliveryOption;
-  deliveryDetails: { locker?: string; name?: string; phone?: string; address?: string };
+  deliveryDetails: { locker?: string; name?: string; phone?: string; address?: string } & Partial<StreetAddress>;
+  /** The locker the buyer picked (courier lockers through Bob Go). */
+  pickupPoint?: { id: number; provider: string };
   foodDate?: string;
   foodSlot?: string;
   foodMessage?: string;
@@ -157,6 +174,12 @@ export interface Order {
   totals: Pick<OrderTotals, "itemPrice" | "deliveryFee" | "protectionFee" | "creditUsed" | "total" | "sellerFee" | "sellerPayout" | "creditTopUp">;
   checkoutUrl: string | null;
   trackingRef: string | null;
+  parcelSize?: ParcelSize | null;
+  /** Booked through Bob Go: the courier, the locker and the latest tracking status. */
+  courierName?: string | null;
+  hasLabel?: boolean;
+  pickupPoint?: PickupPoint | null;
+  trackingStatus?: string | null;
   /** Shown to the seller to film and write on the parcel, like "MH 4821". */
   packingCode: string | null;
   paidAt: string | null;
@@ -225,6 +248,8 @@ export interface ListingInput {
   leadDays: number | null;
   allergens: string | null;
   caption: string;
+  /** Courier size, picked by the seller (not for food). */
+  parcelSize?: ParcelSize;
 }
 
 export interface Payout {
@@ -254,7 +279,7 @@ export interface PendingReview {
 }
 
 /** Delivery details remembered for the next checkout. Private to the user. */
-export interface SavedDelivery { delivery?: string; locker?: string; name?: string; phone?: string; address?: string }
+export interface SavedDelivery extends Partial<StreetAddress> { delivery?: string; locker?: string; name?: string; phone?: string; address?: string; pickupPoint?: PickupPoint | null }
 export interface AppError { id: string; message: string; stack?: string | null; path?: string | null; platform?: string | null; version?: string | null; createdAt: string; userId?: string | null }
 
 // ===== Team dashboard =====
@@ -381,6 +406,16 @@ export interface Api {
   settleAuction(productId: string): Promise<void>;
   /** Delivery details from the last order, to fill in checkout. */
   savedDelivery(): Promise<SavedDelivery | null>;
+  /** Parcel sizes of these items (checkout prices courier and lockers by size). */
+  parcelSizes(productIds: string[]): Promise<Record<string, ParcelSize>>;
+  /** Lockers and pickup points near a spot or in a city. */
+  pickupPoints(where: { lat: number; lng: number } | { city: string }): Promise<{ points: PickupPoint[]; cities: string[] }>;
+  /** The seller's pickup address for courier collections. */
+  shopPickup(): Promise<ShopPickup | null>;
+  saveShopPickup(p: ShopPickup): Promise<void>;
+  /** Link to the courier label PDF (seller), and tracking for an order (buyer or seller). */
+  courierLabel(orderId: string): Promise<string>;
+  shipmentEvents(orderId: string): Promise<ShipmentEvent[]>;
   saveDelivery(d: SavedDelivery | null): Promise<void>;
   /** What the user picked on the welcome screens. Shapes the first For You feed. */
   saveInterests(interests: Category[]): Promise<void>;

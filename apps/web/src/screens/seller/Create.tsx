@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { AUCTION_DAYS, canUse, LISTING_LABELS, rand, reserveProblem, validateListing, type Condition, type ListingLabel } from "@app/core";
+import { AUCTION_DAYS, canUse, PARCEL_SIZE_IDS, PARCEL_SIZES, type ParcelSize, LISTING_LABELS, rand, reserveProblem, validateListing, type Condition, type ListingLabel } from "@app/core";
 import { api, type ListingSuggestion, type MyShop } from "../../api";
 import { clearDraft, loadDraft, loadDraftMedia, saveDraft, saveDraftMedia, snapshot, type DraftFields } from "../../lib/draft";
 import { useLoad, useSession } from "../../session";
 import { Icon } from "../../components/Icon";
-import { ErrorNote, R, useAction } from "../../components/ui";
+import { Choice, ErrorNote, R, useAction } from "../../components/ui";
 
 const CONDITIONS: { value: Condition; label: string }[] = [
   { value: "like_new", label: "Like new" }, { value: "good", label: "Good" }, { value: "fair", label: "Fair" },
@@ -32,6 +32,8 @@ export function CreateListing({ shop, media, onMedia, onCamera, onStep, startAtD
   const [stock, setStock] = useState(1);
   const [sizes, setSizes] = useState<string[]>([]);
   const [leadDays, setLeadDays] = useState(2);
+  // Courier size: decides the delivery price the buyer pays. Picking too small means the courier's extra comes off your payout.
+  const [parcelSize, setParcelSize] = useState<ParcelSize | null>(null);
   const [allergens, setAllergens] = useState("");
   const [description, setDescription] = useState("");
   const [caption, setCaption] = useState("");
@@ -67,14 +69,14 @@ export function CreateListing({ shop, media, onMedia, onCamera, onStep, startAtD
   const touched = !!(title || price || description || caption || media.length);
   useEffect(() => {
     if (!touched || draft) return;
-    const t = window.setTimeout(() => saveDraft(uid, { title, label, condition, price, stock, sizes, leadDays, allergens, description, caption, step, savedAt: new Date().toISOString() }), 400);
+    const t = window.setTimeout(() => saveDraft(uid, { title, label, condition, price, stock, sizes, leadDays, allergens, description, caption, step, parcelSize, savedAt: new Date().toISOString() }), 400);
     return () => window.clearTimeout(t);
-  }, [touched, draft, uid, title, label, condition, price, stock, sizes, leadDays, allergens, description, caption, step]);
+  }, [touched, draft, uid, title, label, condition, price, stock, sizes, leadDays, allergens, description, caption, step, parcelSize]);
   useEffect(() => { if (!draft && media.length) saveDraftMedia(uid, media); }, [media, draft, uid]);
   const resumeDraft = async () => {
     if (!draft) return;
     setTitle(draft.title); setLabel(draft.label as ListingLabel); setCondition(draft.condition as Condition | null); setPrice(draft.price);
-    setStock(draft.stock); setSizes(draft.sizes); setLeadDays(draft.leadDays); setAllergens(draft.allergens);
+    setStock(draft.stock); setSizes(draft.sizes); setLeadDays(draft.leadDays); setAllergens(draft.allergens); setParcelSize(draft.parcelSize ?? null);
     setDescription(draft.description); setCaption(draft.caption);
     const files = await loadDraftMedia(uid);
     if (files.length) onMedia(files);
@@ -112,7 +114,8 @@ export function CreateListing({ shop, media, onMedia, onCamera, onStep, startAtD
       const errs = validateListing({ title, description, price: priceCents, label, condition: condition ?? undefined, hasProof: !!proof, mode })
         .filter((e) => /price/i.test(e));
       const rp = auction ? reserveProblem(priceCents, reserveCents) : null;
-      return rp ? [...errs, rp] : errs;
+      const sizeErr = !food && !parcelSize ? ["Pick a parcel size, so buyers see the right delivery price."] : [];
+      return [...errs, ...(rp ? [rp] : []), ...sizeErr];
     }
     return [];
   };
@@ -128,6 +131,7 @@ export function CreateListing({ shop, media, onMedia, onCamera, onStep, startAtD
       title: title.trim(), description: description.trim(), priceCents, mode, label: food ? "new" : label, condition,
       sizes: auction ? sizes.slice(0, 1) : sizes, stock: food ? 99 : auction ? 1 : stock, leadDays: food ? leadDays : null, allergens: food ? allergens.trim() || null : null,
       ...(auction ? { auctionDays, reserveCents } : {}),
+      ...(!food ? { parcelSize: parcelSize ?? "small" } : {}),
       caption: caption.trim() || title.trim(),
     }, cover, proof, setProgress, media.slice(1));
     clearDraft(uid);
@@ -323,6 +327,18 @@ export function CreateListing({ shop, media, onMedia, onCamera, onStep, startAtD
                 <input id="wz-allergens" className="wz-input" value={allergens} onChange={(e) => setAllergens(e.target.value)} placeholder="Gluten, eggs, dairy, nuts" />
               </>
             )}
+            {!food && (
+              <>
+                <div className="wz-label">Parcel size</div>
+                <div role="radiogroup" aria-label="Parcel size">
+                  {PARCEL_SIZE_IDS.map((z) => (
+                    <Choice key={z} on={parcelSize === z} onClick={() => setParcelSize(z)} title={PARCEL_SIZES[z].label} sub={PARCEL_SIZES[z].hint}
+                      right={`R${PARCEL_SIZES[z].door / 100}`} />
+                  ))}
+                </div>
+                <p className="small muted" style={{ marginTop: 4 }}>The buyer pays delivery by size. If the parcel is bigger or heavier than you pick, the courier's extra charge comes off your payout. Anything bigger than Large is collection only.</p>
+              </>
+            )}
           </>
         )}
 
@@ -351,6 +367,7 @@ export function CreateListing({ shop, media, onMedia, onCamera, onStep, startAtD
                 ? <ReviewRow t="Auction" v={`Starts at ${R(priceCents)}${reserveCents ? `, reserve ${R(reserveCents)}` : ", no reserve"}, ${auctionDays} ${auctionDays === 1 ? "day" : "days"}`} onEdit={() => setStep(2)} />
                 : <ReviewRow t="Price" v={`${R(priceCents)} (you get ${R(priceCents - fee)})`} onEdit={() => setStep(2)} />}
                 {!food && <ReviewRow t="Stock" v={`${stock}${sizes.length ? ` · ${sizes.join(", ")}` : ""}`} onEdit={() => setStep(2)} />}
+                {!food && parcelSize && <ReviewRow t="Parcel" v={`${PARCEL_SIZES[parcelSize].label}, courier R${PARCEL_SIZES[parcelSize].door / 100}`} onEdit={() => setStep(2)} />}
                 {food && <ReviewRow t="Notice" v={`${leadDays} days${allergens ? ` · ${allergens}` : ""}`} onEdit={() => setStep(1)} />}
                 <ReviewRow t="Caption" v={caption || title} onEdit={() => setStep(3)} />
               </div>

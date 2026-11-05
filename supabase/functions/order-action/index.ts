@@ -3,8 +3,10 @@
 import { handler, json, UserError } from "../_shared/http.ts";
 import { adminClient, requireUser, isAdmin, must } from "../_shared/supabase.ts";
 import { escrow } from "../_shared/escrow.ts";
+import { requireDelivery, type Province } from "../_shared/bobgo.ts";
+import { bookedByUs, type DeliveryOption } from "../_shared/core/index.ts";
 
-type Action = "mock_pay" | "cancel_unpaid" | "ship" | "accept_return" | "return_received" | "dispute_return" | "decide_return";
+type Action = "mock_pay" | "cancel_unpaid" | "ship" | "label" | "accept_return" | "return_received" | "dispute_return" | "decide_return";
 
 Deno.serve(handler(async (req, body) => {
   const db = adminClient();
@@ -42,9 +44,6 @@ Deno.serve(handler(async (req, body) => {
       // Packing proof is required for every order, courier or collection (migration 0023 checks it again).
       const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       if (!UUID.test(String(packingMediaId ?? "")) || !UUID.test(String(packingPhotoMediaId ?? ""))) throw new UserError("Add the packing video and the photo of the sealed parcel before shipping.");
-      if (order.delivery === "courier" || order.delivery === "pudo_locker") {
-        if (!trackingRef) throw new UserError("Add the tracking number.");
-      }
       // Check the proof before escrow is told the item is on its way (the database checks it again when the status changes).
       const { data: proof } = await db.from("media").select("id, owner_id, kind, created_at, status, storage_path").in("id", [packingMediaId, packingPhotoMediaId]);
       const v = proof?.find((m: any) => m.id === packingMediaId), p = proof?.find((m: any) => m.id === packingPhotoMediaId);
@@ -56,10 +55,45 @@ Deno.serve(handler(async (req, body) => {
       const { count: used } = await db.from("orders").select("id", { count: "exact", head: true })
         .or(`packing_media_id.in.(${packingMediaId},${packingPhotoMediaId}),packing_photo_media_id.in.(${packingMediaId},${packingPhotoMediaId})`);
       if (used) throw new UserError("Film new packing proof for each order.");
+      // Courier and locker orders: we book Bob Go now (once; a retry reuses the booking).
+      let booking: Record<string, unknown> = { tracking_ref: typeof trackingRef === "string" ? trackingRef.slice(0, 60) : null };
+      if (bookedByUs(order.delivery as DeliveryOption)) {
+        const dl = requireDelivery();
+        if (order.shipment_id) booking = { tracking_ref: order.shipment_id };
+        else {
+          const { data: from } = await db.from("shop_pickup").select("*").eq("shop_id", order.shop_id).maybeSingle();
+          if (!from) throw new UserError("Add your pickup address first (Me, then To ship), so the courier knows where to collect.");
+          const d = order.delivery_details ?? {};
+          const { data: buyer } = await db.auth.admin.getUserById(order.buyer_id);
+          const b = await dl.book({
+            orderRef: String(order.packing_code ?? orderId.slice(0, 8)),
+            parcel: order.parcel_size ?? "small",
+            declaredValueCents: order.item_price_cents,
+            from: { street: from.street, suburb: from.suburb, city: from.city, province: from.province as Province, postalCode: from.postal_code },
+            fromContact: { name: from.name, phone: from.phone },
+            ...(order.delivery === "pudo_locker"
+              ? { toPoint: { id: Number(order.pickup_point?.id), provider: String(order.pickup_point?.provider) } }
+              : { to: { street: d.street, suburb: d.suburb, city: d.city, province: d.province, postalCode: d.postalCode } }),
+            toContact: { name: d.name ?? "Buyer", phone: d.phone ?? "", email: buyer.user?.email ?? undefined },
+            description: "myHaul order",
+          });
+          // Save the booking straight away so a retry never books twice.
+          const saved = await db.from("orders").update({ shipment_id: b.shipmentRef, courier_name: b.courierName, shipping_cost_cents: b.costCents, booked_at: new Date().toISOString() })
+            .eq("id", orderId).eq("status", "paid").is("shipment_id", null);
+          if (saved.error) { await dl.cancel(b.shipmentRef).catch(() => {}); throw new Error(`save booking: ${saved.error.message}`); }
+          booking = { tracking_ref: b.shipmentRef };
+        }
+      }
       must(await db.from("orders").update({ packing_media_id: packingMediaId, packing_photo_media_id: packingPhotoMediaId }).eq("id", orderId).eq("status", "paid"), "packing proof");
       await es.startDelivery(order.escrow_allocation_id);
-      await setStatus("shipped", { tracking_ref: trackingRef ?? null });
+      await setStatus("shipped", booking);
       break;
+    }
+    case "label": {
+      // The courier label to print and stick on the parcel. Links last 24 hours, so we fetch a fresh one each time.
+      if (!(isSeller || admin) || !order.shipment_id) throw new UserError("There's no courier label for this order.");
+      const url = await requireDelivery().labelUrl(order.shipment_id);
+      return json({ url });
     }
     case "accept_return": {
       if (!isSeller || order.status !== "return_requested") throw new UserError("No return to accept.");

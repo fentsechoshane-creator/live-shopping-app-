@@ -96,6 +96,18 @@ At this point everything works with fake escrow: Pay opens a test payment page.
 
 Without Mux, seller videos upload to Supabase Storage and play as plain files. That is fine for testing, but Mux is needed for smooth playback on slow connections.
 
+## 4. Bob Go (courier and locker delivery)
+
+myHaul books every courier and locker parcel through Bob Go when the seller marks an order shipped. The buyer's delivery fee (priced by parcel size: Small R90 door or R60 locker, Medium R120 or R80, Large R180 door only) stays with us to pay Bob Go.
+
+1. Test first in Bob Go's sandbox (free, with test credit): sign up at https://sandbox.bobgo.co.za, then Settings, API keys, create a key. Not tied to a sales channel.
+2. In Supabase, Edge Functions, Secrets, add: `BOBGO_MODE=sandbox` and `BOBGO_API_KEY` (the sandbox key). Never paste keys into chat.
+3. In Bob Go, Settings, Webhook subscriptions: generate the webhook secret and put it in `BOBGO_WEBHOOK_SECRET`. Subscribe `tracking/updated` and `shipment_charged_amount/updated` to `https://<ref>.supabase.co/functions/v1/bobgo-webhook`.
+4. Make sure the account has The Courier Guy and PUDO (and Pargo if you want it) switched on, and enough credit.
+5. Go live: swap to the live key and set `BOBGO_MODE=live`. Request and response shapes are the same.
+
+Without Bob Go set (`BOBGO_MODE` empty), checkout offers collection only. `BOBGO_MODE=mock` fakes bookings for testing, and never runs on the myhaul.co.za site. If a webhook is missed, run-due checks tracking every 15 minutes as a backup.
+
 ## Hosting the web app
 
 `npm run build` makes `apps/web/dist`, a static site. Any static host works (Vercel, Netlify, Cloudflare Pages). Set the three `VITE_` variables there and send all routes to `index.html`.

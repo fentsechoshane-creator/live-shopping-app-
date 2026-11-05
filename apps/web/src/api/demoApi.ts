@@ -2,12 +2,11 @@
 // Used when no Supabase keys are set. Sign in with any email or phone and the code 123456.
 import {
   bidStep, maskHandle, canTransition, isRude, orderTotals, payoutDate, releasableAt, returnReasonsFor, shipBy, tierFor, TRUST_POINTS, validateListing,
-  RETURN_POSTAGE_PAYER, ACCOUNT_FEATURE_KEYS, canForceOn, featureOffMessage, type AccountFeature, type OrderStatus, type TrustEventKind,
-} from "@app/core";
+  RETURN_POSTAGE_PAYER, ACCOUNT_FEATURE_KEYS, canForceOn, featureOffMessage, type AccountFeature, type OrderStatus, type TrustEventKind, bookedByUs, deliveryFee, PARCEL_SIZES, orderParcelSize } from "@app/core";
 import { handleProblem } from "../lib/handle";
 import type {
   Api, Category, ReportReason, ReportTarget, CheckoutInput, FeedItem, ListingInput, MyShop, Notification, Order, Payout, PendingReview, ProductPublic, ReviewStatus,
-  ShopPublic, User, SavedDelivery, AppError, AuctionInfo, TeamAlert, TeamOverview, TeamPerson, TeamPersonDetail, TeamOrder, TeamListing, TeamLogEntry, TeamFeature, Reward,
+  ShopPublic, User, SavedDelivery, AppError, PickupPoint, ShopPickup, ShipmentEvent, AuctionInfo, TeamAlert, TeamOverview, TeamPerson, TeamPersonDetail, TeamOrder, TeamListing, TeamLogEntry, TeamFeature, Reward,
 } from "./types";
 
 interface DShop {
@@ -36,6 +35,9 @@ interface State {
   blocks: { blockerId: string; blockedId: string }[];
   reports: { id: string; reporterId: string; targetKind: ReportTarget; targetId: string; reason: ReportReason; details: string; createdAt: string; status: "open" | "actioned" | "dismissed" }[];
   delivery?: Record<string, SavedDelivery>;
+  /** Sellers' pickup addresses for courier collections, and tracking events per order. */
+  pickup?: Record<string, ShopPickup>;
+  shipEvents?: Record<string, ShipmentEvent[]>;
   interests?: Record<string, Category[]>;
   errors?: AppError[];
   bids?: { id: string; productId: string; round: number; bidderId: string; amountCents: number; at: string }[];
@@ -47,6 +49,14 @@ interface State {
   trustLog?: { userId: string; kind: string; points: number; at: string }[];
   alerts?: (TeamAlert & { dedupe: string })[];
 }
+
+// Sample lockers for testing (the real list comes from Bob Go).
+const DEMO_POINTS: PickupPoint[] = [
+  { id: 9000, provider: "pudo", name: "PUDO Locker, Rondebosch Main Road", address: "Main Road, Rondebosch, Cape Town, 7700", type: "locker" },
+  { id: 9001, provider: "pudo", name: "PUDO Locker, Cavendish Square", address: "Dreyer Street, Claremont, Cape Town, 7708", type: "locker" },
+  { id: 9002, provider: "pudo", name: "PUDO Locker, Gardens Centre", address: "Mill Street, Gardens, Cape Town, 8001", type: "locker" },
+  { id: 9003, provider: "pargo", name: "Pargo, Woodstock Exchange", address: "Albert Road, Woodstock, Cape Town, 7925", type: "pickup_point" },
+];
 
 const KEY = "lsa-demo-v4"; // v4: adds a sample auction
 // Made up seller videos (drawn product scenes with captions and music) so the player can be tested.
@@ -464,9 +474,11 @@ export function createDemoApi(): Api {
       const sh = shopOf(p.shopId);
       if (sh.ownerId === u.id) throw new Error("You cannot buy your own item.");
       if (p.sizes.length && !p.sizes.includes(input.size ?? "")) throw new Error("Pick a size.");
-      if (input.delivery === "pudo_locker" && !input.deliveryDetails.locker) throw new Error("Pick a PUDO locker.");
-      if (input.delivery === "courier" && !(input.deliveryDetails.address && input.deliveryDetails.name && input.deliveryDetails.phone))
-        throw new Error("Add your name, phone and address for the courier.");
+      const dd = input.deliveryDetails;
+      if (bookedByUs(input.delivery) && !(dd.name?.trim() && (dd.phone ?? "").replace(/\D/g, "").length >= 9)) throw new Error("Add your name and cell number for the courier.");
+      if (input.delivery === "pudo_locker" && !DEMO_POINTS.some((x) => x.id === input.pickupPoint?.id)) throw new Error("Pick a locker.");
+      if (input.delivery === "courier" && !(dd.street && dd.suburb && dd.city && dd.province && /^\d{4}$/.test(dd.postalCode ?? "")))
+        throw new Error("Check the delivery address: street, suburb, city, province and a 4 digit postal code.");
       if (p.mode === "order_now" && (!input.foodDate || !input.foodSlot)) throw new Error("Pick a date and time slot.");
       if (p.heldFor && p.heldFor !== u.id && p.heldUntil && new Date(p.heldUntil) > new Date()) throw new Error("The seller is holding this item for someone else right now.");
       let itemPrice = auction ? p.auctionPriceCents! : p.priceCents;
@@ -485,13 +497,18 @@ export function createDemoApi(): Api {
         itemPrice = of.priceCents;
       }
       const reward = featureState(u.id, "welcome_credit") !== "off" ? readyReward(u.id) : undefined;
-      const totals = orderTotals({ itemPrice, delivery: input.delivery, welcomeCreditAvailable: !!reward,
+      const parcelSize = orderParcelSize([p, ...bundleIds.map((b) => s.products.find((y) => y.id === b))].map((x) => x?.parcelSize));
+      if (deliveryFee(input.delivery, parcelSize) === null) throw new Error(`This parcel is ${PARCEL_SIZES[parcelSize].label.toLowerCase()}, too big for a locker. Pick courier or collection.`);
+      const point = input.delivery === "pudo_locker" ? DEMO_POINTS.find((x) => x.id === input.pickupPoint?.id) ?? null : null;
+      if (point) dd.locker = point.name;
+      const totals = orderTotals({ itemPrice, delivery: input.delivery, parcelSize, welcomeCreditAvailable: !!reward,
         foundingUntil: sh.foundingUntil ? new Date(sh.foundingUntil) : null, at: now() });
       const oid = id();
       const o: DOrder = {
         id: oid, status: "pending_payment", mode: p.mode, product: { id: p.id, title }, bundleIds, offerId: input.offerId ?? null, shop: { id: sh.id, name: sh.name, handle: sh.handle },
         buyerId: u.id, shopOwnerId: sh.ownerId, size: input.size ?? null, delivery: input.delivery, deliveryDetails: input.deliveryDetails as Record<string, string>,
         foodDate: input.foodDate ?? null, foodSlot: input.foodSlot ?? null, totals, checkoutUrl: `/mock-pay/${oid}`, trackingRef: null, packingCode: packingCodeFor(oid),
+        parcelSize: p.mode === "order_now" ? null : parcelSize, pickupPoint: point, courierName: null, hasLabel: false, trackingStatus: null,
         paidAt: null, shipBy: null, shippedAt: null, deliveredAt: null, releasableAt: null, createdAt: now().toISOString(), ret: null, review: null,
       };
       s.orders.unshift(o);
@@ -728,6 +745,32 @@ export function createDemoApi(): Api {
       s.delivery = { ...(s.delivery ?? {}) };
       if (d) s.delivery[u.id] = d; else delete s.delivery[u.id];
       save();
+    },
+    async parcelSizes(ids) {
+      return Object.fromEntries(ids.map((i) => [i, s.products.find((p) => p.id === i)?.parcelSize ?? "small"]));
+    },
+    async pickupPoints() {
+      await wait(300);
+      return { points: DEMO_POINTS, cities: ["Cape Town", "Johannesburg", "Pretoria", "Durban"] };
+    },
+    async shopPickup() {
+      const sh = s.shops.find((x) => x.ownerId === me().id);
+      return (sh && s.pickup?.[sh.id]) || null;
+    },
+    async saveShopPickup(p) {
+      const sh = s.shops.find((x) => x.ownerId === me().id);
+      if (!sh) throw new Error("Open your shop first.");
+      if (!/^\d{4}$/.test(p.postalCode) || !p.province || p.street.trim().length < 3 || p.phone.replace(/\D/g, "").length < 9) throw new Error("Check the address and cell number.");
+      s.pickup = { ...(s.pickup ?? {}), [sh.id]: p };
+      save();
+    },
+    async courierLabel(oid) {
+      const o = s.orders.find((x) => x.id === oid && (x.shopOwnerId === me().id || me().admin));
+      if (!o?.trackingRef || !o.hasLabel) throw new Error("There's no courier label for this order.");
+      return `/mock-label/${o.trackingRef}`;
+    },
+    async shipmentEvents(oid) {
+      return (s.shipEvents?.[oid] ?? []).slice().sort((a, b) => b.at.localeCompare(a.at));
     },
     async saveInterests(interests) {
       const u = s.users.find((x) => x.id === s.currentUserId);
@@ -1055,7 +1098,7 @@ export function createDemoApi(): Api {
       const pid = id();
       s.products.push({
         id: pid, shopId: sh.id, title: input.title, description: input.description, priceCents: input.priceCents, mode: input.mode, label: input.label,
-        condition: input.condition, sizes: input.sizes, stock: input.stock, leadDays: input.leadDays, allergens: input.allergens,
+        condition: input.condition, sizes: input.sizes, stock: input.stock, leadDays: input.leadDays, allergens: input.allergens, parcelSize: input.mode === "order_now" ? null : input.parcelSize ?? "small",
         status: live ? "live" : "draft", proofStatus: proof ? "pending" : "not_started",
         ...(input.mode === "auction" ? { stock: 1, reserveCents: input.reserveCents ?? null, auctionState: live ? "open" : null, auctionRound: 0,
           auctionEndsAt: new Date(Date.now() + (input.auctionDays ?? 3) * 86400e3).toISOString() } : {}),
@@ -1077,7 +1120,16 @@ export function createDemoApi(): Api {
       const o = s.orders.find((x) => x.id === oid && x.shopOwnerId === me().id);
       if (!o || o.status !== "paid") throw new Error("Only paid orders can be shipped.");
       if (!packingVideo || !packingPhoto) throw new Error("Add the packing video and the photo of the sealed parcel before shipping.");
-      if ((o.delivery === "courier" || o.delivery === "pudo_locker") && !trackingRef) throw new Error("Add the tracking number.");
+      // Courier and locker: booked through Bob Go (test booking here), like the server does.
+      if (bookedByUs(o.delivery)) {
+        const sh = s.shops.find((x) => x.ownerId === me().id);
+        if (!sh || !s.pickup?.[sh.id]) throw new Error("Add your pickup address first (Me, then To ship), so the courier knows where to collect.");
+        trackingRef = `MOCK${oid.slice(0, 8).toUpperCase()}`;
+        o.courierName = o.delivery === "pudo_locker" ? "PUDO (test)" : "The Courier Guy (test)";
+        o.hasLabel = true;
+        o.trackingStatus = "submitted";
+        s.shipEvents = { ...(s.shipEvents ?? {}), [oid]: [{ at: now().toISOString(), status: "submitted", message: "Booked. The courier collects from the seller.", location: null }] };
+      }
       // Kept on this phone, like the private bucket on the server.
       for (const [k, f] of [[`packing-video-${oid}`, packingVideo], [`packing-photo-${oid}`, packingPhoto]] as const) {
         keepBlob(k, f); blobUrls.set(k, URL.createObjectURL(f));

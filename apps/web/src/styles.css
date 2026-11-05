@@ -1020,3 +1020,13 @@ button.g3 { border: 0; padding: 0; display: block; width: 100%; }
 /* On the video: Custom on the left, hold to bid filling the rest. */
 .bid-actions { display: grid; grid-template-columns: auto 1fr; gap: 8px; }
 .bid-actions .btn.vglass { padding: 0 16px; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.two-col > * { min-width: 0; }
+.card.inset { background: var(--surface-2, rgba(118, 118, 128, 0.12)); box-shadow: none; }
+.track-events { list-style: none; margin: 12px 0 0; padding: 0 0 0 14px; border-left: 2px solid var(--line, rgba(0,0,0,.12)); display: grid; gap: 10px; }
+.track-events li { display: grid; gap: 2px; position: relative; }
+.track-events li::before { content: ""; position: absolute; left: -20px; top: 5px; width: 10px; height: 10px; border-radius: 50%; background: var(--green); }
+.track-events li + li::before { background: var(--line, #ccc); }
+.mock-label { margin-top: 16px; border: 2px dashed var(--ink); border-radius: var(--r); padding: 20px; display: grid; gap: 12px; justify-items: center; text-align: center; }
+.mock-barcode { width: 100%; height: 70px; background: repeating-linear-gradient(90deg, var(--ink) 0 2px, transparent 2px 5px, var(--ink) 5px 6px, transparent 6px 9px); }
+.mock-ref { font: 700 20px/1 ui-monospace, monospace; letter-spacing: 2px; }

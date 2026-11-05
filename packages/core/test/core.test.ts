@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  deliveryFee, PARCEL_SIZE_IDS,
   rand, formatRand, protectionFee, orderTotals, sellerFee, releasableAt, payoutDate, nextFriday, addWorkingDays,
   reserveFor, scoreFrom, tierFor, canUse, canForceOn, packingVideoProblems, validateListing, canTransition, returnReasonsFor, shipBy,
   liveStock, goLiveBlockers, MIN_LIVE_STOCK, isRude, looksOffApp, bidStep, nextMinBid, reserveProblem, timeLeft, maskHandle,
@@ -56,6 +57,38 @@ describe("fees", () => {
         expect(t.total - t.escrowAgentFee + t.creditTopUp).toBe(t.sellerPayout);
         expect(t.escrowAgentFee).toBeGreaterThanOrEqual(0);
         expect(t.creditTopUp).toBeGreaterThanOrEqual(0);
+      }
+    }
+  });
+});
+
+describe("delivery by parcel size", () => {
+  it("prices courier and lockers by size, with no locker for large", () => {
+    expect(deliveryFee("courier", "small")).toBe(rand(90));
+    expect(deliveryFee("courier", "medium")).toBe(rand(120));
+    expect(deliveryFee("courier", "large")).toBe(rand(180));
+    expect(deliveryFee("pudo_locker", "small")).toBe(rand(60));
+    expect(deliveryFee("pudo_locker", "medium")).toBe(rand(80));
+    expect(deliveryFee("pudo_locker", "large")).toBeNull();
+    expect(() => orderTotals({ itemPrice: rand(500), delivery: "pudo_locker", parcelSize: "large" })).toThrow();
+  });
+  it("keeps courier money for Bob Go and pays the seller item minus fee", () => {
+    const t = orderTotals({ itemPrice: rand(400), delivery: "courier", parcelSize: "medium" });
+    expect(t.deliveryKept).toBe(rand(120));
+    expect(t.sellerPayout).toBe(rand(400) - t.sellerFee);
+    expect(t.total - t.escrowAgentFee).toBe(t.sellerPayout);
+  });
+  it("still pays bakers who deliver themselves", () => {
+    const t = orderTotals({ itemPrice: rand(300), delivery: "baker_delivers" });
+    expect(t.deliveryKept).toBe(0);
+    expect(t.sellerPayout).toBe(rand(340) - t.sellerFee);
+  });
+  it("escrow plus our top up pays the seller exactly, every size and option", () => {
+    for (const parcelSize of PARCEL_SIZE_IDS) for (const delivery of ["courier", "pudo_locker", "collect_cpt"] as const) {
+      if (deliveryFee(delivery, parcelSize) === null) continue;
+      for (let p = 50; p <= 2000; p += 37) for (const credit of [true, false]) {
+        const t = orderTotals({ itemPrice: rand(p), delivery, parcelSize, welcomeCreditAvailable: credit });
+        expect(t.total - t.escrowAgentFee + t.creditTopUp).toBe(t.sellerPayout);
       }
     }
   });

@@ -43,10 +43,11 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
   const videoUrl = (path: string | null) => (path ? sb.storage.from("videos").getPublicUrl(path).data.publicUrl : null);
 
   // The product fields anyone may read (0025 hides the auction reserve, proof file path and winner).
-  const PRODUCT_COLS = "id, shop_id, title, description, price_cents, mode, label, condition, sizes, stock, lead_days, allergens, proof_status, status, created_at, held_for, held_until, auction_ends_at, auction_state, auction_round, auction_price_cents, auction_pay_by";
+  const PRODUCT_COLS = "id, shop_id, title, description, price_cents, mode, label, condition, sizes, stock, lead_days, allergens, proof_status, status, created_at, held_for, held_until, auction_ends_at, auction_state, auction_round, auction_price_cents, auction_pay_by, parcel_size";
   const toProduct = (p: any): ProductPublic => ({
     id: p.id, title: p.title, description: p.description ?? "", priceCents: p.price_cents, mode: p.mode, label: p.label,
     condition: p.condition, sizes: p.sizes ?? [], stock: p.stock, leadDays: p.lead_days, allergens: p.allergens, status: p.status ?? "live",
+    parcelSize: p.parcel_size ?? null,
   });
 
   const ORDER_SELECT = "*, products(id, title), shops(id, name, handle), returns(*), reviews(stars)";
@@ -60,7 +61,8 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
       creditUsed: o.credit_cents, total: o.total_cents, sellerFee: o.seller_fee_cents, sellerPayout: o.seller_payout_cents,
       creditTopUp: o.credit_topup_cents ?? 0,
     },
-    checkoutUrl: o.checkout_url, trackingRef: o.tracking_ref, packingCode: o.packing_code ?? null, paidAt: o.paid_at, shipBy: o.ship_by, shippedAt: o.shipped_at,
+    checkoutUrl: o.checkout_url, trackingRef: o.tracking_ref, parcelSize: o.parcel_size ?? null, courierName: o.courier_name ?? null,
+    hasLabel: !!o.shipment_id, pickupPoint: o.pickup_point ?? null, trackingStatus: o.tracking_status ?? null, packingCode: o.packing_code ?? null, paidAt: o.paid_at, shipBy: o.ship_by, shippedAt: o.shipped_at,
     deliveredAt: o.delivered_at, releasableAt: o.releasable_at, createdAt: o.created_at,
     ret: o.returns ? { reason: o.returns.reason, details: o.returns.details, status: o.returns.status, postagePayer: o.returns.postage_payer } : null,
     review: o.reviews ? { stars: o.reviews.stars } : null,
@@ -309,16 +311,47 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
     async savedDelivery() {
       const { data: auth } = await sb.auth.getUser();
       if (!auth.user) return null;
-      const { data } = await sb.from("delivery_details").select("delivery, locker, name, phone, address").eq("user_id", auth.user.id).maybeSingle();
+      const { data } = await sb.from("delivery_details").select("delivery, locker, name, phone, address, suburb, city, province, postal_code, pickup_point").eq("user_id", auth.user.id).maybeSingle();
       if (!data) return null;
       const d = data as any;
-      return { delivery: d.delivery ?? undefined, locker: d.locker ?? undefined, name: d.name ?? undefined, phone: d.phone ?? undefined, address: d.address ?? undefined };
+      return { delivery: d.delivery ?? undefined, locker: d.locker ?? undefined, name: d.name ?? undefined, phone: d.phone ?? undefined,
+        street: d.address ?? undefined, suburb: d.suburb ?? undefined, city: d.city ?? undefined, province: d.province ?? undefined,
+        postalCode: d.postal_code ?? undefined, pickupPoint: d.pickup_point ?? null };
+    },
+    async parcelSizes(ids) {
+      if (!ids.length) return {};
+      const rows = check(await sb.from("products").select("id, parcel_size").in("id", ids.slice(0, 20))) as any[];
+      return Object.fromEntries(rows.map((r) => [r.id, r.parcel_size ?? "small"]));
+    },
+    async pickupPoints(where) {
+      return call("delivery", where);
+    },
+    async shopPickup() {
+      const shopId = await myShopId();
+      if (!shopId) return null;
+      const { data } = await sb.from("shop_pickup").select("*").eq("shop_id", shopId).maybeSingle();
+      const p = data as any;
+      return p ? { name: p.name, phone: p.phone, street: p.street, suburb: p.suburb, city: p.city, province: p.province, postalCode: p.postal_code } : null;
+    },
+    async saveShopPickup(p) {
+      const shopId = await myShopId();
+      if (!shopId) throw new Error("Open your shop first.");
+      check(await sb.from("shop_pickup").upsert({ shop_id: shopId, name: p.name.trim(), phone: p.phone.trim(), street: p.street.trim(), suburb: p.suburb.trim(),
+        city: p.city.trim(), province: p.province, postal_code: p.postalCode.trim() }, { onConflict: "shop_id" }));
+    },
+    async courierLabel(orderId) {
+      return (await call<{ url: string }>("order-action", { orderId, action: "label" })).url;
+    },
+    async shipmentEvents(orderId) {
+      const rows = check(await sb.from("shipment_events").select("happened_at, status, message, location").eq("order_id", orderId).order("happened_at", { ascending: false })) as any[];
+      return rows.map((r) => ({ at: r.happened_at, status: r.status, message: r.message, location: r.location }));
     },
     async saveDelivery(d) {
       const me = await uid();
       if (!d) { check(await sb.from("delivery_details").delete().eq("user_id", me)); return; }
       check(await sb.from("delivery_details").upsert({
-        user_id: me, delivery: d.delivery ?? null, locker: d.locker ?? null, name: d.name ?? null, phone: d.phone ?? null, address: d.address ?? null,
+        user_id: me, delivery: d.delivery ?? null, locker: d.locker ?? null, name: d.name ?? null, phone: d.phone ?? null, address: d.street ?? d.address ?? null,
+        suburb: d.suburb ?? null, city: d.city ?? null, province: d.province || null, postal_code: d.postalCode || null, pickup_point: d.pickupPoint ?? null,
         updated_at: new Date().toISOString(),
       }, { onConflict: "user_id" }));
     },
@@ -515,6 +548,7 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
       const row = {
         shop_id: shopId, title: input.title, description: input.description, price_cents: input.priceCents, mode: input.mode,
         label: input.label, condition: input.condition, sizes: input.sizes, stock: input.stock, lead_days: input.leadDays, allergens: input.allergens,
+        ...(input.mode !== "order_now" ? { parcel_size: input.parcelSize ?? "small" } : {}),
         ...(input.mode === "auction" ? {
           stock: 1, reserve_cents: input.reserveCents ?? null,
           auction_ends_at: new Date(Date.now() + (input.auctionDays ?? 3) * 86400e3).toISOString(),

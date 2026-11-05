@@ -1,4 +1,5 @@
 import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
+import { MockLabel } from "./screens/MockLabel";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useSwipe } from "./components/gestures";
 import { isNative, registerPush, setNavigator, startNative, statusBarFor } from "./native";
@@ -236,6 +237,7 @@ export function App() {
           <Route path="/orders" element={guard(<Orders />)} />
           <Route path="/orders/:id" element={guard(<OrderDetail />)} />
           <Route path="/mock-pay/:id" element={guard(<MockPay />)} />
+          <Route path="/mock-label/:ref" element={<MockLabel />} />
           <Route path="/inbox" element={guard(<Inbox />)} />
           <Route path="/activity" element={<OldActivity />} />
           <Route path="/me" element={guard(<Profile />)} />

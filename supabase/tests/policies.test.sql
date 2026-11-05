@@ -952,3 +952,46 @@ do $$ begin
 end $$;
 reset role;
 select 'live check fix tests passed' as result;
+
+-- ===== Delivery through Bob Go (migration 0028) =====
+-- Pickup addresses are private to the seller and the team.
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000e');
+insert into shop_pickup (shop_id, name, phone, street, suburb, city, province, postal_code)
+  values ((select id from shops where handle = 'other.shop'), 'Other Seller', '0821234567', '5 Lower Main Road', 'Observatory', 'Cape Town', 'WC', '7925');
+select pg_temp.expect_error($$update shop_pickup set postal_code = '79' where true$$, 'violates check');
+reset role;
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000d');
+do $$ begin assert (select count(*) from shop_pickup) = 0, 'strangers do not see pickup addresses'; end $$;
+select pg_temp.expect_error($$insert into shop_pickup (shop_id, name, phone, street, suburb, city, province, postal_code)
+  values ((select id from shops where handle = 'other.shop'), 'Fake', '0821234567', '1 Fake Street', 'Nowhere', 'Cape Town', 'WC', '8001')$$, 'row-level security');
+reset role;
+-- Buyers and sellers can't write booking fields; only our server does.
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000e');
+select pg_temp.expect_error($$update orders set courier_extra_cents = 0, shipment_id = 'X' where id = '40000000-0000-0000-0000-000000000011'$$, 'permission denied');
+reset role;
+-- The payout sum: courier money kept for Bob Go never reaches the seller, and can't be more than the fee.
+select pg_temp.act_as_service();
+update seller_checks set bank_status = 'approved' where shop_id = (select id from shops where handle = 'other.shop');
+reset role;
+select pg_temp.expect_error($$insert into orders (buyer_id, shop_id, product_id, mode, item_price_cents, delivery, delivery_fee_cents, delivery_kept_cents, protection_fee_cents, total_cents, seller_fee_cents, seller_payout_cents)
+  values ('00000000-0000-0000-0000-00000000000b', (select id from shops where handle = 'other.shop'), '40000000-0000-0000-0000-000000000001', 'buy_now', 30000, 'courier', 9000, 9000, 1200, 40200, 1800, 37200)$$, 'orders_payout_exact');
+select pg_temp.expect_error($$insert into orders (buyer_id, shop_id, product_id, mode, item_price_cents, delivery, delivery_fee_cents, delivery_kept_cents, protection_fee_cents, total_cents, seller_fee_cents, seller_payout_cents)
+  values ('00000000-0000-0000-0000-00000000000b', (select id from shops where handle = 'other.shop'), '40000000-0000-0000-0000-000000000001', 'buy_now', 30000, 'courier', 9000, 12000, 1200, 40200, 1800, 25200)$$, 'orders_kept_within_fee');
+-- Tracking: the buyer and seller see it, a stranger doesn't. A booking that costs more than the buyer paid alerts the team.
+select pg_temp.act_as_service();
+update orders set delivery_kept_cents = 0 where id = '40000000-0000-0000-0000-000000000011';
+insert into shipment_events (order_id, happened_at, status, message) values ('40000000-0000-0000-0000-000000000011', now(), 'collected', 'Collected');
+update orders set shipping_cost_cents = 9650 where id = '40000000-0000-0000-0000-000000000011';
+reset role;
+do $$ begin assert exists (select 1 from team_alerts where dedupe = 'shipping_cost:40000000-0000-0000-0000-000000000011'), 'team alerted about the courier cost'; end $$;
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000b');
+do $$ begin assert (select count(*) from shipment_events where order_id = '40000000-0000-0000-0000-000000000011') = 1, 'buyer sees tracking'; end $$;
+reset role;
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000d');
+do $$ begin assert (select count(*) from shipment_events) = 0, 'strangers do not see tracking'; end $$;
+reset role;
+-- Every non food listing has a parcel size.
+select pg_temp.act_as_service();
+select pg_temp.expect_error($$update products set parcel_size = null where id = '40000000-0000-0000-0000-000000000001'$$, 'products_parcel_size_needed');
+reset role;
+select 'delivery tests passed' as result;

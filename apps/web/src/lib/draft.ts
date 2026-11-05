@@ -3,6 +3,7 @@
 // or private browser simply has no drafts.
 
 export interface DraftFields {
+  parcelSize?: "small" | "medium" | "large" | null;
   title: string; label: string; condition: string | null; price: string; stock: number; sizes: string[];
   leadDays: number; allergens: string; description: string; caption: string; step: number; savedAt: string;
 }

@@ -65,6 +65,7 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 
 ## Next up
 
+- **Bob Go:** sandbox key and webhook secret in Supabase secrets (docs/SETUP.md section 4), then deploy 0028 and the functions. [Ofentse, Claude]
 - **Apply migration 0027 live** (live check fixes) once Ofentse says yes. [Claude]
 - **Make Ofentse a team member (one line, Ofentse):** Supabase > SQL Editor, run `update profiles set role = 'admin' where id = (select id from auth.users where email = 'fentsechoshane@gmail.com');` Claude was not allowed to grant team access itself.
 - **Secrets (Ofentse or Lehloma, in Supabase > Edge Functions > Secrets):** `TRADESAFE_MODE=mock` and `APP_URL=https://myhaul-app.netlify.app` while testing. Payments are refused until TRADESAFE_MODE is set. Later: Mux, Anthropic, Telegram, Resend, Firebase and Apple push keys.
@@ -104,6 +105,18 @@ Debug as we go: anyone who finds or fixes a problem updates this list. Highest r
 Fixed in this round: Safari double back on the edge swipe (now only in the installed app), deleting an account now also deletes the person's photos and videos, React Router warnings.
 
 ## Log
+
+### 2026-11-06: Delivery through Bob Go
+
+- Decided with Ofentse: **myHaul books** every courier and locker parcel through Bob Go (Ofentse has an account). Delivery is priced by the **parcel size** the seller picks when listing, so big parcels can't sink us: Small (up to 2 kg) R90 door / R60 locker, Medium (up to 5 kg) R120 / R80, Large (up to 15 kg) R180 door only. Bigger is collection only. Bundles take the biggest item, and 3 or more items are at least Medium.
+- The delivery fee now stays with us to pay Bob Go (before, it went to the seller). Escrow: our share is our fees plus the courier money. Bakers who deliver themselves still get their fee.
+- Wrong size: if the courier weighs a parcel heavier than the size allows and charges extra, the extra comes off that seller's payout (in the Terms). Any booking that costs more than the buyer paid alerts the team.
+- Migration 0028: `products.parcel_size`; order booking fields; `shop_pickup` (seller's pickup address, private); `shipment_events` (tracking); payout sum changed to item + delivery - kept - fee.
+- Server: `_shared/bobgo.ts` (mock, sandbox, live), checkout prices by size and checks the locker with Bob Go, order-action books on ship (once, a retry reuses it) and gives the label, new `delivery` function (lockers near you or a city), new `bobgo-webhook` (HMAC signed, then confirmed by asking Bob Go), run-due checks tracking every 15 minutes as a backup.
+- App: parcel size step when listing; checkout with street, suburb, city, province and postal code, prices by size, a real locker picker; seller pickup address on To ship; "Book courier and mark shipped", then "Print courier label"; tracking steps for buyer and seller; test label page.
+- Terms: Bob Go delivery, parcel size rule, and fixed the seller fee wording (6% of the item price only, which is what the app always charged).
+- Not live yet: migration 0028 and the new functions need deploying, and Bob Go keys in Supabase secrets (docs/SETUP.md, section 4). Start in Bob Go's sandbox.
+- [CONFIRM] Bob Go's status names (we read "delivered" and a delivered time); check them in the sandbox.
 
 ### 2026-11-05: Hold to bid
 

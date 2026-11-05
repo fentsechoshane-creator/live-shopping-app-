@@ -9,6 +9,7 @@
 import { json } from "../_shared/http.ts";
 import { adminClient, cronAllowed, must } from "../_shared/supabase.ts";
 import { escrow, PAID_STATES } from "../_shared/escrow.ts";
+import { applyTracking, delivery } from "../_shared/bobgo.ts";
 import { payoutDate, tierFor } from "../_shared/core/index.ts";
 
 Deno.serve(async (req) => {
@@ -42,7 +43,7 @@ Deno.serve(async (req) => {
 
   // Completed orders without a payout row yet.
   const { data: completed } = await db.from("orders")
-    .select("id, shop_id, seller_payout_cents, credit_topup_cents, releasable_at, completed_at, shops!inner(owner_id, owner:profiles(trust_score)), payouts(id)")
+    .select("id, shop_id, seller_payout_cents, courier_extra_cents, credit_topup_cents, releasable_at, completed_at, shops!inner(owner_id, owner:profiles(trust_score)), payouts(id)")
     .eq("status", "completed").is("payouts", null).limit(200);
   for (const o of (completed ?? []) as any[]) {
     if (o.payouts?.length) continue;
@@ -51,7 +52,8 @@ Deno.serve(async (req) => {
     const payOn = payoutDate(tier, releasable);
     // [CONFIRM] new seller reserve: needs a second escrow allocation per order. Not applied yet.
     const { error } = await db.from("payouts").insert({
-      order_id: o.id, shop_id: o.shop_id, amount_cents: o.seller_payout_cents, reserve_cents: 0,
+      order_id: o.id, shop_id: o.shop_id, // A seller who picked too small a parcel size pays the courier's extra charge from this payout (0028).
+      amount_cents: Math.max(0, o.seller_payout_cents - (o.courier_extra_cents ?? 0)), reserve_cents: 0,
       // Welcome credit top up: paid by us by EFT, listed for our team on the Admin page.
       topup_cents: o.credit_topup_cents ?? 0,
       releasable_at: releasable.toISOString(), pay_on: payOn ? payOn.toISOString().slice(0, 10) : null,
@@ -102,6 +104,18 @@ Deno.serve(async (req) => {
   }
 
   // Unpaid checkouts.
+  // Backup for Bob Go's tracking webhooks: check parcels on the way that haven't updated in 6 hours.
+  const dl = delivery();
+  if (dl && dl.mode !== "mock") {
+    const sixHours = new Date(now.getTime() - 6 * 3600_000).toISOString();
+    const { data: moving } = await db.from("orders").select("id, shipment_id").eq("status", "shipped").not("shipment_id", "is", null)
+      .or(`tracking_checked_at.is.null,tracking_checked_at.lt.${sixHours}`).order("tracking_checked_at", { nullsFirst: true }).limit(50);
+    for (const o of moving ?? []) {
+      try { await applyTracking(db, o.id, await dl.tracking(o.shipment_id)); done.tracked = (done.tracked ?? 0) + 1; }
+      catch (e) { console.error("tracking", o.id, e); }
+    }
+  }
+
   const dayAgo = new Date(now.getTime() - 86400_000).toISOString();
   const { data: stale } = await db.from("orders").select("id, escrow_transaction_id").eq("status", "pending_payment").lt("created_at", dayAgo).limit(200);
   for (const o of stale ?? []) {

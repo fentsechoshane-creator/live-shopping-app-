@@ -3,6 +3,6 @@
 export const FEATURES = {
   /** Live selling (streams with Buy now cards). Apple rejects "coming soon" features, so it stays hidden until it works. */
   live: import.meta.env.VITE_LIVE === "1",
-  /** PUDO lockers. The locker list is sample data until we have a PUDO account. */
-  lockers: import.meta.env.VITE_LOCKERS === "1",
+  /** Lockers and pickup points through Bob Go. On unless a build sets VITE_LOCKERS=0. */
+  lockers: import.meta.env.VITE_LOCKERS !== "0",
 };

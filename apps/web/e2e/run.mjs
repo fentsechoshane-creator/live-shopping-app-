@@ -478,6 +478,10 @@ try {
   await page.getByLabel("Price (rand)").fill("450");
   await page.getByText(/You get R450 after the 0% founding fee/).waitFor(); // founding sellers pay no fee
   await page.getByRole("button", { name: "M", exact: true }).click();
+  // Parcel size is required: it sets the buyer's delivery price.
+  await page.getByRole("button", { name: "Next" }).click();
+  await page.getByText("Pick a parcel size, so buyers see the right delivery price.").waitFor();
+  await page.getByRole("button", { name: /^Medium/ }).click();
   await shot("create-price");
   // Drafts: leave halfway, come back, carry on where you were.
   await page.waitForTimeout(600);
@@ -530,6 +534,7 @@ try {
   await page.getByRole("button", { name: "Next" }).click();
   await page.getByRole("button", { name: "Use these" }).click(); // a suggestion from a frame of the video
   await page.getByRole("button", { name: "Next" }).click();
+  await page.getByRole("button", { name: /^Small/ }).click();
   await page.getByRole("button", { name: "Next" }).click();
   await page.getByRole("button", { name: /^(Next|Skip)$/ }).click();
   await page.getByRole("button", { name: "Post listing" }).click();
@@ -683,6 +688,36 @@ try {
   await page.getByRole("button", { name: "Pay now" }).click();
   await page.waitForURL(/\/orders\//);
 
+  // ===== Delivery through Bob Go: prices by parcel size, a street address, lockers =====
+  await page.goto(`${BASE}/i/p-denim`);
+  const runner = page.getByRole("region", { name: /Vintage denim jacket/ });
+  await runner.getByRole("button", { name: /See details/ }).click();
+  await page.getByRole("dialog", { name: "Vintage denim jacket" }).getByRole("button", { name: "Buy now" }).click();
+  const pay = page.getByRole("dialog", { name: "Checkout" });
+  await pay.getByRole("button", { name: /Courier to your door.*R90/ }).click();
+  await check(pay.getByRole("button", { name: /PUDO locker.*R60/ }).isVisible(), "small parcels: R90 door, R60 locker");
+  await pay.getByRole("button", { name: /Add your name and cell number|Add your delivery address/ }).waitFor();
+  await pay.getByLabel("Name").fill("Buyer Test");
+  await pay.getByLabel("Cell number").fill("0821234567");
+  await pay.getByLabel("Street address").fill("12 Main Road");
+  await pay.getByLabel("Suburb").fill("Rondebosch");
+  await pay.getByLabel("City").fill("Cape Town");
+  await pay.getByLabel("Province").selectOption("WC");
+  await pay.getByLabel("Postal code").fill("770");
+  await check(pay.getByRole("button", { name: "Add your delivery address" }).isDisabled(), "a 3 digit postal code isn't enough");
+  await pay.getByLabel("Postal code").fill("7700");
+  // A locker instead: pick a city, then a locker from Bob Go's list.
+  await pay.getByRole("button", { name: /PUDO locker/ }).click();
+  await pay.getByLabel("City", { exact: true }).selectOption("Cape Town");
+  await pay.getByRole("button", { name: /PUDO Locker, Cavendish Square/ }).click();
+  await pay.getByText("PUDO Locker, Cavendish Square").waitFor();
+  await page.waitForTimeout(300);
+  await shot("checkout-locker");
+  await pay.getByRole("button", { name: /^Pay R/ }).click();
+  await page.waitForURL(/mock-pay/);
+  await page.getByRole("button", { name: "Pay now" }).click();
+  await page.waitForURL(/\/orders\//);
+
   // ===== Packing proof: no shipping without the video and the sealed parcel photo =====
   await signOut();
   await signIn("lebo@shop.demo");
@@ -699,6 +734,29 @@ try {
   await shot("packing-proof");
   await shipBtn.click();
   await page.getByText("Marked as shipped").waitFor();
+  // The locker order: we book the courier, so the seller needs a pickup address first, then prints the label.
+  await page.goto(`${BASE}/sell/orders`);
+  await page.getByText("Your pickup address").waitFor();
+  await page.getByLabel("Contact name").fill("Lebo M");
+  await page.getByLabel("Cell number").fill("0831112222");
+  await page.getByLabel("Street address").fill("5 Lower Main Road");
+  await page.getByLabel("Suburb").fill("Observatory");
+  await page.getByLabel("City", { exact: true }).fill("Cape Town");
+  await page.getByLabel("Province").selectOption("WC");
+  await page.getByLabel("Postal code").fill("7925");
+  await page.getByRole("button", { name: "Save pickup address" }).click();
+  await page.getByText("Courier collects from").waitFor();
+  await page.getByRole("link", { name: /Vintage denim jacket/ }).first().click();
+  await page.getByText(/To a locker: PUDO Locker, Cavendish Square/).waitFor();
+  const bookBtn = page.getByRole("button", { name: "Book courier and mark shipped" });
+  await page.getByLabel("Packing video").setInputFiles(here + "../src/assets/demo/tee.mp4");
+  await page.getByLabel("Photo of the sealed parcel").setInputFiles(here + "../store/screenshots/raw/checkout.png");
+  await page.getByText("Photo of the sealed parcel added").waitFor();
+  await bookBtn.click();
+  await page.getByText("Courier booked. Print the label.").waitFor();
+  await page.getByRole("button", { name: "Print courier label" }).waitFor();
+  await page.getByText("Booked", { exact: true }).waitFor();
+  await shot("courier-booked");
   // The team checks it in To do and gives a strike; the seller is told.
   await signOut();
   await signIn("admin@test.co.za");

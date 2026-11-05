@@ -89,6 +89,7 @@ export function OrderDetail() {
 
       <h2>Where it is</h2>
       <Timeline o={o} />
+      {o.hasLabel && <CourierTracking o={o} />}
       {!["pending_payment", "cancelled"].includes(o.status) && (
         <button className="btn block" style={{ marginTop: 12 }} onClick={() => messageShop(o.shop.id, o.product.id)}><Icon name="chat" size={18} />Message {o.shop.name}</button>
       )}
@@ -219,3 +220,35 @@ export function MockPay() {
     </div>
   );
 }
+
+/** Courier and locker parcels booked through Bob Go: who's carrying it, where it's going, and every update. */
+export function CourierTracking({ o, seller }: { o: Order; seller?: boolean }) {
+  const [events] = useLoad(() => api.shipmentEvents(o.id), [o.id, o.status]);
+  return (
+    <div className="card" style={{ marginTop: 12 }}>
+      <div className="row between"><b>{o.courierName ?? "Courier"}</b><span className="small muted">{o.trackingRef}</span></div>
+      {o.pickupPoint && (seller
+        ? <p className="small" style={{ margin: "6px 0 0" }}>Going to <b>{o.pickupPoint.name}</b>. The buyer gets a code to collect it.</p>
+        : <p className="small" style={{ margin: "6px 0 0" }}>Collect from <b>{o.pickupPoint.name}</b>. The code to open the locker is sent to your phone when it arrives.</p>)}
+      {!!events?.length && (
+        <ol className="track-events">
+          {events.map((e) => (
+            <li key={`${e.at}-${e.status}`}>
+              <b>{trackingText(e.status)}</b>
+              <span className="small muted">{new Date(e.at).toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}{e.location ? ` · ${e.location}` : ""}</span>
+              {e.message && <span className="small">{e.message}</span>}
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
+  );
+}
+
+/** Bob Go's status codes in plain words. */
+export const trackingText = (s: string) => ({
+  submitted: "Booked", "collection-assigned": "Driver on the way to the seller", collected: "Collected from the seller",
+  "in-transit": "On the way", "at-hub": "At the courier's depot", "out-for-delivery": "Out for delivery",
+  "ready-for-pickup": "Ready to collect from the locker", delivered: "Delivered", "delivery-failed": "Delivery attempt failed",
+  cancelled: "Cancelled", "returned-to-sender": "Returned to the seller",
+} as Record<string, string>)[s] ?? s.replace(/[-_]/g, " ").replace(/^./, (c) => c.toUpperCase());
