@@ -4,10 +4,10 @@ import { handler, json, UserError } from "../_shared/http.ts";
 import { adminClient, requireUser, must } from "../_shared/supabase.ts";
 import { escrow } from "../_shared/escrow.ts";
 
-// [CONFIRM] TradeSafe's bank enum values in the schema playground.
-const BANKS: Record<string, string> = {
-  "Absa": "ABSA", "Capitec": "CAPITEC", "FNB": "FNB", "Nedbank": "NEDBANK", "Standard Bank": "SBSA",
-  "TymeBank": "TYMEBANK", "African Bank": "AFRICAN", "Discovery Bank": "DISCOVERY", "Investec": "INVESTEC",
+// Banks sellers can pick. TradeSafe's own bank codes are looked up from their schema in escrow.ts.
+const BANKS: Record<string, true> = {
+  "Absa": true, "Capitec": true, "FNB": true, "Nedbank": true, "Standard Bank": true,
+  "TymeBank": true, "African Bank": true, "Discovery Bank": true, "Investec": true,
 };
 
 Deno.serve(handler(async (req, body) => {
@@ -29,7 +29,7 @@ Deno.serve(handler(async (req, body) => {
   const token = await escrow().createParty({
     givenName, familyName, email: u.user?.email ?? "", mobile: shop.seller_checks?.phone ?? u.user?.phone ?? "",
     idNumber: idNumber || undefined,
-    bank: { bank: BANKS[bankName], accountNumber: digits, accountType: accountType === "CHEQUE" ? "CHEQUE" : "SAVINGS" },
+    bank: { bankName, accountNumber: digits, accountType: accountType === "CHEQUE" ? "CHEQUE" : "SAVINGS" },
   });
   must(await db.from("seller_checks").update({
     escrow_token: token, bank_name: bankName, bank_last4: digits.slice(-4), bank_status: "approved",

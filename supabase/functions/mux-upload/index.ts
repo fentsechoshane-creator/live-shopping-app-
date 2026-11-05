@@ -13,7 +13,11 @@ Deno.serve(handler(async (req) => {
   if (!shop) throw new UserError("Open your shop first.", 403);
   const { data: allowed } = await db.rpc("take_usage", { p_user: uid, p_kind: "mux_upload", p_max: 30, p_window: "1 day" });
   if (allowed !== true) throw new UserError("That's a lot of uploads today. Try again tomorrow.", 429);
-  const upload = await createDirectUpload(req.headers.get("origin") ?? "*");
+  // Uploads are only accepted from our own app (the website and the phone apps), never any site.
+  const app = new URL(Deno.env.get("APP_URL") ?? "https://myhaul-app.netlify.app").origin;
+  const allowed = [app, "https://myhaul.co.za", "capacitor://localhost", "https://localhost", "http://localhost:5173"];
+  const origin = req.headers.get("origin") ?? "";
+  const upload = await createDirectUpload(allowed.includes(origin) ? origin : app);
   const media = must(await db.from("media").insert({ owner_id: uid, kind: "video", mux_upload_id: upload.id, status: "uploading" })
     .select("id").single(), "create media") as any;
   return json({ mediaId: media.id, uploadUrl: upload.url });

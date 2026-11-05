@@ -64,16 +64,30 @@ Deno.serve(async (req) => {
 
   // Release payouts that are due today.
   const today = now.toISOString().slice(0, 10);
-  const { data: payable } = await db.from("payouts").select("id, order_id, orders!inner(escrow_allocation_id)")
+  const { data: payable } = await db.from("payouts").select("id, order_id, orders!inner(escrow_allocation_id, escrow_transaction_id)")
     .eq("status", "scheduled").lte("pay_on", today).limit(200);
   for (const p of (payable ?? []) as any[]) {
     try {
+      // A dispute opened on TradeSafe's side holds the payout for our team.
+      if (es.mode === "live" && p.orders.escrow_transaction_id) {
+        const st = await es.transactionState(p.orders.escrow_transaction_id);
+        if (st?.state === "DISPUTED") {
+          await db.from("payouts").update({ status: "held", pay_on: null }).eq("id", p.id);
+          await db.rpc("raise_alert", { p_kind: "escrow_dispute", p_severity: "urgent", p_title: "Payout held: buyer disputed on TradeSafe",
+            p_body: `Order ${String(p.order_id).slice(0, 8)}. Sort out the dispute, then release the payout.`, p_link: "/team/orders", p_dedupe: `escrow_dispute:${p.order_id}` });
+          continue;
+        }
+      }
       await es.release(p.orders.escrow_allocation_id);
       must(await db.from("payouts").update({ status: "released", released_at: now.toISOString() }).eq("id", p.id), "release");
       done.released++;
     } catch (e) {
       console.error("release failed", p.id, e);
       done.failed++;
+      // Tell the team once (not every 15 minutes); the payout stays scheduled and is tried again.
+      await db.rpc("raise_alert", { p_kind: "payout_failed", p_severity: "urgent", p_title: "A payout didn't go through",
+        p_body: `Payout for order ${String(p.order_id).slice(0, 8)} was refused by TradeSafe. We keep trying every 15 minutes. Check the logs.`,
+        p_link: "/team/orders", p_dedupe: `payout_failed:${p.id}` });
     }
   }
 

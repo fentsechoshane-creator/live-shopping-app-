@@ -106,6 +106,17 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-06: TradeSafe checked against their real API, connections reviewed
+
+- Ofentse asked whether TradeSafe is set up. Honest answer: the code was written but never run against a real account, and its request shapes were guesses marked [CONFIRM]. Checked them against TradeSafe's API spec and their own open source WooCommerce plugin.
+- Fixed: the payment callback read the wrong place (TradeSafe sends reference and state at the top level, not inside "data") and needed a transaction id it doesn't send, so real payments would have been ignored. Now it accepts both shapes, matches on our order id and asks TradeSafe for the real state.
+- Fixed: bank codes were guesses (like "SBSA"). Now looked up from TradeSafe's own list (UniversalBranchCode, BankAccountType, IdType, PayoutInterval), like their plugin; an unknown bank is refused, not guessed. Sellers' payouts set to Immediate.
+- Added: the GraphQL address defaults to live (sandbox is set by TRADESAFE_API_URL), time limits on every call, a reason on refunds, https only payment links, later paid states count as paid, a TradeSafe dispute raises an urgent alert and holds the payout, and a failed payout alerts the team once.
+- Mux: ids from the notice are checked before use; uploads only from our own app's addresses.
+- Reviewed and fine: post and media rules (only your own uploads), Bob Go, push, alerts, photo suggestions.
+- Tests: 4 new TradeSafe tests run our code against a pretend TradeSafe (13 server tests in all).
+- [CONFIRM] questions for TradeSafe are in docs/SETUP.md section 2. The big one: may we accept delivery as the agent?
+
 ### 2026-11-06: Delivery details at sign up, one tap checkout
 
 - Ofentse's idea: collect what checkout needs once, with Skip for now. Sign up now ends with "Where should we send your orders?": to my door (name, cell, street, suburb, city, province, postal code) or a locker near me, saved to the account.

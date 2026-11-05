@@ -81,12 +81,21 @@ At this point everything works with fake escrow: Pay opens a test payment page.
 
 ## 2. TradeSafe (escrow)
 
+Our code was checked on 6 Nov 2026 against TradeSafe's API spec and their own open source WooCommerce plugin. It has never been run against a real TradeSafe account, so test in their sandbox first.
+
 1. In the TradeSafe developer portal, create an application. Copy the Client ID and Secret (the secret is shown once).
-2. Set the API callback to: `https://<ref>.supabase.co/functions/v1/escrow-webhook?secret=<TRADESAFE_CALLBACK_SECRET>`
+2. Set the API callback to: `https://<ref>.supabase.co/functions/v1/escrow-webhook?secret=<TRADESAFE_CALLBACK_SECRET>` (make up a long random secret). TradeSafe doesn't sign callbacks, so this secret plus asking TradeSafe for the real state is what protects it.
 3. Set the success and failure URLs to your app's `/orders` page.
-4. Create the platform's own token (role AGENT, with our business bank account). This is where our fees go. Put its id in `TRADESAFE_AGENT_TOKEN`.
-5. In `supabase/.env` set `TRADESAFE_MODE=live`, the client id and secret, `TRADESAFE_API_URL` (the sandbox GraphQL URL from your account), and `TRADESAFE_CALLBACK_SECRET`. Run `supabase secrets set --env-file supabase/.env`.
-6. Before switching on, check every item marked [CONFIRM] in `supabase/functions/_shared/escrow.ts` against the schema playground. See docs/ARCHITECTURE.md, "Open questions".
+4. Create the platform's own token (role AGENT, with our business bank account). This is where our fees and the courier money go. Put its id in `TRADESAFE_AGENT_TOKEN`.
+5. Secrets (Supabase, Edge Functions, Secrets): `TRADESAFE_MODE=live`, `TRADESAFE_CLIENT_ID`, `TRADESAFE_CLIENT_SECRET`, `TRADESAFE_AGENT_TOKEN`, `TRADESAFE_CALLBACK_SECRET`, and for the sandbox `TRADESAFE_API_URL=https://api-developer.tradesafe.dev/graphql` (leave it out for live: the default is `https://api.tradesafe.co.za/graphql`).
+6. Bank codes, account types, ID type and payout timing are looked up from TradeSafe's own list, so they don't need setting. Sellers' payouts are set to Immediate.
+
+**Questions to ask TradeSafe before going live** (email support@tradesafe.co.za):
+- Can we, as the AGENT, accept delivery for the buyer once our return window closes (`allocationAcceptDelivery`)? Their plugin doesn't do this; it lets the buyer accept. If we can't, payouts happen when TradeSafe's own inspection time ends (we set it to our return window), and our payout timing by seller tier won't apply.
+- When we mark delivery complete, does TradeSafe email or SMS the buyer to accept? If so, can that be switched off for us, since our app asks the buyer?
+- Does `transactionCancel` refund the buyer after delivery has started (for returns)?
+- Do they offer saved cards or a way to preselect a payment method?
+- Confirm the codes `GENERAL_GOODS_SERVICES`, fee allocation `AGENT` and fee type `FLAT`.
 
 ## 3. Mux (video)
 

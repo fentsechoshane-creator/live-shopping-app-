@@ -9,9 +9,15 @@ Deno.serve(async (req) => {
   if (!(await verifyMuxSignature(req.headers.get("mux-signature"), raw, env("MUX_WEBHOOK_SECRET")))) {
     return json({ error: "bad signature" }, 401);
   }
-  const evt = JSON.parse(raw);
+  let evt: any;
+  try { evt = JSON.parse(raw); } catch { return json({ ok: true, ignored: "not json" }); }
   const db = adminClient();
   const d = evt.data ?? {};
+  // Mux ids are letters and numbers. Anything else is ignored, so nothing odd ever reaches a database filter.
+  const ID = /^[A-Za-z0-9]{1,128}$/;
+  const ok = (v: unknown) => typeof v === "string" && ID.test(v);
+  if (!ok(d.id) || (d.asset_id != null && !ok(d.asset_id)) || (d.upload_id != null && !ok(d.upload_id))
+      || (d.playback_ids?.[0]?.id != null && !ok(d.playback_ids[0].id))) return json({ ok: true, ignored: "bad id" });
   switch (evt.type) {
     case "video.upload.asset_created":
       await db.from("media").update({ mux_asset_id: d.asset_id, status: "processing" }).eq("mux_upload_id", d.id);
