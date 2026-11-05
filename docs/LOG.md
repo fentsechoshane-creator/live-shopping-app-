@@ -106,6 +106,13 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-06: Payment costs and the Instant EFT nudge
+
+- Compared fees from Ofentse's screenshots. PaySafe South Africa (paysafe.co.za, an escrow service, not the international Paysafe) has a R100 minimum plus R15 per settlement: R115 on a R350 order, so it's out for us. No public API found either. Staying with TradeSafe.
+- TradeSafe rates (before VAT): Instant EFT through Ozow 1.5%, normal EFT 0.75% (slow to clear), card 2.5%, SnapScan 3.5%, PayJustNow 5.25%. We pay these out of our cut (feeAllocation AGENT). On a R350 card order we earn R33 and pay about R10; with a founding seller on 0% fee we earn only R12, so SnapScan can cost us money.
+- Checkout now nudges Instant EFT (Ozow): confirmed straight away so the seller can ship today; a normal transfer can take up to 2 days. Card and SnapScan still work. We can't preselect the method (it's chosen on TradeSafe's page).
+- [CONFIRM] with TradeSafe: any minimum fee per transaction, and lower rates at volume.
+
 ### 2026-11-06: TradeSafe checked against their real API, connections reviewed
 
 - Ofentse asked whether TradeSafe is set up. Honest answer: the code was written but never run against a real account, and its request shapes were guesses marked [CONFIRM]. Checked them against TradeSafe's API spec and their own open source WooCommerce plugin.

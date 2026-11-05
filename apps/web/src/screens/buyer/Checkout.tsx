@@ -178,7 +178,13 @@ export function CheckoutSheet({ item, onClose, offer, auctionPrice }: { item: Fe
       {delivery === "collect_cpt" && <div className="note" style={{ marginBottom: 14 }}>We send you a collection code when it is ready at our Cape Town pickup point.</div>}
 
       <h3 style={{ fontSize: 15, margin: "10px 0 8px" }}>Pay with</h3>
-      <div className="note" style={{ marginBottom: 16 }}>Instant EFT, card or SnapScan, on our escrow partner's secure page next.</div>
+      {/* Nudge to Instant EFT (Ozow): cleared straight away, and it costs us far less than card or SnapScan. */}
+      <div className="pay-tip">
+        <Icon name="spark" size={18} />
+        <span className="grow"><b>Tip: pay with Instant EFT (Ozow)</b>
+          <span className="small">It's confirmed straight away, so the seller can ship today. A normal bank transfer can take up to 2 days.</span></span>
+      </div>
+      <p className="small muted" style={{ margin: "0 0 16px" }}>Card and SnapScan work too. You pay on TradeSafe's secure page next; we never see your card.</p>
       {t && <div className="price-rows" style={{ marginTop: 8 }}>
         <div className="row"><span>Item</span><span>{R(t.itemPrice)}</span></div>
         <div className="row"><span>Delivery</span><span>{t.deliveryFee ? R(t.deliveryFee) : "Free"}</span></div>
