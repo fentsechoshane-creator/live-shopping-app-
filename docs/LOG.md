@@ -103,6 +103,12 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-05: Pushing to live
+
+- Checked live (read only): database at 0016; 7 of 11 server functions deployed (old versions); run-due scheduled; 1 account, no team member yet.
+- New `npm run push:live` (scripts/push-live.mjs): lines up the update history (the first 16 updates were recorded live under other version numbers), shows the updates, asks, pushes 0017 to 0025, then deploys all functions. Then paste scripts/after-push.sql in the SQL Editor (schedules and making yourself a team member).
+- Test payments (TRADESAFE_MODE=mock) are now refused only on myhaul.co.za, so the Netlify test site can test checkout.
+
 ### 2026-11-05: Attacker style security review, swipe lesson
 
 - Welcome now ends with a TikTok style "Swipe up for more" lesson over the feed. Swiping it away (or scrolling, or the down arrow on a laptop) starts the first video the ranking picked; there's no Get started button.
