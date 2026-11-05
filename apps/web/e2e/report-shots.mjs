@@ -86,7 +86,7 @@ try {
   await jacket.scrollIntoViewIfNeeded();
   await page.waitForTimeout(1500);
   await shot("feed-auction");
-  await jacket.getByRole("button", { name: /^Bid ·/ }).click();
+  await jacket.getByRole("button", { name: "Custom" }).click();
   const bidSheet = page.getByRole("dialog", { name: /Vintage 90s denim jacket/ });
   await bidSheet.getByText("Recent bids").waitFor();
   await shot("auction-sheet");

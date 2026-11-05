@@ -41,6 +41,14 @@ const consoleIssues = new Set();
 page.on("requestfailed", (r) => consoleIssues.add(`failed request: ${r.url().slice(0, 90)} (${r.failure()?.errorText})`));
 page.on("console", (m) => { if (m.type() === "error" || m.type() === "warning") consoleIssues.add(`${m.type()}: ${m.text().slice(0, 160)}`); });
 let step = 0;
+/** Press and hold a button like a thumb would. `keep` leaves it held (for a screenshot mid hold). */
+const hold = async (loc, ms, keep = false) => {
+  const b = await loc.boundingBox();
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+  await page.mouse.down();
+  await page.waitForTimeout(ms);
+  if (!keep) await page.mouse.up();
+};
 const shot = (name) => (console.log("step", step + 1, name), page.screenshot({ path: `${shots}${String(++step).padStart(2, "0")}-${name}.png` }));
 const check = async (cond, msg) => { if (!(await cond)) throw new Error("Check failed: " + msg); };
 // Swipe on an element with real touch events (Chromium supports new Touch()).
@@ -224,15 +232,31 @@ try {
   const jacket = page.getByRole("region", { name: /Vintage 90s denim jacket/ });
   await jacket.scrollIntoViewIfNeeded();
   await jacket.getByText(/Auction · 1d/).waitFor();
-  await jacket.getByRole("button", { name: /^Bid · R700/ }).click();
+  // Bid straight from the video: hold the button until the ring closes. Letting go early does nothing.
+  const holdBtn = jacket.getByRole("button", { name: /^Hold to bid R720/ });
+  await jacket.getByRole("button", { name: "Custom" }).waitFor();
+  await hold(holdBtn, 1500);
+  await page.waitForTimeout(400);
+  await check(await page.getByText("You're the top bidder at R720").count() === 0, "letting go early doesn't bid");
+  await page.mouse.move(0, 0); await hold(holdBtn, 2500, true);
+  await shot("hold-to-bid");
+  await page.mouse.up();
+  await hold(holdBtn, 5400);
+  await page.getByText("You're the top bidder at R720").waitFor();
+  await jacket.getByRole("button", { name: "Bid placed" }).waitFor();
+  check(true, "holding for 5 seconds places the bid without leaving the video");
+  // Custom: your own amount, in the bid sheet over the video.
+  await jacket.getByRole("button", { name: "Custom" }).click();
   const bidSheet = page.getByRole("dialog", { name: /Vintage 90s denim jacket/ });
   await bidSheet.getByText("Reserve not met yet").waitFor();
   await bidSheet.getByText("l***m").first().waitFor(); // other bidders are masked
+  await page.waitForTimeout(600);
+  await check(await bidSheet.getByLabel(/Or your own amount/).evaluate((el) => el === document.activeElement), "Custom starts in the amount box");
   await shot("auction-sheet");
-  await bidSheet.getByLabel(/Or your own amount/).fill("705");
-  await check(bidSheet.getByRole("button", { name: "Bid R705" }).isDisabled(), "a bid under the step can't be placed");
+  await bidSheet.getByLabel(/Or your own amount/).fill("725");
+  await check(bidSheet.getByRole("button", { name: /^Hold to bid R725/ }).isDisabled(), "a bid under the step can't be placed");
   await bidSheet.getByLabel(/Or your own amount/).fill("900");
-  await bidSheet.getByRole("button", { name: "Bid R900" }).click();
+  await hold(bidSheet.getByRole("button", { name: /^Hold to bid R900/ }), 5400);
   await page.getByText("You're the top bidder at R900").waitFor();
   await bidSheet.getByText("Reserve met").waitFor();
   await page.keyboard.press("Escape");

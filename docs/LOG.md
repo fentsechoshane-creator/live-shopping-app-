@@ -105,6 +105,15 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-05: Hold to bid
+
+- Bidding happens on the video now, like Whatnot but with a hold instead of a swipe. Left: **Custom** (opens the bid sheet with the amount box ready). Right: **Hold to bid R720** (the next minimum step).
+- Hold for 5 seconds: a thin amber Liquid Glass ring closes around the button, with a light tick each second and a firm "done" haptic when it closes, then "Bid placed" in green. Let go early and nothing happens. Works with a thumb, a mouse, or holding Space or Enter. The hold time is one setting (`HOLD_MS` in `components/HoldToBid.tsx`).
+- The bid sheet (from Custom or the item details) uses the same hold button.
+- Messages ("You're the top bidder", "Welcome") now drop in at the top and let taps through. Before, they sat on top of the Pay and Bid buttons at the bottom.
+- e2e: holds like a thumb would; letting go early doesn't bid; a full hold bids without leaving the video; Custom starts in the amount box.
+- [CONFIRM] 5 seconds is long when an auction is ending. The 2 minute extension protects late bidders, but 2 to 3 seconds may feel better. Easy to change after trying it on a phone.
+
 ### 2026-11-05: App Store and Google Play prep
 
 - docs/STORE.md rewritten with the rules as checked today: Apple builds need Xcode 26 or later (since April 2026) and the new age rating questions; Google targets API 36 (we already do); iPhone screenshots at 6.9 inch (ours are 1320 x 2868).

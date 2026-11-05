@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { bidStep, timeLeft } from "@app/core";
 import { api, type AuctionInfo, type FeedItem } from "../api";
 import { useSession } from "../session";
-import { tap } from "../native";
 import { Icon } from "./Icon";
-import { ErrorNote, R, Sheet, timeAgo, useAction } from "./ui";
+import { HoldToBid } from "./HoldToBid";
+import { ErrorNote, R, Sheet, timeAgo } from "./ui";
 
 /** Ticks once a second, for countdowns. */
 export function useNow(active = true) {
@@ -44,11 +44,14 @@ export function auctionButton(a: AuctionInfo | undefined, now: number): { label:
  * Bid on a timed auction. Shows the current bid, time left, reserve and recent bids, and offers quick amounts.
  * A bid is a promise to buy: the winner pays within 2 hours.
  */
-export function AuctionSheet({ item, info, onInfo, onClose, onPay }: {
+export function AuctionSheet({ item, info, onInfo, onClose, onPay, focusCustom }: {
   item: FeedItem; info?: AuctionInfo; onInfo: (a: AuctionInfo) => void; onClose: () => void; onPay: () => void;
+  /** Opened from Custom on the video: start in the amount box. */
+  focusCustom?: boolean;
 }) {
   const now = useNow();
-  const { busy, error, run } = useAction();
+  const [error, setError] = useState<string | null>(null);
+  const amountBox = useRef<HTMLInputElement>(null);
   const { toast } = useSession();
   const [custom, setCustom] = useState("");
   const [pick, setPick] = useState<number | null>(null);
@@ -60,16 +63,29 @@ export function AuctionSheet({ item, info, onInfo, onClose, onPay }: {
     if (info?.state === "open" && left <= 0) api.settleAuction(item.product.id).then(() => api.auctionInfo([item.product.id])).then((r) => r[item.product.id] && onInfo(r[item.product.id])).catch(() => {});
   }, [info?.state, left <= 0]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // From Custom: go to the amount box once the sheet has slid up (the sheet takes focus first when it opens).
+  useEffect(() => {
+    if (!focusCustom || !open) return;
+    const t = window.setTimeout(() => amountBox.current?.focus(), 320);
+    return () => window.clearTimeout(t);
+  }, [focusCustom, open]);
+
   const min = info?.minNextCents ?? item.product.priceCents;
   const quick = [min, min + bidStep(min), min + 3 * bidStep(min)];
   const amount = custom ? Math.round(Number(custom) * 100) : pick ?? min;
-  const bid = () => run(async () => {
-    const r = await api.placeBid(item.product.id, amount);
-    tap();
-    onInfo(r);
-    setCustom(""); setPick(null);
-    toast(`You're the top bidder at ${R(amount)}`);
-  });
+  // Called by the hold button once the ring closes. Throwing resets the button so they can try again.
+  const bid = async () => {
+    setError(null);
+    try {
+      const r = await api.placeBid(item.product.id, amount);
+      onInfo(r);
+      setCustom(""); setPick(null);
+      toast(`You're the top bidder at ${R(amount)}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "That bid didn't go through. Try again.");
+      throw e;
+    }
+  };
 
   return (
     <Sheet title={item.product.title} onClose={onClose}
@@ -83,8 +99,8 @@ export function AuctionSheet({ item, info, onInfo, onClose, onPay }: {
       ) : open ? (
         <>
           <ErrorNote error={error} />
-          <button className="btn amber block big" onClick={bid} disabled={busy || amount < min}>{busy ? "Placing bid…" : `Bid ${R(amount)}`}</button>
-          <p className="small muted" style={{ textAlign: "center", margin: "8px 0 0" }}>A bid is a promise to buy. If you win, pay within 2 hours.</p>
+          <HoldToBid block label={`Hold to bid ${R(amount)}`} onConfirm={bid} disabled={amount < min} />
+          <p className="small muted" style={{ textAlign: "center", margin: "8px 0 0" }}>Hold until the ring closes. A bid is a promise to buy: if you win, pay within 2 hours.</p>
         </>
       ) : undefined}>
       {!info && <div className="muted">Loading the auction…</div>}
@@ -116,7 +132,7 @@ export function AuctionSheet({ item, info, onInfo, onClose, onPay }: {
               </div>
               <div className="field" style={{ marginBottom: 6 }}>
                 <label htmlFor="bid-amount">Or your own amount (R{min / 100} or more)</label>
-                <input id="bid-amount" value={custom} onChange={(e) => setCustom(e.target.value.replace(/[^\d]/g, ""))} inputMode="numeric" placeholder={String(min / 100)} enterKeyHint="done" />
+                <input id="bid-amount" value={custom} onChange={(e) => setCustom(e.target.value.replace(/[^\d]/g, ""))} inputMode="numeric" placeholder={String(min / 100)} enterKeyHint="done" ref={amountBox} />
               </div>
             </>
           )}

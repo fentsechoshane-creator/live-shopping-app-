@@ -70,6 +70,13 @@ export async function tap() {
   Haptics.impact({ style: ImpactStyle.Light }).catch(() => {});
 }
 
+/** A firm "done" feel when something important goes through, like a bid. */
+export async function confirmFeel() {
+  if (!isNative) { try { navigator.vibrate?.(40); } catch { /* ignore */ } return; }
+  const { Haptics, NotificationType } = await import("@capacitor/haptics");
+  Haptics.notification({ type: NotificationType.Success }).catch(() => {});
+}
+
 /**
  * Notifications. `ask: false` (on start) only registers if the person already said yes.
  * `ask: true` shows the phone's question: we only do that at a moment it clearly helps, like right after an order

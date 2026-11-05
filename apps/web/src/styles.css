@@ -421,7 +421,9 @@ a { color: inherit; text-decoration: none; }
 .grabber { width: 40px; height: 5px; border-radius: 3px; background: var(--hairline); margin: 8px auto 0; }
 .item-row { display: flex; align-items: center; gap: 12px; background: var(--surface-2); border-radius: var(--r); padding: 10px 14px 10px 10px; margin-bottom: 16px; }
 
-.toast { position: absolute; left: 16px; right: 16px; bottom: calc(var(--tab-space) + 12px); border-radius: var(--r); padding: 13px 16px; font-size: 14px; font-weight: 600; z-index: 50; background: var(--ink); color: var(--bg); animation: up 0.25s ease; }
+/* Messages drop in at the top, under the For you bar, so they never sit on a Pay or Bid button. Taps go through them. */
+.toast { position: absolute; left: 16px; right: 16px; top: calc(env(safe-area-inset-top) + 64px); border-radius: var(--r); padding: 13px 16px; font-size: 14px; font-weight: 600; z-index: 90; background: var(--ink); color: var(--bg); pointer-events: none; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25); animation: toast-in 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); }
+@keyframes toast-in { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: none; } }
 
 /* Steps and checklists */
 .progress { display: flex; gap: 6px; margin: 6px 0 18px; }
@@ -926,7 +928,7 @@ button.g3 { border: 0; padding: 0; display: block; width: 100%; }
 .team-gate-card { background: var(--surface); border: 1px solid var(--hairline); border-radius: 20px; padding: 26px; width: 100%; max-width: 400px; }
 .team-gate-card .team-logo { padding: 0 0 8px; }
 .team-scrim { display: none; }
-.team ~ .toast { position: fixed; left: auto; right: 24px; bottom: 24px; max-width: 420px; }
+.team ~ .toast { position: fixed; left: auto; right: 24px; top: auto; bottom: 24px; max-width: 420px; }
 @media (max-width: 900px) {
   .team-nav { position: fixed; inset: 0 auto 0 0; z-index: 90; transform: translateX(-100%); transition: transform 0.22s ease; box-shadow: var(--glass-shadow); padding-top: max(18px, env(safe-area-inset-top)); }
   .team-nav.open { transform: none; }
@@ -989,3 +991,32 @@ button.g3 { border: 0; padding: 0; display: block; width: 100%; }
 .pack-media { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 10px; margin: 10px 0; }
 .pack-media video, .pack-media img { width: 100%; max-height: 52vh; object-fit: contain; background: #000; border-radius: 12px; }
 @media (max-width: 560px) { .pack-media { grid-template-columns: minmax(0, 1fr); } }
+
+/* ===== Hold to bid: a thin amber glass ring closes around the button while you hold ===== */
+.hold { position: relative; display: inline-flex; isolation: isolate; }
+.hold.block { display: flex; width: 100%; }
+.hold .hold-btn { flex: 1; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+  transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.25s, box-shadow 0.25s; }
+/* The glass halo: a hint of amber behind blurred glass, only while holding. */
+.hold::before { content: ""; position: absolute; inset: -4px; border-radius: 999px; z-index: -1; pointer-events: none;
+  background: rgba(251, 191, 36, 0.1); border: 0.5px solid rgba(255, 255, 255, 0.28);
+  -webkit-backdrop-filter: blur(14px) saturate(180%); backdrop-filter: blur(14px) saturate(180%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25); opacity: 0; transform: scale(0.96);
+  transition: opacity 0.25s, transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.hold-ring { position: absolute; left: -4px; top: -4px; pointer-events: none; overflow: visible; }
+.hold-ring rect { fill: none; stroke-width: 2.25; }
+.hold-ring .track { stroke: rgba(255, 255, 255, 0.22); opacity: 0; transition: opacity 0.25s; }
+.hold-ring .fill { stroke-linecap: round; stroke-dasharray: 100; stroke-dashoffset: 100; opacity: 0;
+  filter: drop-shadow(0 0 3px rgba(251, 191, 36, 0.6));
+  transition-property: stroke-dashoffset, opacity; transition-duration: 0.35s, 0.25s; transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1), ease; }
+.hold[data-phase="holding"]::before, .hold[data-phase="sending"]::before { opacity: 1; transform: none; }
+.hold[data-phase="holding"] .hold-btn { transform: scale(0.97); box-shadow: 0 0 22px rgba(251, 191, 36, 0.35); }
+.hold[data-phase="holding"] .track, .hold[data-phase="sending"] .track { opacity: 1; }
+.hold[data-phase="holding"] .fill { stroke-dashoffset: 0; opacity: 1; transition-timing-function: linear, ease; }
+.hold[data-phase="sending"] .fill, .hold[data-phase="done"] .fill { stroke-dashoffset: 0; opacity: 1; transition: opacity 0.6s ease 0.9s; }
+.hold[data-phase="done"] .fill { opacity: 0; }
+.hold[data-phase="done"] .hold-btn { background: var(--green); color: var(--green-ink); animation: hold-pop 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); }
+@keyframes hold-pop { 0% { transform: scale(0.97); } 60% { transform: scale(1.04); } 100% { transform: none; } }
+/* On the video: Custom on the left, hold to bid filling the rest. */
+.bid-actions { display: grid; grid-template-columns: auto 1fr; gap: 8px; }
+.bid-actions .btn.vglass { padding: 0 16px; }
