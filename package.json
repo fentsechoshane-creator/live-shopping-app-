@@ -18,6 +18,7 @@
     "dev:live": "npm run dev:live -w apps/web",
     "build:live": "npm run build:live -w apps/web",
     "status": "node scripts/status.mjs",
-    "build:phone": "npm run build:artifact -w apps/web"
+    "build:phone": "npm run build:artifact -w apps/web",
+    "push:live": "node scripts/push-live.mjs"
   }
 }

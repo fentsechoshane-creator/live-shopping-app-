@@ -177,8 +177,9 @@ export function escrow(): Escrow {
   const mode = Deno.env.get("TRADESAFE_MODE");
   if (mode === "live") return new TradeSafe();
   if (mode === "mock") {
-    // Test payments can never run on the real site, even if the setting is left on by mistake.
-    if (/myhaul\.co\.za|netlify\.app/i.test(Deno.env.get("APP_URL") ?? "")) throw new UserError("Payments aren't switched on yet. Please try again later.", 503);
+    // Test payments can never run on the real site (myhaul.co.za), even if the setting is left on by mistake.
+    // The Netlify test site can use them while we test before launch.
+    if (/myhaul\.co\.za/i.test(Deno.env.get("APP_URL") ?? "")) throw new UserError("Payments aren't switched on yet. Please try again later.", 503);
     return new MockEscrow();
   }
   throw new UserError("Payments aren't switched on yet. Please try again later.", 503);
