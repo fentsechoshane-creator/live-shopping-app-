@@ -3,7 +3,7 @@
 import { handler, json, UserError } from "../_shared/http.ts";
 import { adminClient, requireUser, must } from "../_shared/supabase.ts";
 import { escrow, ESCROW_DAYS } from "../_shared/escrow.ts";
-import { orderTotals, DELIVERY_OPTIONS, bookedByUs, deliveryFee, PARCEL_SIZES, type DeliveryOption } from "../_shared/core/index.ts";
+import { orderTotals, MIN_PRICE, DELIVERY_OPTIONS, bookedByUs, deliveryFee, PARCEL_SIZES, type DeliveryOption } from "../_shared/core/index.ts";
 import { cleanAddress, orderParcelSize, requireDelivery } from "../_shared/bobgo.ts";
 
 const NON_FOOD: DeliveryOption[] = ["pudo_locker", "courier", "collect_cpt"];
@@ -119,6 +119,9 @@ Deno.serve(handler(async (req, body) => {
     foundingUntil: shop.founding_until ? new Date(shop.founding_until) : null,
   });
 
+  // TradeSafe's smallest payment is about R49, so an order (after any special price or reward) must be R50 or more.
+  if (t.total < MIN_PRICE) throw new UserError("Orders on myHaul start at R50. Our payment partner can't take smaller amounts.");
+
   const es = escrow(); // refuses if payments aren't switched on
   // Buyer's escrow token, created once.
   let buyerToken = (await db.from("escrow_parties").select("token").eq("user_id", uid).maybeSingle()).data?.token as string | undefined;
@@ -144,18 +147,26 @@ Deno.serve(handler(async (req, body) => {
   }), "create order");
 
   const days = ESCROW_DAYS[product.mode as keyof typeof ESCROW_DAYS];
-  const tx = await es.createTransaction({
-    reference: orderId,
-    title: title.slice(0, 60),
-    description: `${title} from ${shop.name}`,
-    buyerToken, sellerToken,
-    amountCents: t.total,
-    // Our cut inside escrow: our fees plus the courier money for Bob Go. If the reward is bigger, it is 0 and we
-    // top the seller up ourselves.
-    agentFeeCents: t.escrowAgentFee,
-    daysToDeliver: days.deliver, daysToInspect: days.inspect,
-  });
-  const checkoutUrl = await es.checkoutUrl(tx.transactionId, orderId);
+  // If TradeSafe turns the order down, cancel it straight away so it doesn't sit there unpaid.
+  const cancelOrder = () => db.from("orders").update({ status: "cancelled" }).eq("id", orderId).eq("status", "pending_payment");
+  let tx: { transactionId: string; allocationId: string }, checkoutUrl: string;
+  try {
+    tx = await es.createTransaction({
+      reference: orderId,
+      title: title.slice(0, 60),
+      description: `${title} from ${shop.name}`,
+      buyerToken, sellerToken,
+      amountCents: t.total,
+      // Our cut inside escrow: our fees plus the courier money for Bob Go. If the reward is bigger, it is 0 and we
+      // top the seller up ourselves.
+      agentFeeCents: t.escrowAgentFee,
+      daysToDeliver: days.deliver, daysToInspect: days.inspect,
+    });
+    checkoutUrl = await es.checkoutUrl(tx.transactionId, orderId);
+  } catch (e) {
+    await cancelOrder();
+    throw e;
+  }
   must(await db.from("orders").update({
     escrow_transaction_id: tx.transactionId, escrow_allocation_id: tx.allocationId, checkout_url: checkoutUrl,
   }).eq("id", orderId), "save escrow ids");

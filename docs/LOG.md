@@ -107,6 +107,13 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-06: TradeSafe minimum, R50 lowest price
+
+- First live test checkout (R25 item, collection) failed: TradeSafe refuses payments under about R49 ("value must be at least 42.6086956522", which is R49 with VAT).
+- Lowest listing price is now R50 (was R20). Checkout also refuses any order under R50 with a clear message, since special prices and bundles can go lower than a listing.
+- If TradeSafe turns an order down, checkout now cancels it straight away instead of leaving it unpaid.
+- Live checkout function needs redeploying with this (waiting for Ofentse's OK). [Claude]
+
 ### 2026-11-06: Email sign in link brings you back to where you were
 
 - Ofentse signed in on /team with the email code and landed in the app instead. The sign in email can carry a link, and that link always went to the home page. Now it goes back to the page you started from (like /team), only on our own site; Supabase also checks it against the allowed addresses.

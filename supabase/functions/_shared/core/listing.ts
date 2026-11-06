@@ -33,14 +33,16 @@ export interface ListingInput {
   mode: "buy_now" | "order_now" | "auction";
 }
 
-export const MIN_PRICE = rand(20);
+// TradeSafe refuses payments under about R49 (R42.61 before VAT, seen live on 6 Nov 2026), so nothing on myHaul
+// sells for less than R50. Checkout checks the final amount too (offers and bundles can be lower than a listing).
+export const MIN_PRICE = rand(50);
 export const MAX_PRICE = rand(50000);
 
 export function validateListing(l: ListingInput): string[] {
   const errors: string[] = [];
   const text = ` ${(l.title + " " + (l.description ?? "")).toLowerCase()} `;
   if (l.title.trim().length < 4) errors.push("Add a title of at least 4 characters.");
-  if (l.price < MIN_PRICE) errors.push("The lowest price is R20.");
+  if (l.price < MIN_PRICE) errors.push("The lowest price is R50.");
   if (l.price > MAX_PRICE) errors.push("The highest price is R50,000.");
   if (COUNTERFEIT_WORDS.some((w) => text.includes(w)))
     errors.push("Replicas and fakes are not allowed. Selling counterfeit goods is an offence under the Counterfeit Goods Act.");
