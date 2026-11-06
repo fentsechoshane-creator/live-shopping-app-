@@ -1149,3 +1149,37 @@ select pg_temp.act_as('00000000-0000-0000-0000-0000000000b3');
 select pg_temp.expect_error($$select follow_person('00000000-0000-0000-0000-0000000000b1', true)$$, 'paused');
 reset role;
 select 'friends and sharing tests passed' as result;
+
+-- ===== Cancelling paid orders (migration 0035) =====
+select pg_temp.act_as_service();
+-- Three paid orders from the same shop; each is cancelled a different way.
+insert into orders (id, buyer_id, shop_id, product_id, mode, item_price_cents, delivery, delivery_fee_cents, protection_fee_cents, total_cents, seller_fee_cents, seller_payout_cents)
+  select ('40000000-0000-0000-0000-00000000006' || i)::uuid, '00000000-0000-0000-0000-00000000000d', (select id from shops where handle = 'other.shop'),
+    '40000000-0000-0000-0000-000000000001', 'buy_now', 30000, 'collect_cpt', 0, 1200, 31200, 1800, 28200 from generate_series(1, 4) i;
+update products set stock = 10, status = 'live' where id = '40000000-0000-0000-0000-000000000001';
+update orders set status = 'paid' where id::text like '40000000-0000-0000-0000-00000000006_';
+do $$ begin assert not exists (select 1 from orders where id::text like '40000000-0000-0000-0000-00000000006_' and oversold), 'in stock, so not oversold'; end $$;
+create temp table seller_points as select count(*) n from trust_events where user_id = (select owner_id from shops where handle = 'other.shop') and kind = 'not_shipped';
+grant select on seller_points to authenticated, service_role;
+-- The buyer cancels: no points lost, and the seller is told not to ship.
+update orders set status = 'refunded', cancelled_by = 'buyer', cancel_reason = 'Ordered by mistake' where id = '40000000-0000-0000-0000-000000000061';
+-- The seller cancels after the courier couldn't book: no points lost.
+update orders set booking_failed_at = now() where id = '40000000-0000-0000-0000-000000000062';
+update orders set status = 'refunded', cancelled_by = 'seller', cancel_reason = 'The courier couldn''t book it' where id = '40000000-0000-0000-0000-000000000062';
+-- The seller cancels for no good reason: 5 points, like not shipping.
+update orders set status = 'refunded', cancelled_by = 'seller', cancel_reason = 'It''s no longer available' where id = '40000000-0000-0000-0000-000000000063';
+-- Not shipped in time (no one cancelled): 5 points.
+update orders set status = 'refunded' where id = '40000000-0000-0000-0000-000000000064';
+do $$ begin
+  assert (select count(*) from trust_events where user_id = (select owner_id from shops where handle = 'other.shop') and kind = 'not_shipped') - (select n from seller_points) = 2,
+    'only the seller''s own cancel and not shipping cost points';
+  assert exists (select 1 from notifications where user_id = (select owner_id from shops where handle = 'other.shop') and title like 'Order cancelled:%' and body like 'The buyer cancelled%'), 'seller told the buyer cancelled';
+  assert exists (select 1 from notifications where user_id = '00000000-0000-0000-0000-00000000000d' and title like 'Order cancelled:%'), 'buyer told';
+end $$;
+select pg_temp.expect_error($$update orders set cancelled_by = 'nobody' where id = '40000000-0000-0000-0000-000000000061'$$, 'cancelled_by');
+reset role;
+-- People can't set who cancelled themselves (only our server functions change orders).
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000d');
+select pg_temp.expect_error($$update orders set cancelled_by = 'buyer' where id = '40000000-0000-0000-0000-000000000063'$$, 'permission denied');
+reset role;
+select 'cancel tests passed' as result;

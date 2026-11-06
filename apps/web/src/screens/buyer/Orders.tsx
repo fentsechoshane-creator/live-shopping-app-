@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { BuyerCancel, CancelledNote } from "../../components/CancelOrder";
 import { Icon } from "../../components/Icon";
 import { askForNotifications } from "../../lib/push";
 import { useMessageShop } from "./Messages";
@@ -112,6 +113,7 @@ export function OrderDetail() {
       {o.status === "paid" && (
         <div className="note green-note" style={{ marginTop: 12 }}><b>Order placed.</b> Your money is held safely. We'll let you know when it ships.</div>
       )}
+      <CancelledNote o={o} side="buyer" />
 
       <h2>Where it is</h2>
       <Timeline o={o} />
@@ -127,6 +129,8 @@ export function OrderDetail() {
           <button className="btn line block" disabled={busy} onClick={() => act(() => api.cancelUnpaid(o.id), "Order cancelled")}>Cancel order</button>
         </div>
       )}
+
+      <BuyerCancel o={o} onDone={reload} />
 
       {o.status === "shipped" && (
         <button className="btn green block big" disabled={busy} onClick={() => act(() => api.confirmReceived(o.id), "Thanks. Your return window has started.")}>

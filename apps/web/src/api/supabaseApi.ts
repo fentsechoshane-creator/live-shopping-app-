@@ -66,6 +66,7 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
     deliveredAt: o.delivered_at, releasableAt: o.releasable_at, createdAt: o.created_at,
     ret: o.returns ? { reason: o.returns.reason, details: o.returns.details, status: o.returns.status, postagePayer: o.returns.postage_payer } : null,
     review: o.reviews ? { stars: o.reviews.stars } : null,
+    cancelledBy: o.cancelled_by ?? null, cancelReason: o.cancel_reason ?? null, cancelRequestedAt: o.cancel_requested_at ?? null, bookingFailedAt: o.booking_failed_at ?? null,
   });
 
   async function upload(bucket: "videos" | "private", file: File, prefix: string): Promise<string> {
@@ -174,6 +175,19 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
     async order(id) {
       const { data } = await sb.from("orders").select(ORDER_SELECT).eq("id", id).maybeSingle();
       return data ? toOrder(data) : null;
+    },
+    async cancelOrder(id, reason) {
+      const r = await call<{ cancelled?: boolean }>("order-action", { orderId: id, action: "cancel", reason });
+      return { cancelled: !!r.cancelled };
+    },
+    async answerCancel(id, accept) {
+      await call("order-action", { orderId: id, action: "answer_cancel", accept });
+    },
+    async sellerCancelOrder(id, reason) {
+      await call("order-action", { orderId: id, action: "seller_cancel", reason });
+    },
+    async teamCancelOrder(id, reason) {
+      await call("order-action", { orderId: id, action: "team_cancel", reason });
     },
     async cancelUnpaid(id) {
       await call("order-action", { orderId: id, action: "cancel_unpaid" });

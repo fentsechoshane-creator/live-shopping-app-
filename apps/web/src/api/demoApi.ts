@@ -323,11 +323,15 @@ export function createDemoApi(): Api {
     }
     if (to === "refunded") {
       if (o.status === "paid") {
-        trust(o.shopOwnerId, "not_shipped");
+        // Same as migration 0035: points only when it's the seller's doing.
+        if (!o.cancelledBy || (o.cancelledBy === "seller" && !o.bookingFailedAt && !o.cancelRequestedAt)) trust(o.shopOwnerId, "not_shipped");
         const p = s.products.find((x) => x.id === o.product.id)!;
         p.stock += 1; if (p.status === "sold_out") p.status = "live";
       }
-      notify(o.buyerId, "Refund on the way", "Your money is going back to your card or account.", `/orders/${o.id}`);
+      notify(o.buyerId, o.cancelledBy ? `Order cancelled: ${title}` : "Refund on the way", "Your money is going back to your card or account.", `/orders/${o.id}`);
+      if (o.cancelledBy === "buyer" || o.cancelledBy === "auto" || o.cancelledBy === "team")
+        notify(o.shopOwnerId, `Order cancelled: ${title}`, o.cancelledBy === "team" ? "Our team cancelled this order and refunded the buyer. Don't ship it."
+          : "The buyer cancelled before you shipped, so don't ship it. No trust points lost.", `/sell/orders/${o.id}`);
     }
     o.status = to;
   }
@@ -386,7 +390,8 @@ export function createDemoApi(): Api {
     for (const p of s.products) settleAuction(p);
     const t = now();
     for (const o of s.orders) {
-      if (o.status === "paid" && o.shipBy && new Date(o.shipBy) < t) setStatus(o, "refunded");
+      if (o.status === "paid" && o.cancelRequestedAt && t.getTime() - new Date(o.cancelRequestedAt).getTime() > 24 * 3600e3) { o.cancelledBy = "auto"; setStatus(o, "refunded"); }
+      else if (o.status === "paid" && o.shipBy && new Date(o.shipBy) < t) setStatus(o, "refunded");
       else if (o.status === "delivered" && o.releasableAt && new Date(o.releasableAt) <= t) setStatus(o, "completed");
     }
     const today = t.toISOString().slice(0, 10);
@@ -592,6 +597,46 @@ export function createDemoApi(): Api {
       runDue();
       const u = me();
       return s.orders.find((o) => o.id === oid && (o.buyerId === u.id || o.shopOwnerId === u.id || u.admin)) ?? null;
+    },
+    async cancelOrder(oid, reason) {
+      const o = s.orders.find((x) => x.id === oid && x.buyerId === me().id);
+      if (!o) throw new Error("Not your order.");
+      if (o.status !== "paid") throw new Error(o.status === "shipped" ? "It's already on the way. Once it arrives you can return it." : "This order can't be cancelled.");
+      const why = reason?.trim().slice(0, 300) || null;
+      if (o.paidAt && now().getTime() - new Date(o.paidAt).getTime() <= 3600e3) {
+        o.cancelledBy = "buyer"; o.cancelReason = why; setStatus(o, "refunded"); save();
+        return { cancelled: true };
+      }
+      if (o.cancelRequestedAt) throw new Error("You've already asked. The seller has 24 hours to answer.");
+      o.cancelRequestedAt = now().toISOString(); o.cancelReason = why;
+      notify(o.shopOwnerId, "The buyer asked to cancel", `${why ? `"${why}". ` : ""}Accept to refund them, or ship it. No answer in 24 hours cancels it. You don't lose trust points either way.`, `/sell/orders/${o.id}`);
+      save();
+      return { cancelled: false };
+    },
+    async answerCancel(oid, accept) {
+      const o = s.orders.find((x) => x.id === oid && x.shopOwnerId === me().id);
+      if (!o || o.status !== "paid" || !o.cancelRequestedAt) throw new Error("There's no cancel request to answer.");
+      if (accept) { o.cancelledBy = "buyer"; setStatus(o, "refunded"); }
+      else {
+        o.cancelRequestedAt = null;
+        notify(o.buyerId, "The seller is sending your order", "They couldn't cancel it. Once it arrives you can still return it within 7 days if you change your mind.", `/orders/${o.id}`);
+      }
+      save();
+    },
+    async sellerCancelOrder(oid, reason) {
+      const o = s.orders.find((x) => x.id === oid && x.shopOwnerId === me().id);
+      if (!o || o.status !== "paid") throw new Error("Only paid orders that haven't shipped can be cancelled.");
+      if (reason.trim().length < 3) throw new Error("Say why, in a few words.");
+      o.cancelledBy = "seller"; o.cancelReason = reason.trim().slice(0, 300); setStatus(o, "refunded"); save();
+    },
+    async teamCancelOrder(oid, reason) {
+      teamOnly();
+      const o = s.orders.find((x) => x.id === oid);
+      if (!o || !["paid", "shipped", "delivered", "return_requested", "return_in_transit"].includes(o.status)) throw new Error("This order can't be refunded now.");
+      if (reason.trim().length < 3) throw new Error("Say why, in a few words.");
+      o.cancelledBy = "team"; o.cancelReason = reason.trim().slice(0, 300); setStatus(o, "refunded");
+      logTeam("Cancelled and refunded order", "order", o.id, o.cancelReason);
+      save();
     },
     async cancelUnpaid(oid) {
       const o = s.orders.find((x) => x.id === oid && x.buyerId === me().id);
@@ -1338,7 +1383,7 @@ export function createDemoApi(): Api {
       }
       o.packingVideo = `packing-video-${oid}`; o.packingPhoto = `packing-photo-${oid}`;
       o.trackingRef = trackingRef || null;
-      setStatus(o, "shipped");
+      o.cancelRequestedAt = null; setStatus(o, "shipped");
       if (o.paidAt && now().getTime() - new Date(o.paidAt).getTime() <= 48 * 3600e3) trust(o.shopOwnerId, "fast_ship_with_video");
       save();
     },

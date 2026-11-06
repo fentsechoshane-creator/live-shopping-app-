@@ -6,7 +6,7 @@ import { escrow, PAID_STATES } from "../_shared/escrow.ts";
 import { BookingRefused, requireDelivery, type Province } from "../_shared/bobgo.ts";
 import { bookedByUs, type DeliveryOption } from "../_shared/core/index.ts";
 
-type Action = "mock_pay" | "check_payment" | "cancel_unpaid" | "ship" | "label" | "accept_return" | "return_received" | "dispute_return" | "decide_return";
+type Action = "mock_pay" | "check_payment" | "cancel_unpaid" | "cancel" | "answer_cancel" | "seller_cancel" | "team_cancel" | "ship" | "label" | "accept_return" | "return_received" | "dispute_return" | "decide_return";
 
 Deno.serve(handler(async (req, body) => {
   const db = adminClient();
@@ -20,6 +20,18 @@ Deno.serve(handler(async (req, body) => {
   const isSeller = order.shops.owner_id === uid;
   const admin = await isAdmin(db, uid);
   const es = escrow();
+  const HOUR = 3600_000;
+  const cleanReason = (r: unknown, required: boolean) => {
+    const t = typeof r === "string" ? r.trim().slice(0, 300) : "";
+    if (required && t.length < 3) throw new UserError("Say why, in a few words.");
+    return t || null;
+  };
+  // Refund in full and close the order. A courier already booked is cancelled with Bob Go first.
+  const refundNow = async (by: "buyer" | "seller" | "team" | "auto", reason: string | null) => {
+    if (order.shipment_id && order.status === "paid") await requireDelivery().cancel(order.shipment_id).catch((e) => console.error("cancel booking", orderId, e));
+    if (order.escrow_transaction_id) await es.refund(order.escrow_transaction_id);
+    await setStatus("refunded", { cancelled_by: by, cancel_reason: reason });
+  };
   const setStatus = async (status: string, extra: Record<string, unknown> = {}) =>
     must(await db.from("orders").update({ status, ...extra }).eq("id", orderId).eq("status", order.status), `set ${status}`);
   const ret = order.returns as any;
@@ -48,6 +60,44 @@ Deno.serve(handler(async (req, body) => {
       if (!isBuyer || order.status !== "pending_payment") throw new UserError("Only unpaid orders can be cancelled.");
       if (order.escrow_transaction_id) await es.refund(order.escrow_transaction_id);
       await setStatus("cancelled");
+      break;
+    }
+    // ----- Cancelling a paid order (migration 0035, decided with Ofentse 7 Nov 2026) -----
+    case "cancel": {
+      // Buyer: free within 1 hour of paying while not shipped; after that it's a request the seller has 24 hours to answer.
+      if (!isBuyer) throw new UserError("Not your order.", 403);
+      if (order.status !== "paid") throw new UserError(order.status === "shipped" ? "It's already on the way. Once it arrives you can return it." : "This order can't be cancelled.");
+      const reason = cleanReason(body.reason, false);
+      if (Date.now() - new Date(order.paid_at).getTime() <= HOUR) {
+        await refundNow("buyer", reason);
+        return json({ ok: true, cancelled: true });
+      }
+      if (order.cancel_requested_at) throw new UserError("You've already asked. The seller has 24 hours to answer.");
+      must(await db.from("orders").update({ cancel_requested_at: new Date().toISOString(), cancel_reason: reason }).eq("id", orderId).eq("status", "paid"), "ask to cancel");
+      await db.from("notifications").insert({ user_id: order.shops.owner_id, kind: "order", title: "The buyer asked to cancel",
+        body: `${reason ? `"${reason}". ` : ""}Accept to refund them, or ship it. No answer in 24 hours cancels it. You don't lose trust points either way.`, link: `/sell/orders/${orderId}` });
+      return json({ ok: true, requested: true });
+    }
+    case "answer_cancel": {
+      if (!isSeller || order.status !== "paid" || !order.cancel_requested_at) throw new UserError("There's no cancel request to answer.");
+      if (body.accept === true) { await refundNow("buyer", order.cancel_reason); break; }
+      must(await db.from("orders").update({ cancel_requested_at: null }).eq("id", orderId).eq("status", "paid"), "decline cancel");
+      await db.from("notifications").insert({ user_id: order.buyer_id, kind: "order", title: "The seller is sending your order",
+        body: "They couldn't cancel it. Once it arrives you can still return it within 7 days if you change your mind.", link: `/orders/${orderId}` });
+      break;
+    }
+    case "seller_cancel": {
+      // Loses 5 trust points (like not shipping) unless the courier couldn't book or the buyer had asked to cancel.
+      if (!isSeller || order.status !== "paid") throw new UserError("Only paid orders that haven't shipped can be cancelled.");
+      await refundNow("seller", cleanReason(body.reason, true));
+      break;
+    }
+    case "team_cancel": {
+      if (!admin) throw new UserError("Only our team can do this.", 403);
+      if (!["paid", "shipped", "delivered", "return_requested", "return_in_transit"].includes(order.status)) throw new UserError("This order can't be refunded now.");
+      const reason = cleanReason(body.reason, true)!;
+      await refundNow("team", reason);
+      await db.rpc("log_admin", { p_action: "Cancelled and refunded order", p_kind: "order", p_target: orderId, p_note: reason, p_admin: uid });
       break;
     }
     case "ship": {
@@ -118,7 +168,8 @@ Deno.serve(handler(async (req, body) => {
       }
       must(await db.from("orders").update({ packing_media_id: packingMediaId, packing_photo_media_id: packingPhotoMediaId }).eq("id", orderId).eq("status", "paid"), "packing proof");
       await es.startDelivery(order.escrow_allocation_id);
-      await setStatus("shipped", booking);
+      // Shipping answers a pending cancel request with no (the buyer can still return it).
+      await setStatus("shipped", { ...booking, cancel_requested_at: null });
       break;
     }
     case "label": {

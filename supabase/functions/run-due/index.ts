@@ -138,6 +138,19 @@ Deno.serve(async (req) => {
   }
 
   // Unpaid checkouts.
+  // Cancel requests the seller didn't answer in 24 hours: cancelled and refunded, no trust points lost (decided 7 Nov).
+  const askedBefore = new Date(now.getTime() - 24 * 3600_000).toISOString();
+  const { data: asked } = await db.from("orders").select("id, escrow_transaction_id, shipment_id").eq("status", "paid")
+    .not("cancel_requested_at", "is", null).lt("cancel_requested_at", askedBefore).limit(100);
+  for (const o of asked ?? []) {
+    try {
+      if (o.shipment_id) { const d = delivery(); if (d) await d.cancel(o.shipment_id).catch((e) => console.error("cancel booking", o.id, e)); }
+      if (o.escrow_transaction_id) await es.refund(o.escrow_transaction_id);
+      must(await db.from("orders").update({ status: "refunded", cancelled_by: "auto" }).eq("id", o.id).eq("status", "paid"), "auto cancel");
+      done.cancelRequests = (done.cancelRequests ?? 0) + 1;
+    } catch (e) { console.error("auto cancel failed", o.id, e); done.failed++; }
+  }
+
   // Backup for Bob Go's tracking webhooks: check parcels on the way that haven't updated in 30 minutes
   // (decided with Ofentse 7 Nov). Up to 50 a run, every 5 minutes: about 600 parcels on the way at once.
   const dl = delivery();

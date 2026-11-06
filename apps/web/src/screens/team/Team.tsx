@@ -2,6 +2,7 @@
 // Everything here reads and writes the same database as the app (admin_* functions), so what the team does
 // shows in the app straight away, and what people do in the app shows here.
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { TeamCancel } from "../../components/CancelOrder";
 import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ACCOUNT_FEATURES, ORDER_STATUS_TEXT, REPORT_REASONS, type AccountFeature, type FeatureState, type OrderStatus } from "@app/core";
 import {
@@ -646,11 +647,12 @@ function Orders() {
   const dq = useDebounced(q);
   const [rows, setRows] = useState<TeamOrder[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
   useEffect(() => {
     let live = true; setRows(null);
     api.teamOrders(dq, filter).then((r) => live && setRows(r)).catch((e) => live && setErr(e.message));
     return () => { live = false; };
-  }, [dq, filter]);
+  }, [dq, filter, reloadKey]);
   const totals = useMemo(() => (rows ?? []).reduce((a, o) => ({ sales: a.sales + o.totalCents, fees: a.fees + o.feeCents }), { sales: 0, fees: 0 }), [rows]);
   return (
     <div className="team-page">
@@ -677,7 +679,8 @@ function Orders() {
               <td data-l="Status"><span className={`pill ${o.late ? "red" : ORDER_PILL[o.status] ?? ""}`}>{o.late ? "Late to ship" : orderStatus(o.status)}</span>
                 {o.returnReason && <div className="small muted">{o.returnReason.replace(/_/g, " ")}</div>}</td>
               <td data-l="Payout" className="small">{o.payoutStatus ? `${o.payoutStatus}${o.payOn ? `, ${dateText(o.payOn)}` : ""}` : "—"}</td>
-              <td data-l="Packing">{["pending_payment", "paid", "cancelled"].includes(o.status) ? <span className="small muted">Not shipped</span> : <PackingButton orderId={o.id} small />}</td>
+              <td data-l="Packing">{["pending_payment", "paid", "cancelled"].includes(o.status) ? <span className="small muted">Not shipped</span> : <PackingButton orderId={o.id} small />}
+                <div style={{ marginTop: 6 }}><TeamCancel orderId={o.id} status={o.status} onDone={() => setReloadKey((k) => k + 1)} /></div></td>
               <td data-l="Date" className="small">{dateText(o.createdAt)}</td>
             </tr>
           ))}</tbody>

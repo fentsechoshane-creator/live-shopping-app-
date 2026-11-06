@@ -219,6 +219,11 @@ export interface Order {
   createdAt: string;
   ret: { reason: ReturnReason; details: string; status: string; postagePayer: "buyer" | "seller" } | null;
   review: { stars: number } | null;
+  /** Cancelling (migration 0035): who cancelled, why, and a buyer's request waiting for the seller. */
+  cancelledBy?: "buyer" | "seller" | "team" | "auto" | null;
+  cancelReason?: string | null;
+  cancelRequestedAt?: string | null;
+  bookingFailedAt?: string | null;
 }
 
 export interface Notification {
@@ -389,6 +394,14 @@ export interface Api {
   myOrders(): Promise<Order[]>;
   order(id: string): Promise<Order | null>;
   cancelUnpaid(id: string): Promise<void>;
+  /** Buyer, paid and not shipped: cancelled straight away within 1 hour of paying, otherwise a request to the seller. */
+  cancelOrder(id: string, reason?: string): Promise<{ cancelled: boolean }>;
+  /** Seller answers a buyer's cancel request: accept refunds them, decline means they'll ship it. */
+  answerCancel(id: string, accept: boolean): Promise<void>;
+  /** Seller cancels a paid order before shipping (5 trust points unless it wasn't their fault). */
+  sellerCancelOrder(id: string, reason: string): Promise<void>;
+  /** Our team cancels and refunds any order, with a reason. */
+  teamCancelOrder(id: string, reason: string): Promise<void>;
   confirmReceived(id: string): Promise<void>;
   requestReturn(id: string, reason: ReturnReason, details: string): Promise<void>;
   leaveReview(id: string, stars: number, body: string): Promise<void>;

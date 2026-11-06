@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { CancelledNote, SellerCancel } from "../../components/CancelOrder";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import {
   bookedByUs, canUse, DELIVERY_OPTIONS, PARCEL_SIZES, PACKING_KEEP_MONTHS, PACKING_STEPS, PACKING_VIDEO_MAX_S, PACKING_VIDEO_MIN_S, packingVideoProblems, LISTING_LABELS, rand, TIER_INFO, tierFor, TRUST_POINTS, validateListing,
@@ -85,11 +86,13 @@ export function SellerOrderDetail() {
       <h1 style={{ marginTop: 6 }}>{o.product.title}</h1>
       <div className="row between"><span className="small muted">{o.size ? `Size ${o.size} · ` : ""}{DELIVERY_OPTIONS[o.delivery].label}</span>{statusPill(o, "seller")}</div>
       <ErrorNote error={actErr} />
+      <CancelledNote o={o} side="seller" />
+      <SellerCancel o={o} onDone={reload} part="request" />
 
       {o.status === "paid" && (
         <div className="card" style={{ marginTop: 14 }}>
           <b>Ship by {dateTimeText(o.shipBy)}</b>
-          <p className="small muted">If it is not shipped in time, the buyer is refunded automatically and you lose 5 trust points.</p>
+          <p className="small muted">If it isn't shipped in time, the buyer is refunded automatically and you lose 5 trust points.</p>
           {booked && (
             <div className="note" style={{ marginBottom: 12 }}>
               <b>{o.delivery === "pudo_locker" ? `To a locker: ${o.pickupPoint?.name ?? o.deliveryDetails.locker ?? ""}` : `To ${o.deliveryDetails.suburb ?? ""}${o.deliveryDetails.city ? `, ${o.deliveryDetails.city}` : ""}`}</b><br />
@@ -130,6 +133,7 @@ export function SellerOrderDetail() {
           </button>
         </div>
       )}
+      <SellerCancel o={o} onDone={reload} part="button" />
 
       {o.hasLabel && ["shipped", "delivered"].includes(o.status) && (
         <div className="card" style={{ marginTop: 14 }}>

@@ -109,6 +109,13 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-07: Cancelling paid orders
+
+- Decided with Ofentse: buyers cancel freely within 1 hour of paying (not shipped yet); after that they ask, and the seller has 24 hours to accept or ship it. No answer cancels it. No trust points lost either way. Sellers can cancel before shipping and lose 5 trust points like not shipping, unless the courier couldn't book or the buyer had asked. Our team can cancel and refund any order with a reason (team log).
+- Migration 0035: `orders.cancelled_by`, `cancel_reason`, `cancel_requested_at`; the order trigger now decides trust points and messages by who cancelled. order-action: `cancel`, `answer_cancel`, `seller_cancel`, `team_cancel` (refund through TradeSafe, a booked courier is cancelled with Bob Go first). run-due cancels unanswered requests after 24 hours. Shipping answers a request with no.
+- Screens: Cancel order / Ask to cancel on the buyer's order with reason chips; a request card (Accept and refund, I'll ship it) and Cancel this order on the seller's order, warning about trust points only when they apply; Cancel and refund in the team's orders list.
+- Tests: database tests for trust points by who cancelled; the app test cancels within the hour, then asks after 2 hours and the seller accepts.
+
 ### 2026-11-07: Bob Go: only offer delivery that can be booked
 
 - Why: Ofentse's first sandbox locker order couldn't be booked at shipping ("No courier can take this parcel"). Decided: check up front and limit options, instead of failing when the seller ships.

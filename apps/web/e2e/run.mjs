@@ -952,6 +952,50 @@ try {
   await page.getByRole("button", { name: "Message" }).waitFor();
   await shot("person-page");
 
+  // ===== Cancelling a paid order: free within an hour; after that the seller is asked =====
+  const buyTee = async () => {
+    await page.goto(BASE);
+    await page.getByRole("region", { name: /Oversized tee/ }).getByRole("button", { name: "Buy now" }).click();
+    const c = page.getByRole("dialog", { name: "Checkout" });
+    await c.getByRole("button", { name: "M", exact: true }).click();
+    await c.getByRole("button", { name: /Free collection/ }).click();
+    await c.getByRole("button", { name: /^Pay R/ }).click();
+    await page.waitForURL(/mock-pay/);
+    await page.getByRole("button", { name: "Pay now" }).click();
+    await page.waitForURL(/\/orders\//);
+    await page.getByText("Order placed.").waitFor();
+  };
+  await buyTee();
+  await page.getByRole("button", { name: "Cancel order" }).click();
+  const cancelSheet = page.getByRole("dialog", { name: "Cancel this order?" });
+  await cancelSheet.getByRole("button", { name: "Ordered by mistake" }).click();
+  await shot("cancel-sheet");
+  await cancelSheet.getByRole("button", { name: "Cancel and refund me" }).click();
+  await page.getByText("You cancelled this order.").waitFor();
+  await page.getByText("Refunded").first().waitFor();
+  // A second order, paid 2 hours ago: now it's a request to the seller.
+  await buyTee();
+  const teeOrder = page.url().split("/orders/")[1];
+  await page.evaluate((oid) => {
+    const k = "lsa-demo-v4", st = JSON.parse(localStorage.getItem(k));
+    st.orders.find((o) => o.id === oid).paidAt = new Date(Date.now() - 2 * 3600e3).toISOString();
+    localStorage.setItem(k, JSON.stringify(st));
+  }, teeOrder);
+  await page.reload();
+  await page.getByRole("button", { name: "Ask to cancel" }).click();
+  const askSheet = page.getByRole("dialog", { name: "Ask the seller to cancel?" });
+  await askSheet.getByRole("button", { name: "Wrong size or colour" }).click();
+  await askSheet.getByRole("button", { name: "Ask to cancel" }).click();
+  await page.getByText("You asked to cancel.").waitFor();
+  await signOut();
+  await signIn("lebo@shop.demo");
+  await page.goto(`${BASE}/sell/orders/${teeOrder}`);
+  const ask = page.getByRole("region", { name: "Cancel request" });
+  await ask.getByText('"Wrong size or colour"').waitFor();
+  await shot("cancel-request-seller");
+  await ask.getByRole("button", { name: "Accept and refund" }).click();
+  await page.getByText("The buyer cancelled this order.").waitFor();
+
   if (errors.length) throw new Error("Page errors: " + errors.join(" | "));
   if (consoleIssues.size) console.log("Console issues:\n  " + [...consoleIssues].join("\n  "));
   console.log(`E2E passed. Screenshots in ${shots}`);
