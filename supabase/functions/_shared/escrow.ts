@@ -45,6 +45,8 @@ export interface Escrow {
   transactionState(transactionId: string): Promise<{ state: string; reference: string | null } | null>;
   /** How the buyer paid (like "OZOW"), for Instant EFT delivery stamps. Null if unknown; never throws. */
   paymentMethod(transactionId: string): Promise<string | null>;
+  /** A check the team can run: does sign in work, and do our banks map to TradeSafe codes? Never returns keys. */
+  health(): Promise<Record<string, unknown>>;
 }
 
 class MockEscrow implements Escrow {
@@ -63,6 +65,7 @@ class MockEscrow implements Escrow {
   async refund() {}
   async transactionState() { return null; }
   async paymentMethod() { return "OZOW (test)"; }
+  async health() { return { mode: "mock" }; }
 }
 
 // Words that identify each bank in TradeSafe's bank list (UniversalBranchCode descriptions).
@@ -228,6 +231,23 @@ class TradeSafe implements Escrow {
     const d = await this.gql<{ transaction: { state: string; reference: string | null } | null }>(
       `query t($id: ID!) { transaction(id: $id) { state reference } }`, { id: transactionId });
     return d.transaction ?? null;
+  }
+
+  async health() {
+    const out: Record<string, unknown> = { mode: "live", api: env("TRADESAFE_API_URL", "https://api.tradesafe.co.za/graphql") };
+    try { await this.accessToken(); out.signIn = "ok"; } catch (e) { out.signIn = String(e instanceof Error ? e.message : e); return out; }
+    try { out.ownAccount = (await this.agentToken()) ? "found" : "missing"; } catch (e) { out.ownAccount = String(e instanceof Error ? e.message : e); }
+    try {
+      const banks: Record<string, string | null> = {};
+      for (const name of Object.keys(BANK_WORDS)) banks[name] = await this.pick("UniversalBranchCode", BANK_WORDS[name]);
+      out.banks = banks;
+      out.accountTypes = { savings: await this.pick("BankAccountType", ["SAVINGS", "savings"]), cheque: await this.pick("BankAccountType", ["CHEQUE", "cheque", "current"]) };
+      out.idType = await this.pick("IdType", ["NATIONAL", "national", "identity"]);
+      out.payoutInterval = await this.pick("PayoutInterval", ["IMMEDIATE"]);
+      out.transactionStates = (await this.enumValues("TransactionState")).map((v) => v.name);
+      out.depositMethods = (await this.enumValues("DepositMethod")).map((v) => v.name);
+    } catch (e) { out.lookups = String(e instanceof Error ? e.message : e); }
+    return out;
   }
 
   async paymentMethod(transactionId: string) {

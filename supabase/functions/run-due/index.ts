@@ -16,6 +16,19 @@ Deno.serve(async (req) => {
   const db = adminClient();
   if (!(await cronAllowed(req, db))) return json({ error: "forbidden" }, 403);
   let es;
+  // Health check for the team (same secret as the schedule): which connections are set up and working. No keys returned.
+  const body = await req.json().catch(() => ({}));
+  if (body?.check === "health") {
+    const set = (n: string) => !!Deno.env.get(n);
+    let tradesafe: Record<string, unknown>;
+    try { tradesafe = await escrow().health(); } catch (e) { tradesafe = { error: String(e instanceof Error ? e.message : e) }; }
+    return json({
+      tradesafe,
+      bobgo: { mode: Deno.env.get("BOBGO_MODE") ?? null, key: set("BOBGO_API_KEY"), webhookSecret: set("BOBGO_WEBHOOK_SECRET") },
+      mux: { token: set("MUX_TOKEN_ID") && set("MUX_TOKEN_SECRET"), webhookSecret: set("MUX_WEBHOOK_SECRET") },
+      callbackSecret: set("TRADESAFE_CALLBACK_SECRET"), appUrl: Deno.env.get("APP_URL") ?? null,
+    });
+  }
   try { es = escrow(); } catch { return json({ error: "payments are not switched on (set TRADESAFE_MODE)" }, 503); }
   const done: Record<string, number> = { refunded: 0, completed: 0, scheduled: 0, released: 0, cancelled: 0, auto_accepted: 0, failed: 0 };
   const now = new Date();
