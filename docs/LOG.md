@@ -109,6 +109,15 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-07: Bob Go: only offer delivery that can be booked
+
+- Why: Ofentse's first sandbox locker order couldn't be booked at shipping ("No courier can take this parcel"). Decided: check up front and limit options, instead of failing when the seller ships.
+- One check, used everywhere (`_shared/route.ts`, `quote()` in `_shared/bobgo.ts`): the same Bob Go rate request a booking makes. Bob Go's answers are sorted into ok, no route, too big, low balance, try later (statuses from developer.bobgo.co.za/rates/rates).
+- Checkout: as soon as a locker or address is picked, the app asks; a refused option shows why and the Pay button says "Pick another locker" until fixed. The checkout server asks again before taking payment. Low Bob Go balance never blocks a buyer: the order goes through and the team gets an urgent alert. Bob Go being down never blocks a sale either.
+- Sellers without a pickup address yet are not blocked (they add it when they first ship). Saving a pickup address now asks Bob Go first and refuses an address couriers can't find.
+- Safety net when shipping (migration 0034, `orders.booking_failed_at`): if a booking still fails, the seller gets 2 more days once (no automatic refund, no lost trust points), the team is alerted with Bob Go's reason, and the seller is told plainly.
+- Tests: Bob Go verdicts and booking request shapes (17 function tests), the app test picks an unreachable test locker and can't pay.
+
 ### 2026-11-07: Live: friends and sharing, Bob Go sandbox connected
 
 - Deployed with Ofentse's OK ("apply everything"): migration 0033 (friends) live, the app pushed (site on 6fa3e67), bobgo-webhook and run-due redeployed.

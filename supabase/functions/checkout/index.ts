@@ -5,6 +5,7 @@ import { adminClient, requireUser, must } from "../_shared/supabase.ts";
 import { escrow, ESCROW_DAYS } from "../_shared/escrow.ts";
 import { orderTotals, MIN_PRICE, DELIVERY_OPTIONS, bookedByUs, deliveryFee, PARCEL_SIZES, type DeliveryOption } from "../_shared/core/index.ts";
 import { cleanAddress, orderParcelSize, requireDelivery } from "../_shared/bobgo.ts";
+import { checkRoute } from "../_shared/route.ts";
 
 const NON_FOOD: DeliveryOption[] = ["pudo_locker", "courier", "collect_cpt"];
 const FOOD: DeliveryOption[] = ["collect_baker", "baker_delivers"];
@@ -92,6 +93,10 @@ Deno.serve(handler(async (req, body) => {
       savedPoint = { id: point.id, provider: point.provider, name: point.name, address: point.address };
       deliveryDetails.locker = point.name;
     }
+    // Only take the order if Bob Go can book this exact route and parcel (the app checks first; this is the real check).
+    const route = await checkRoute(db, dl, { shopId: shop.id, parcel: parcelSize, declaredValueCents: itemPrice,
+      ...(delivery === "courier" ? { to: cleanAddress(deliveryDetails, "delivery address") } : { toPoint: { id: Number(savedPoint!.id), provider: String(savedPoint!.provider) } }) });
+    if (!route.ok) throw new UserError(route.message ?? "That delivery option isn't available. Pick another one.", 409);
   }
   if (product.mode === "order_now") {
     const earliest = new Date(Date.now() + (product.lead_days ?? 2) * 86400_000).toISOString().slice(0, 10);

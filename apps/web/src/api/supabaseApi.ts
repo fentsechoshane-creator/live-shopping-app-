@@ -341,6 +341,10 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
     async pickupPoints(where) {
       return call("delivery", where);
     },
+    async checkDelivery(c) {
+      const r = await call<{ ok: boolean; message?: string | null }>("delivery", { check: "route", ...c });
+      return { ok: r.ok, message: r.message ?? null };
+    },
     async shopPickup() {
       const shopId = await myShopId();
       if (!shopId) return null;
@@ -351,6 +355,9 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
     async saveShopPickup(p) {
       const shopId = await myShopId();
       if (!shopId) throw new Error("Open your shop first.");
+      // Bob Go checks couriers can find the address before it's saved.
+      const ok = await call<{ ok: boolean; message?: string }>("delivery", { check: "pickup", address: { street: p.street, suburb: p.suburb, city: p.city, province: p.province, postalCode: p.postalCode } });
+      if (!ok.ok) throw new Error(ok.message ?? "Couriers can't find this address. Check it and try again.");
       check(await sb.from("shop_pickup").upsert({ shop_id: shopId, name: p.name.trim(), phone: p.phone.trim(), street: p.street.trim(), suburb: p.suburb.trim(),
         city: p.city.trim(), province: p.province, postal_code: p.postalCode.trim() }, { onConflict: "shop_id" }));
     },

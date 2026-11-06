@@ -22,6 +22,53 @@ export interface BookingInput {
   description: string;
 }
 export interface Booking { shipmentRef: string; courierName: string; costCents: number }
+/** What a quote needs: the same route and parcel a booking would use, without contacts. */
+export type QuoteInput = Pick<BookingInput, "parcel" | "declaredValueCents" | "from" | "to" | "toPoint" | "description">;
+/**
+ * Bob Go's answer boiled down (statuses from https://developer.bobgo.co.za/rates/rates/):
+ * ok: bookable. no_route: success-no-rates, unimplemented or refused for another reason. too_big: over a weight, size or
+ * locker compartment limit. low_balance: our Bob Go account needs topping up (never shown to buyers). try_later:
+ * pending or failed-will-retry, a courier hiccup.
+ */
+export type QuoteVerdict = "ok" | "no_route" | "too_big" | "low_balance" | "try_later";
+export interface Quote {
+  verdict: QuoteVerdict;
+  cheapest: { provider: string; providerName: string; level: string; amount: number } | null;
+  rateRequestId: number | null;
+  /** Each courier's status and reason, for logs and the team. */
+  detail: string;
+}
+/** A booking that Bob Go refused, with the verdict so callers can react (alert the team, give the seller more time). */
+export class BookingRefused extends UserError {
+  constructor(public verdict: QuoteVerdict, public detail: string) {
+    super(verdict === "too_big" ? "This parcel is too big for that courier or locker."
+      : verdict === "no_route" ? "No courier delivers this route right now."
+      : "Couriers can't book this right now. Please try again in a little while.", 409);
+  }
+}
+
+/** Sorts Bob Go's rate answer into one verdict. Exported for tests. */
+export function judgeRates(rates: any): Quote {
+  const reqs: any[] = rates?.provider_rate_requests ?? [];
+  const options: Quote["cheapest"][] = [];
+  for (const pr of reqs) {
+    if (pr.status !== "success") continue;
+    for (const r of pr.responses ?? []) if (r.status === "success" && typeof r.rate_amount === "number")
+      options.push({ provider: pr.provider_slug, providerName: pr.provider_name ?? pr.provider_slug, level: r.service_level_code, amount: r.rate_amount });
+  }
+  const detail = reqs.map((pr) => `${pr.provider_name ?? pr.provider_slug}: ${pr.status}${pr.failed_reason ? ` (${String(pr.failed_reason).slice(0, 120)})` : ""}`
+    + (pr.responses ?? []).filter((r: any) => r.status !== "success").map((r: any) => ` [${r.service_level_code}: ${r.status}${r.failed_reason ? ` ${String(r.failed_reason).slice(0, 80)}` : ""}]`).join("")).join("; ").slice(0, 1500)
+    || "no couriers answered";
+  const rateRequestId = typeof rates?.id === "number" ? rates.id : null;
+  if (options.length) return { verdict: "ok", cheapest: options.sort((a, z) => a!.amount - z!.amount)[0], rateRequestId, detail };
+  const all = (st: (x: string) => boolean) => reqs.flatMap((pr) => [pr.status, ...(pr.responses ?? []).map((r: any) => r.status)]).some(st);
+  const reasons = reqs.flatMap((pr) => [pr.failed_reason, ...(pr.responses ?? []).map((r: any) => r.failed_reason)]).filter(Boolean).join(" ").toLowerCase();
+  const verdict: QuoteVerdict = /balance|credit|insufficient funds|top ?up/.test(reasons) ? "low_balance"
+    : /weight|dimension|size|compartment|too (big|large|heavy|long)|exceed|limit/.test(reasons) ? "too_big"
+    : all((x) => x === "pending" || x === "failed-will-retry") ? "try_later"
+    : "no_route";
+  return { verdict, cheapest: null, rateRequestId, detail };
+}
 export interface Tracking { status: string; delivered: boolean; events: { at: string; status: string; message: string | null; location: string | null }[] }
 
 export interface Delivery {
@@ -29,6 +76,8 @@ export interface Delivery {
   pickupPoints(lat: number, lng: number): Promise<PickupPoint[]>;
   /** One pickup point, checked with Bob Go so a buyer can't send a made up locker. */
   pickupPoint(id: number, provider: string): Promise<PickupPoint | null>;
+  /** Can this route and parcel be booked? Same request a booking makes. */
+  quote(input: QuoteInput, timeoutMs?: number): Promise<Quote>;
   book(input: BookingInput): Promise<Booking>;
   labelUrl(shipmentRef: string): Promise<string>;
   tracking(shipmentRef: string): Promise<Tracking>;
@@ -79,38 +128,36 @@ class BobGo implements Delivery {
         lat: Number(l.lat), lng: Number(l.lng), type: String(l.type ?? "pickup_point"), hours: typeof l.trading_hours === "string" ? l.trading_hours : undefined }));
   }
 
-  async book(b: BookingInput) {
-    const common = {
+  /** The route and parcel, the same for quoting and booking. */
+  private common(b: QuoteInput) {
+    return {
       parcels: parcels(b.parcel, b.description),
       declared_value: Math.round(b.declaredValueCents / 100),
+      collection_address: toAddress(b.from),
       ...(b.toPoint ? { delivery_pickup_point_location_id: b.toPoint.id } : { delivery_address: toAddress(b.to!) }),
     };
-    // 1. Prices from every courier on our account; take the cheapest that works.
+  }
+  async quote(b: QuoteInput, timeoutMs = 25000) {
+    // Prices from every courier on our account (a locker restricts it to the locker's courier).
     const rates = await this.call("/v2/rates", { method: "POST", body: JSON.stringify({
-      ...common, collection_address: toAddress(b.from), timeout: 25000,
+      ...this.common(b), timeout: Math.min(25000, Math.max(6000, timeoutMs)),
       ...(b.toPoint ? { pickup_point_provider_slug: b.toPoint.provider } : {}),
     }) });
-    const options: { provider: string; providerName: string; level: string; amount: number }[] = [];
-    for (const pr of rates?.provider_rate_requests ?? []) {
-      if (pr.status !== "success") continue;
-      for (const r of pr.responses ?? []) if (r.status === "success" && typeof r.rate_amount === "number")
-        options.push({ provider: pr.provider_slug, providerName: pr.provider_name ?? pr.provider_slug, level: r.service_level_code, amount: r.rate_amount });
-    }
-    if (!options.length) {
-      // Bob Go answers 200 even with no usable rates; the reason is in each courier's status and failed_reason.
-      const why = (rates?.provider_rate_requests ?? []).map((pr: any) =>
-        `${pr.provider_name ?? pr.provider_slug}: ${pr.status}${pr.failed_reason ? ` (${String(pr.failed_reason).slice(0, 120)})` : ""}`
-        + (pr.responses ?? []).filter((r: any) => r.status !== "success").map((r: any) => ` [${r.service_level_code}: ${r.status}${r.failed_reason ? ` ${String(r.failed_reason).slice(0, 80)}` : ""}]`).join(""));
-      console.error("bobgo no rates", rates?.id, JSON.stringify(why).slice(0, 1500));
-      const reason = why.length ? why.join("; ").slice(0, 300) : "no couriers answered";
-      throw new UserError(`No courier can take this parcel right now. Check your pickup address, or try again in a few minutes. (Courier said: ${reason})`, 409);
-    }
-    const best = options.sort((a, z) => a.amount - z.amount)[0];
+    const q = judgeRates(rates);
+    if (q.verdict !== "ok") console.error("bobgo quote", q.verdict, q.rateRequestId, q.detail);
+    return q;
+  }
+  async book(b: BookingInput) {
+    // 1. Quote; take the cheapest courier that works.
+    const q = await this.quote(b);
+    if (q.verdict !== "ok" || !q.cheapest) throw new BookingRefused(q.verdict, q.detail);
+    const best = q.cheapest;
+    const common = { ...this.common(b) };
     // 2. Book it.
     const from = split(b.fromContact.name), to = split(b.toContact.name);
     const s = await this.call("/v2/shipments", { method: "POST", body: JSON.stringify({
-      ...common, collection_address: toAddress(b.from),
-      provider_slug: best.provider, service_level_code: best.level, selected_rate_request_id: rates.id,
+      ...common,
+      provider_slug: best.provider, service_level_code: best.level, selected_rate_request_id: q.rateRequestId,
       collection_contact_name: from.first, collection_contact_surname: from.last, collection_contact_mobile_number: b.fromContact.phone,
       delivery_contact_name: to.first, delivery_contact_surname: to.last, delivery_contact_mobile_number: b.toContact.phone,
       ...(b.toContact.email ? { delivery_contact_email: b.toContact.email } : {}),
@@ -162,6 +209,12 @@ class MockDelivery implements Delivery {
   }
   async pickupPoint(id: number, provider: string) {
     return (await this.pickupPoints(-33.95, 18.47)).find((p) => p.id === id && p.provider === provider) ?? null;
+  }
+  async quote(b: QuoteInput) {
+    // Like the real thing for testing: lockers can't take Large parcels; anything else works.
+    const p = PARCEL_SIZES[b.parcel];
+    if (b.toPoint && p.locker === null) return { verdict: "too_big" as const, cheapest: null, rateRequestId: null, detail: "test: too big for a locker" };
+    return { verdict: "ok" as const, cheapest: { provider: "demo", providerName: "Test courier", level: "ECO", amount: (b.toPoint ? (p.locker ?? p.door) : p.door) / 100 }, rateRequestId: 1, detail: "test" };
   }
   async book(b: BookingInput) {
     const p = PARCEL_SIZES[b.parcel];

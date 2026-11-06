@@ -829,7 +829,15 @@ try {
   // A locker instead: pick a city, then a locker from Bob Go's list.
   await pay.getByRole("button", { name: /PUDO locker/ }).click();
   await pay.getByLabel("City", { exact: true }).selectOption("Cape Town");
+  // A locker couriers can't reach: checkout says so before paying and won't let you pay.
+  await pay.getByRole("button", { name: /PUDO Locker, Robben Island/ }).click();
+  await pay.getByText("Couriers can't reach that locker from this seller right now.", { exact: false }).waitFor();
+  await check(pay.getByRole("button", { name: "Pick another locker" }).isDisabled(), "can't pay for a locker couriers can't reach");
+  await shot("checkout-locker-refused");
+  await pay.locator(".locker-picker").getByRole("button", { name: "Change", exact: true }).click();
+  await pay.getByLabel("City", { exact: true }).selectOption("Cape Town");
   await pay.getByRole("button", { name: /PUDO Locker, Cavendish Square/ }).click();
+  await pay.getByRole("button", { name: /^Pay R/ }).waitFor(); // a reachable locker: Pay comes back
   await pay.getByText("PUDO Locker, Cavendish Square").waitFor();
   await page.waitForTimeout(300);
   await shot("checkout-locker");

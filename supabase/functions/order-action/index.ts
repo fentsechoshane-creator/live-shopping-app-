@@ -3,7 +3,7 @@
 import { handler, json, UserError } from "../_shared/http.ts";
 import { adminClient, requireUser, isAdmin, must } from "../_shared/supabase.ts";
 import { escrow, PAID_STATES } from "../_shared/escrow.ts";
-import { requireDelivery, type Province } from "../_shared/bobgo.ts";
+import { BookingRefused, requireDelivery, type Province } from "../_shared/bobgo.ts";
 import { bookedByUs, type DeliveryOption } from "../_shared/core/index.ts";
 
 type Action = "mock_pay" | "check_payment" | "cancel_unpaid" | "ship" | "label" | "accept_return" | "return_received" | "dispute_return" | "decide_return";
@@ -78,7 +78,9 @@ Deno.serve(handler(async (req, body) => {
           if (!from) throw new UserError("Add your pickup address first (Me, then To ship), so the courier knows where to collect.");
           const d = order.delivery_details ?? {};
           const { data: buyer } = await db.auth.admin.getUserById(order.buyer_id);
-          const b = await dl.book({
+          let b: Awaited<ReturnType<typeof dl.book>>;
+          try {
+          b = await dl.book({
             orderRef: String(order.packing_code ?? orderId.slice(0, 8)),
             parcel: order.parcel_size ?? "small",
             declaredValueCents: order.item_price_cents,
@@ -90,6 +92,23 @@ Deno.serve(handler(async (req, body) => {
             toContact: { name: d.name ?? "Buyer", phone: d.phone ?? "", email: buyer.user?.email ?? undefined },
             description: "myHaul order",
           });
+          } catch (e) {
+            // Safety net (decided with Ofentse 7 Nov): a failed booking is never the seller's fault. The first time, they
+            // get 2 more days to ship (so no automatic refund or trust points lost) and our team is told with Bob Go's reason.
+            const verdict = e instanceof BookingRefused ? e.verdict : "try_later";
+            const detail = e instanceof BookingRefused ? e.detail : String(e instanceof Error ? e.message : e).slice(0, 300);
+            if (!order.booking_failed_at) {
+              const later = new Date(Math.max(Date.now(), new Date(order.ship_by ?? Date.now()).getTime()) + 2 * 86400_000).toISOString();
+              await db.from("orders").update({ booking_failed_at: new Date().toISOString(), ship_by: later }).eq("id", orderId).eq("status", "paid");
+            }
+            await db.rpc("raise_alert", { p_kind: verdict === "low_balance" ? "bobgo_balance" : "booking_failed", p_severity: "urgent",
+              p_title: verdict === "low_balance" ? "Bob Go balance is too low to book couriers" : "A courier booking failed",
+              p_body: `Order ${String(order.packing_code ?? orderId.slice(0, 8))} (${order.delivery}): ${detail}`.slice(0, 600),
+              p_link: "/team/orders", p_dedupe: `booking_failed:${orderId}` });
+            throw new UserError(verdict === "too_big"
+              ? "The courier says this parcel is too big for this delivery. We've told our team and given you 2 more days. You don't lose trust points."
+              : "We couldn't book the courier right now. We've told our team and given you 2 more days to ship, so you don't lose trust points. Try again in a little while.", 409);
+          }
           // Save the booking straight away so a retry never books twice.
           const saved = await db.from("orders").update({ shipment_id: b.shipmentRef, courier_name: b.courierName, shipping_cost_cents: b.costCents, booked_at: new Date().toISOString() })
             .eq("id", orderId).eq("status", "paid").is("shipment_id", null);

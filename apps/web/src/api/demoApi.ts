@@ -62,6 +62,8 @@ const DEMO_POINTS: PickupPoint[] = [
   { id: 9001, provider: "pudo", name: "PUDO Locker, Cavendish Square", address: "Dreyer Street, Claremont, Cape Town, 7708", type: "locker" },
   { id: 9002, provider: "pudo", name: "PUDO Locker, Gardens Centre", address: "Mill Street, Gardens, Cape Town, 8001", type: "locker" },
   { id: 9003, provider: "pargo", name: "Pargo, Woodstock Exchange", address: "Albert Road, Woodstock, Cape Town, 7925", type: "pickup_point" },
+  // Test only: couriers "can't reach" this one, so checkout shows how a refused locker looks.
+  { id: 9999, provider: "pudo", name: "PUDO Locker, Robben Island (test)", address: "Robben Island, Cape Town, 7400", type: "locker" },
 ];
 
 const KEY = "lsa-demo-v4"; // v4: adds a sample auction
@@ -813,6 +815,15 @@ export function createDemoApi(): Api {
     async pickupPoints() {
       await wait(300);
       return { points: DEMO_POINTS, cities: ["Cape Town", "Johannesburg", "Pretoria", "Durban"] };
+    },
+    async checkDelivery(c) {
+      // Same rules as the server in test mode: lockers can't take Large parcels; a test locker id 9999 is unreachable.
+      await wait(200);
+      const p = s.products.find((x) => x.id === c.productId);
+      if (!p || p.status !== "live") throw new Error("That item isn't available.");
+      if (c.delivery === "pudo_locker" && (p.parcelSize ?? "small") === "large") return { ok: false, message: "This parcel is too big for a locker. Pick courier or collection." };
+      if (c.delivery === "pudo_locker" && c.pickupPoint?.id === 9999) return { ok: false, message: "Couriers can't reach that locker from this seller right now. Pick another locker, or courier to your door." };
+      return { ok: true, message: null };
     },
     async shopPickup() {
       const sh = s.shops.find((x) => x.ownerId === me().id);

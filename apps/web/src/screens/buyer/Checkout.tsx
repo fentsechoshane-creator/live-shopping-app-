@@ -68,6 +68,22 @@ export function CheckoutSheet({ item, onClose, offer, auctionPrice }: { item: Fe
 
   const needsAddress = delivery === "courier" || delivery === "baker_delivers";
   const needsContact = needsAddress || delivery === "pudo_locker";
+  // Ask couriers before the buyer pays: only offer a locker or address Bob Go can actually book (decided 7 Nov).
+  const routeKey = delivery === "pudo_locker" && point ? `L${point.provider}:${point.id}`
+    : delivery === "courier" && addressOk(address) ? `C${address.street}|${address.suburb}|${address.city}|${address.province}|${address.postalCode}` : null;
+  const [route, setRoute] = useState<{ key: string; ok: boolean; message: string | null } | null>(null);
+  useEffect(() => {
+    if (!routeKey) return;
+    let live = true;
+    const t = window.setTimeout(() => {
+      api.checkDelivery({ productId: p.id, delivery: delivery as "courier" | "pudo_locker",
+        ...(delivery === "pudo_locker" && point ? { pickupPoint: { id: point.id, provider: point.provider } } : { address: { ...address } }) })
+        .then((r) => { if (live) setRoute({ key: routeKey, ...r }); })
+        .catch(() => { if (live) setRoute({ key: routeKey, ok: true, message: null }); }); // can't check: don't block, checkout checks again
+    }, 500);
+    return () => { live = false; window.clearTimeout(t); };
+  }, [routeKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const routeNow = route && route.key === routeKey ? route : null;
   const phoneOk = phone.replace(/\D/g, "").length >= 9;
   // The Pay button says what's still missing instead of failing after the tap.
   const missing = p.sizes.length > 0 && !size ? "Pick a size"
@@ -75,6 +91,8 @@ export function CheckoutSheet({ item, onClose, offer, auctionPrice }: { item: Fe
     : delivery === "pudo_locker" && !point ? "Pick a locker"
     : needsContact && (!name.trim() || !phoneOk) ? "Add your name and cell number"
     : needsAddress && !addressOk(address) ? "Add your delivery address"
+    : routeKey && !routeNow ? "Checking couriers…"
+    : routeNow && !routeNow.ok ? (delivery === "pudo_locker" ? "Pick another locker" : "Pick another option")
     : null;
   const addressShown = needsContact && (editing || !name || !phoneOk || (needsAddress && !addressOk(address)));
   // Offer to save only when something new was typed or picked: right under the details, before paying.
@@ -163,6 +181,7 @@ export function CheckoutSheet({ item, onClose, offer, auctionPrice }: { item: Fe
         <p className="small muted" style={{ margin: "-4px 0 12px" }}>Orders of R1,000 or more get half price delivery, and a free locker from R1,500.</p>
       )}
       {delivery === "pudo_locker" && feeFor(delivery) !== null && <LockerPicker value={point} onChange={setPoint} />}
+      {routeNow && !routeNow.ok && routeNow.message && <div className="note amber small" role="alert" style={{ margin: "0 0 12px" }}>{routeNow.message}</div>}
       {needsContact && !addressShown && (
         <div className="saved-address">
           <Icon name="user" size={18} />
