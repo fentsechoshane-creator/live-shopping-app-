@@ -65,6 +65,7 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 
 ## Next up
 
+- **Web host:** finish the move to Cloudflare Pages (see the log entry of 6 Nov). [Ofentse, Claude]
 - **Test payment:** buy something on the live site, pay on TradeSafe's sandbox page, check the order turns Paid. [Ofentse, Claude]
 - **Bob Go:** sandbox key and webhook secret in Supabase secrets (docs/SETUP.md section 4), then set `BOBGO_MODE=sandbox`. Everything else is already live. [Ofentse]
 - **Mux:** token and webhook secret in Supabase secrets. Until then videos go to Supabase storage. [Ofentse]
@@ -106,6 +107,15 @@ Debug as we go: anyone who finds or fixes a problem updates this list. Highest r
 Fixed in this round: Safari double back on the edge swipe (now only in the installed app), deleting an account now also deletes the person's photos and videos, React Router warnings.
 
 ## Log
+
+### 2026-11-06: Moving the web app to Cloudflare Pages
+
+- Found the reason the site looked old: Netlify's free plan gives 300 credits a month and every update costs 15 (about 20 a month). We used them all, so Netlify skipped the last 23 updates and the site was stuck on 4 November (8034e43). If the credits hit zero the whole site goes offline.
+- Ofentse chose Cloudflare Pages: free, about 500 updates a month, no traffic charges.
+- Ready in the repo: `apps/web/public/_headers` (same security headers as netlify.toml), `functions/i/[key].ts` and `functions/s/[key].ts` (WhatsApp link previews, tested), `.nvmrc` (Node 22). Single page routing needs nothing extra on Cloudflare.
+- Fixed while moving: the security headers blocked the phone's location, so "Near me" in the locker search could never work. Now allowed for our own site only.
+- Cloudflare settings: root directory blank, build command `npm ci && npm run build:live`, output `apps/web/dist`, variables `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (public).
+- After it's live: Supabase Site URL and redirect URLs, the `APP_URL` secret, and TradeSafe's app links move to the new address. [Ofentse, Claude]
 
 ### 2026-11-06: Version line in the menu
 

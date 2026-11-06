@@ -1,0 +1,17 @@
+# Cloudflare Pages headers (our web host from 6 Nov 2026). Same rules as netlify.toml; keep both in step.
+# Security headers on every page (docs/SECURITY.md, section 4). The Content Security Policy lists the only places
+# the app may load code, styles, pictures, video and data from. Add a new service here before the app uses it.
+/*
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(self), microphone=(self), geolocation=(self), payment=(), usb=(), interest-cohort=()
+  Cross-Origin-Opener-Policy: same-origin
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://gingqryoycwtzbfvfbln.supabase.co https://image.mux.com; media-src 'self' blob: https://gingqryoycwtzbfvfbln.supabase.co https://*.mux.com; connect-src 'self' https://gingqryoycwtzbfvfbln.supabase.co wss://gingqryoycwtzbfvfbln.supabase.co https://*.mux.com https://storage.googleapis.com; worker-src 'self' blob:; base-uri 'self'; form-action 'self'; object-src 'none'; frame-ancestors 'none'; upgrade-insecure-requests
+
+# Links open the phone app when it's installed (Apple and Android need these as JSON).
+/.well-known/apple-app-site-association
+  Content-Type: application/json
+/.well-known/assetlinks.json
+  Content-Type: application/json
