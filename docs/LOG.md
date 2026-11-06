@@ -66,10 +66,10 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 ## Next up
 
 - **Edit your own listing:** price, description, stock, pause, mark sold, delete (sellers can't change a listing after posting yet). [Claude]
-- **Basic video editing:** research done first, build when Ofentse says. [Claude]
-- **Test payment:** buy something on the live site, pay on TradeSafe's sandbox page, check the order turns Paid. [Ofentse, Claude]
+- **Friends and sharing in the inbox (decided 7 Nov):** people follow people; friends are mutual follows; Share opens a TikTok style sheet with friends' faces to send a post in app, plus WhatsApp, Copy link and More; friend chats sit with shop chats; shared posts show as a card with Buy. Direct messages 16 and older only. [Claude]
+- **Mux Robots:** check videos when they're ready (hold flagged posts), suggest covers and listing details. [Claude]
+- **Live selling on Mux:** go live from the phone, watch, buy or bid during a live. [Claude]
 - **Bob Go:** sandbox key and webhook secret in Supabase secrets (docs/SETUP.md section 4), then set `BOBGO_MODE=sandbox`. Everything else is already live. [Ofentse]
-- **Mux:** token and webhook secret in Supabase secrets. Until then videos go to Supabase storage. [Ofentse]
 - **Make Ofentse a team member (one line, Ofentse):** Supabase > SQL Editor, run `update profiles set role = 'admin' where id = (select id from auth.users where email = 'fentsechoshane@gmail.com');` Claude was not allowed to grant team access itself.
 - **Secrets (Ofentse or Lehloma, in Supabase > Edge Functions > Secrets):** `TRADESAFE_MODE=mock` and `APP_URL=https://myhaul-app.netlify.app` while testing. Payments are refused until TRADESAFE_MODE is set. Later: Mux, Anthropic, Telegram, Resend, Firebase and Apple push keys.
 - **Supabase settings:** turn on leaked password protection (Authentication > Sign in / Providers > Password). [Ofentse]
@@ -108,6 +108,14 @@ Debug as we go: anyone who finds or fixes a problem updates this list. Highest r
 Fixed in this round: Safari double back on the edge swipe (now only in the installed app), deleting an account now also deletes the person's photos and videos, React Router warnings.
 
 ## Log
+
+### 2026-11-07: Video editor
+
+- Built the editor planned in docs/VIDEO_EDITING.md. Edit sits between Retake and Next after filming, and Edit video sits on the cover in Create. Join up to 10 clips from the camera and gallery (photos show for 3 seconds), trim with two handles, split at the playhead, reorder, delete, sound on or off per clip, text (top, middle or bottom, 2 to 10 seconds), tag items so one video sells several (haul mode), mark flaws, and set the cover moment. Up to 3 minutes.
+- Nothing is re-rendered: the edit is a list saved on the post (migration 0032, `set_post_edit` checks every part on the server: your own uploads, your own items, lengths and limits). ClipPlayer plays the clips in order with one segmented bar. On the feed, tagged items change the product chip and Buy button as they appear, "1 flaw shown" jumps to each flaw, and clips filmed in the app say "Filmed in myHaul".
+- Flaw note on videos is now a dark pill with white text and an amber edge (amber text on amber was hard to read).
+- Tests: core edit rules (45 unit tests), database tests for set_post_edit, and the app test builds a 3 clip edit with text, tag and flaw, posts it and checks it in the feed.
+- Deployed with Ofentse's OK (7 Nov): migration 0032 live; push-live.mjs knows the live ids of 0031 and 0032.
 
 ### 2026-11-07: Design pass, buyer offers, Message button
 
