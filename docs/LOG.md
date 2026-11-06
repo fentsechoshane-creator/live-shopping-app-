@@ -109,6 +109,11 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-06: Video editing research (no build yet)
+
+- Ofentse wants basic editing between Retake and Next. Research and plan in `docs/VIDEO_EDITING.md`: what TikTok, Reels, Whatnot, Depop and Poshmark offer, a first version of 4 tools (trim, cover, sound on or off, one line of text), and how to do each without re-encoding on the phone (Mux clipping for trim; cover, mute and text saved as settings and drawn by the app).
+- Waiting for Ofentse to say build, and to answer the 3 questions at the end of that file.
+
 ### 2026-11-06: Your own posts look like yours
 
 - Ofentse could tap Message seller and Follow on his own posts. Now, like Depop (Edit on your own listing), Vinted (Bump) and TikTok (no Follow on yourself):
