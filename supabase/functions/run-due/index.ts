@@ -22,9 +22,16 @@ Deno.serve(async (req) => {
     const set = (n: string) => !!Deno.env.get(n);
     let tradesafe: Record<string, unknown>;
     try { tradesafe = await escrow().health(); } catch (e) { tradesafe = { error: String(e instanceof Error ? e.message : e) }; }
+    // Bob Go: a read only call (lockers near Cape Town) proves the key and address work. Books nothing.
+    let bobgoPing: unknown = null;
+    const bg = delivery();
+    if (bg && bg.mode !== "mock") {
+      try { bobgoPing = { lockersNearCapeTown: (await bg.pickupPoints(-33.9249, 18.4241)).length }; }
+      catch (e) { bobgoPing = { error: String(e instanceof Error ? e.message : e).slice(0, 300) }; }
+    }
     return json({
       tradesafe,
-      bobgo: { mode: Deno.env.get("BOBGO_MODE") ?? null, key: set("BOBGO_API_KEY"), webhookSecret: set("BOBGO_WEBHOOK_SECRET") },
+      bobgo: { mode: Deno.env.get("BOBGO_MODE") ?? null, key: set("BOBGO_API_KEY"), webhookSecret: set("BOBGO_WEBHOOK_SECRET"), ping: bobgoPing },
       mux: { token: set("MUX_TOKEN_ID") && set("MUX_TOKEN_SECRET"), webhookSecret: set("MUX_WEBHOOK_SECRET") },
       callbackSecret: set("TRADESAFE_CALLBACK_SECRET"), appUrl: Deno.env.get("APP_URL") ?? null,
     });
@@ -131,12 +138,13 @@ Deno.serve(async (req) => {
   }
 
   // Unpaid checkouts.
-  // Backup for Bob Go's tracking webhooks: check parcels on the way that haven't updated in 6 hours.
+  // Backup for Bob Go's tracking webhooks: check parcels on the way that haven't updated in 30 minutes
+  // (decided with Ofentse 7 Nov). Up to 50 a run, every 5 minutes: about 600 parcels on the way at once.
   const dl = delivery();
   if (dl && dl.mode !== "mock") {
-    const sixHours = new Date(now.getTime() - 6 * 3600_000).toISOString();
+    const halfHour = new Date(now.getTime() - 30 * 60_000).toISOString();
     const { data: moving } = await db.from("orders").select("id, shipment_id").eq("status", "shipped").not("shipment_id", "is", null)
-      .or(`tracking_checked_at.is.null,tracking_checked_at.lt.${sixHours}`).order("tracking_checked_at", { nullsFirst: true }).limit(50);
+      .or(`tracking_checked_at.is.null,tracking_checked_at.lt.${halfHour}`).order("tracking_checked_at", { nullsFirst: true }).limit(50);
     for (const o of moving ?? []) {
       try { await applyTracking(db, o.id, await dl.tracking(o.shipment_id)); done.tracked = (done.tracked ?? 0) + 1; }
       catch (e) { console.error("tracking", o.id, e); }
