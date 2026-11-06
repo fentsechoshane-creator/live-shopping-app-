@@ -109,6 +109,13 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-06: Video editing research, round two (TikTok Shop is the competitor)
+
+- Ofentse: trim only isn't enough; the timeline (gallery clips joined into one video) matters, and TikTok Shop is the real competitor, so we must be different.
+- `docs/VIDEO_EDITING.md` rewritten: TikTok basics (timeline with camera and gallery clips, trim, reorder, cover, sound, text) plus what TikTok Shop doesn't have: tag several items in one video (haul mode), flaw marks buyers can jump to (ties to not as described protection), live price and stock stickers, a "Filmed in myHaul" badge, and data light editing. No AI avatars or music library.
+- Built as an edit list (clips plus marks saved as data, played by the app), not a re-rendered video. One file export later (AVFoundation on iPhone, Mediabunny or a server).
+- Still research only; waiting for Ofentse's answers and go ahead.
+
 ### 2026-11-06: Video editing research (no build yet)
 
 - Ofentse wants basic editing between Retake and Next. Research and plan in `docs/VIDEO_EDITING.md`: what TikTok, Reels, Whatnot, Depop and Poshmark offer, a first version of 4 tools (trim, cover, sound on or off, one line of text), and how to do each without re-encoding on the phone (Mux clipping for trim; cover, mute and text saved as settings and drawn by the app).
