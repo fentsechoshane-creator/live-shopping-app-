@@ -7,6 +7,8 @@ import { useLoad } from "../../session";
 import { Icon } from "../../components/Icon";
 import { Loading, useGoBack } from "../../components/ui";
 import { CreateListing } from "./Create";
+import { EditVideo } from "./EditVideo";
+import type { EditDraft } from "../../api";
 import { useTabSwipe } from "../../components/gestures";
 
 type Mode = "camera" | "create" | "live";
@@ -32,6 +34,15 @@ export function Post() {
   });
   // On a later page (a camera review or a later Create step) the Camera, Create, Live switch hides.
   const [sub, setSub] = useState(false);
+  // The video editor: what it's editing, and the finished edit. A new cover video drops an old edit.
+  const [editing, setEditing] = useState<{ files: File[]; inApp: boolean[] } | null>(null);
+  const [edit, setEdit] = useState<EditDraft | null>(null);
+  const shotInApp = useRef(new WeakSet<File>());
+  useEffect(() => { if (edit && media[0] !== edit.files[0]) setEdit(null); }, [media, edit]);
+  const editCover = () => {
+    if (edit && media[0] === edit.files[0]) return setEditing({ files: edit.files, inApp: edit.list.clips.map((c) => c.inApp) });
+    if (media[0]) setEditing({ files: [media[0]], inApp: [shotInApp.current.has(media[0])] });
+  };
   const [shop] = useLoad(() => api.myShop(), []);
   const nav = useNavigate();
   const close = useGoBack("/");
@@ -44,14 +55,21 @@ export function Post() {
 
   return (
     <div className={`post ${dark ? "dark" : ""}`} {...(sub || mode === "create" ? {} : swipeModes)}>
-      {mode === "camera" && <Camera onReview={setSub} onDone={(f) => { addShot(f); setFromCamera(true); setMode("create"); }} />}
+      {editing && (
+        <EditVideo files={editing.files} inApp={editing.inApp} shop={shop} itemTitle="" initial={edit && editing.files === edit.files ? edit.list : null}
+          onCancel={() => setEditing(null)}
+          onDone={(d) => { setEditing(null); setMedia((cur) => [d.files[0], ...cur.filter((x) => !x.type.startsWith("video/"))]); setEdit(d); setFromCamera(true); setMode("create"); }} />
+      )}
+      {mode === "camera" && !editing && <Camera onReview={setSub}
+        onDone={(f, inApp) => { if (inApp) shotInApp.current.add(f); addShot(f); setFromCamera(true); setMode("create"); }}
+        onEdit={(f, inApp) => { if (inApp) shotInApp.current.add(f); setEditing({ files: [f], inApp: [inApp] }); }} />}
       {mode === "create" && (
-        <CreateListing shop={shop} media={media} onMedia={setMedia} startAtDetails={fromCamera}
+        <CreateListing shop={shop} media={media} onMedia={setMedia} startAtDetails={fromCamera} edit={edit} onEdit={editCover}
           onCamera={() => { setFromCamera(false); setMode("camera"); }} onStep={(n) => { setSub(n > 0); if (n === 0) setFromCamera(false); }} />
       )}
       {mode === "live" && <GoLive onCreate={() => setMode("create")} />}
 
-      {!sub && (
+      {!sub && !editing && (
         <>
           <button className={`post-close ${dark ? "vglass" : "glass"}`} onClick={close} aria-label="Close"><Icon name="close" size={20} /></button>
           <div className={`post-modes ${dark ? "vglass" : "glass"}`} role="tablist" aria-label="Post">
@@ -93,7 +111,7 @@ const LIMITS = [15, 60, 180] as const;
 const HOLD_MS = 250;
 
 /** Phone style camera: gallery on the left, shutter in the middle, flip on the right. Tap for a photo, hold to record. */
-function Camera({ onDone, onReview }: { onDone: (file: File) => void; onReview: (on: boolean) => void }) {
+function Camera({ onDone, onEdit, onReview }: { onDone: (file: File, inApp: boolean) => void; onEdit: (file: File, inApp: boolean) => void; onReview: (on: boolean) => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recRef = useRef<MediaRecorder | null>(null);
@@ -105,6 +123,7 @@ function Camera({ onDone, onReview }: { onDone: (file: File) => void; onReview: 
   const [why, setWhy] = useState("");
   const [elapsed, setElapsed] = useState(0);
   const [shot, setShot] = useState<File | null>(null);
+  const fromGallery = useRef(false);
 
   // Start (or restart after a flip) the camera.
   useEffect(() => {
@@ -185,10 +204,11 @@ function Camera({ onDone, onReview }: { onDone: (file: File) => void; onReview: 
     if (recRef.current && recRef.current.state === "recording") recRef.current.stop();
   };
 
-  const pick = (f: File | undefined) => f && setShot(f);
+  const pick = (f: File | undefined) => { if (f) { fromGallery.current = true; setShot(f); } };
   useEffect(() => onReview(!!shot), [shot]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (shot) return <Review file={shot} onRetake={() => setShot(null)} onUse={() => onDone(shot)} />;
+  if (shot) return <Review file={shot} onRetake={() => { fromGallery.current = false; setShot(null); }}
+    onUse={() => onDone(shot, !fromGallery.current)} onEdit={() => onEdit(shot, !fromGallery.current)} />;
 
   const pct = Math.min(1, elapsed / limit);
   return (
@@ -233,7 +253,7 @@ function Camera({ onDone, onReview }: { onDone: (file: File) => void; onReview: 
   );
 }
 
-function Review({ file, onRetake, onUse }: { file: File; onRetake: () => void; onUse: () => void }) {
+function Review({ file, onRetake, onUse, onEdit }: { file: File; onRetake: () => void; onUse: () => void; onEdit: () => void }) {
   const url = useMemo(() => URL.createObjectURL(file), [file]);
   useEffect(() => () => URL.revokeObjectURL(url), [url]);
   return (
@@ -242,6 +262,7 @@ function Review({ file, onRetake, onUse }: { file: File; onRetake: () => void; o
       <div className="cam-bottom">
         <div className="row" style={{ gap: 10, justifyContent: "center", marginBottom: 4 }}>
           <button className="btn vglass" onClick={onRetake}><Icon name="back" size={18} />Retake</button>
+          {file.type.startsWith("video/") && <button className="btn vglass" onClick={onEdit}><Icon name="cut" size={18} />Edit</button>}
           <button className="btn green" onClick={onUse}>Next<Icon name="chevron" size={18} /></button>
         </div>
       </div>

@@ -2,7 +2,7 @@
 // Used when no Supabase keys are set. Sign in with any email or phone and the code 123456.
 import {
   bidStep, maskHandle, canTransition, isRude, orderTotals, payoutDate, releasableAt, returnReasonsFor, shipBy, tierFor, TRUST_POINTS, validateListing,
-  RETURN_POSTAGE_PAYER, ACCOUNT_FEATURE_KEYS, canForceOn, featureOffMessage, type AccountFeature, type OrderStatus, type TrustEventKind, bookedByUs, deliveryFee, PARCEL_SIZES, orderParcelSize, DELIVERY_PERKS } from "@app/core";
+  RETURN_POSTAGE_PAYER, ACCOUNT_FEATURE_KEYS, canForceOn, featureOffMessage, type AccountFeature, type OrderStatus, type TrustEventKind, bookedByUs, deliveryFee, PARCEL_SIZES, orderParcelSize, DELIVERY_PERKS, validateEdit } from "@app/core";
 import { handleProblem } from "../lib/handle";
 import type {
   Api, Category, ReportReason, ReportTarget, CheckoutInput, FeedItem, ListingInput, MyShop, Notification, Order, Payout, PendingReview, ProductPublic, ReviewStatus,
@@ -17,7 +17,7 @@ interface DShop {
 interface DProduct extends ProductPublic { shopId: string; proofStatus: ReviewStatus;
   auctionEndsAt?: string | null; reserveCents?: number | null; auctionState?: AuctionInfo["state"]; auctionRound?: number;
   auctionWinner?: string | null; auctionPriceCents?: number | null; auctionPayBy?: string | null }
-interface DPost { id: string; shopId: string; productId: string; caption: string; video: FeedItem["video"]; createdAt: string; photos?: string[] }
+interface DPost { id: string; shopId: string; productId: string; caption: string; video: FeedItem["video"]; createdAt: string; photos?: string[]; edit?: FeedItem["edit"] }
 interface DOrder extends Order { shopOwnerId: string; bundleIds?: string[]; offerId?: string | null; paymentMethod?: string | null;
   packingVideo?: string; packingPhoto?: string; packingReview?: "ok" | "strike"; packingReviewedAt?: string }
 interface DUser extends User { trust: number; welcomeUsed: boolean; admin: boolean; createdAt?: string; bio?: string;
@@ -389,7 +389,8 @@ export function createDemoApi(): Api {
 
   const toFeed = (po: DPost): FeedItem => {
     const p = s.products.find((x) => x.id === po.productId)!;
-    return { postId: po.id, caption: po.caption, product: p, shop: publicShop(shopOf(po.shopId)), video: DEMO_CLIPS[po.id] ? { ...po.video, url: DEMO_CLIPS[po.id], kind: "video" } : { ...po.video, url: mediaUrl(po.video.url) } };
+    const edit = po.edit ? { ...po.edit, clips: po.edit.clips.map((c) => ({ ...c, video: { ...c.video, url: mediaUrl(c.video.url) } })) } : undefined;
+    return { postId: po.id, caption: po.caption, product: p, shop: publicShop(shopOf(po.shopId)), edit, video: DEMO_CLIPS[po.id] ? { ...po.video, url: DEMO_CLIPS[po.id], kind: "video" } : { ...po.video, url: mediaUrl(po.video.url) } };
   };
   const typingIn = new Set<string>();
   const offerOf = (oid?: string | null) => {
@@ -1129,7 +1130,7 @@ export function createDemoApi(): Api {
       }
       save();
     },
-    async createListing(input: ListingInput, video, proof, onProgress, photos = []) {
+    async createListing(input: ListingInput, video, proof, onProgress, photos = [], edit = null) {
       notSuspended(); notOff("sell");
       const sh = myShopRow();
       if (!sh) throw new Error("Start your shop first.");
@@ -1155,10 +1156,18 @@ export function createDemoApi(): Api {
         ...(input.mode === "auction" ? { stock: 1, reserveCents: input.reserveCents ?? null, auctionState: live ? "open" : null, auctionRound: 0,
           auctionEndsAt: new Date(Date.now() + (input.auctionDays ?? 3) * 86400e3).toISOString() } : {}),
       });
-      if (video && sh.status === "open") {
+      if (edit) {
+        const problems = validateEdit(edit.list);
+        if (problems.length) throw new Error(problems[0]);
+      }
+      const first = edit?.files[0] ?? video;
+      if (first && sh.status === "open") {
+        const clipUrls = edit ? await Promise.all(edit.files.map((f) => stash(f))) : [];
         s.posts.unshift({ id: id(), shopId: sh.id, productId: pid, caption: input.caption, createdAt: now().toISOString(),
+          edit: edit ? { clips: edit.list.clips.map((c, i) => ({ ...c, video: { url: clipUrls[i], kind: edit.files[i].type.startsWith("image/") ? "image" : "video" } })),
+            marks: edit.list.marks.map((m) => ({ ...m, text: m.text?.trim() || undefined, productId: m.productId === "self" ? pid : m.productId })), cover: edit.list.cover } : undefined,
           photos: await Promise.all(photos.slice(0, 9).map((p) => stash(p))),
-          video: { url: await stash(video), kind: video.type.startsWith("image/") ? "image" : "video", demo: { bg: "#3f3f46", label: "Your post (this browser only)" } } });
+          video: { url: clipUrls[0] ?? await stash(first), kind: first.type.startsWith("image/") ? "image" : "video", demo: { bg: "#3f3f46", label: "Your post (this browser only)" } } });
       }
       save();
       return { live, message };

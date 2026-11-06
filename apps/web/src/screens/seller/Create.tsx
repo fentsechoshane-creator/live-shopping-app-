@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AUCTION_DAYS, canUse, PARCEL_SIZE_IDS, PARCEL_SIZES, type ParcelSize, LISTING_LABELS, rand, reserveProblem, validateListing, type Condition, type ListingLabel } from "@app/core";
-import { api, type ListingSuggestion, type MyShop } from "../../api";
+import { api, type EditDraft, type ListingSuggestion, type MyShop } from "../../api";
 import { clearDraft, loadDraft, loadDraftMedia, saveDraft, saveDraftMedia, snapshot, type DraftFields } from "../../lib/draft";
 import { useLoad, useSession } from "../../session";
 import { Icon } from "../../components/Icon";
@@ -18,8 +18,12 @@ const STEPS = ["Media", "What is it", "Price", "More", "Review"] as const;
  * 0 photo or video, 1 what it is, 2 price and stock, 3 extra details (optional), 4 review and post.
  * Step 0 is the first page (the Camera, Create, Live switch shows); later steps hide it and Back goes one step back.
  */
-export function CreateListing({ shop, media, onMedia, onCamera, onStep, startAtDetails }: {
+export function CreateListing({ shop, media, onMedia, onCamera, onStep, startAtDetails, edit, onEdit }: {
   shop: MyShop; media: File[]; onMedia: (files: File[]) => void; onCamera: () => void; onStep: (step: number) => void; startAtDetails?: boolean;
+  /** The edit from the video editor, if the cover video was edited. */
+  edit?: EditDraft | null;
+  /** Open the video editor on the cover video. */
+  onEdit?: () => void;
 }) {
   const food = shop.category === "food";
   const founding = !!shop.foundingUntil && new Date(shop.foundingUntil) > new Date();
@@ -133,7 +137,7 @@ export function CreateListing({ shop, media, onMedia, onCamera, onStep, startAtD
       ...(auction ? { auctionDays, reserveCents } : {}),
       ...(!food ? { parcelSize: parcelSize ?? "small" } : {}),
       caption: caption.trim() || title.trim(),
-    }, cover, proof, setProgress, media.slice(1));
+    }, cover, proof, setProgress, media.slice(1), edit && edit.files[0] === cover ? edit : undefined);
     clearDraft(uid);
     toast(res.live ? "Your item is live" : res.message ?? "Saved as a draft");
     nav("/me");
@@ -187,6 +191,11 @@ export function CreateListing({ shop, media, onMedia, onCamera, onStep, startAtD
                 <div className="wz-preview">
                   {isImage ? <img src={preview} alt="Cover" /> : <video src={preview} muted playsInline loop autoPlay />}
                   <span className="wz-cover-tag">Cover</span>
+                  {!isImage && onEdit && (
+                    <button className="wz-edit vglass" onClick={onEdit}>
+                      <Icon name="cut" size={16} />{edit && edit.files[0] === cover ? `Edited · ${edit.files.length} clip${edit.files.length > 1 ? "s" : ""}` : "Edit video"}
+                    </button>
+                  )}
                 </div>
                 <div className="wz-strip" aria-label="Photos and video">
                   {media.map((m, i) => (

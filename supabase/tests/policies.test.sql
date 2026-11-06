@@ -107,6 +107,27 @@ insert into media (owner_id, kind, storage_path, status) values (auth.uid(), 'vi
 select pg_temp.expect_error($$insert into media (owner_id, kind, storage_path, status) values (auth.uid(), 'video', 'elsewhere/x.mp4', 'ready')$$, 'row-level security');
 insert into posts (shop_id, product_id, media_id, caption)
   select my_shop_id(), (select id from products where title = 'Oversized tee, sand'), (select id from media limit 1), '3 ways to style one tee';
+-- The video editor: two clips (one from the gallery), a text, a tag of your own item, a flaw and a cover.
+insert into media (owner_id, kind, storage_path, status) values (auth.uid(), 'video', '00000000-0000-0000-0000-00000000000a/clip2.mp4', 'ready');
+select set_post_edit((select id from posts limit 1), jsonb_build_object(
+  'clips', jsonb_build_array(
+    jsonb_build_object('media', (select id from media where storage_path like '%tee.mp4'), 'start', 1, 'end', 6, 'inApp', true),
+    jsonb_build_object('media', (select id from media where storage_path like '%clip2.mp4'), 'start', 0, 'end', 4, 'muted', true)),
+  'marks', jsonb_build_array(
+    jsonb_build_object('kind', 'text', 'at', 0.5, 'text', '  Size M  ', 'pos', 'top'),
+    jsonb_build_object('kind', 'tag', 'at', 0, 'productId', (select id from products where title = 'Oversized tee, sand')),
+    jsonb_build_object('kind', 'flaw', 'at', 6, 'text', 'Tiny mark')),
+  'cover', 2));
+select pg_temp.expect_error($$select set_post_edit((select id from posts limit 1), '{"clips":[{"media":"00000000-0000-0000-0000-000000000000","start":0,"end":3}]}')$$, 'isn''t one of your uploads');
+select pg_temp.expect_error($$select set_post_edit((select id from posts limit 1), jsonb_build_object('clips', jsonb_build_array(jsonb_build_object('media', (select id from media where storage_path like '%tee.mp4'), 'start', 1, 'end', 1.5))))$$, 'at least 1 second');
+select pg_temp.expect_error($$select set_post_edit((select id from posts limit 1), jsonb_build_object('clips', jsonb_build_array(jsonb_build_object('media', (select id from media where storage_path like '%tee.mp4'), 'start', 0, 'end', 200))))$$, 'up to 3 minutes');
+do $$ begin
+  assert (select edit->'marks'->0->>'text' from posts limit 1) = 'Size M', 'text trimmed';
+  assert (select (edit->>'cover')::numeric from posts limit 1) = 2, 'cover kept';
+end $$;
+reset role;
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000b');
+select pg_temp.expect_error($$select set_post_edit((select id from posts limit 1), '{"clips":[]}')$$, 'Only the seller');
 reset role;
 
 -- The feed is public.
@@ -114,6 +135,9 @@ select pg_temp.act_as_anon();
 do $$ begin
   assert (select count(*) from feed()) = 1, 'feed shows the live post';
   assert (select tier from feed() limit 1) = 'standard', 'tier shown';
+  assert (select jsonb_array_length(clips) from feed() limit 1) = 2, 'feed has both clips';
+  assert (select clips->1->>'muted' from feed() limit 1) = 'true', 'clip settings kept';
+  assert (select count(*) from media where storage_path like '%clip2.mp4') = 1, 'clip videos are public with the post';
 end $$;
 select pg_temp.expect_error($$select * from orders$$, 'permission denied');
 reset role;
@@ -950,7 +974,9 @@ reset role;
 select pg_temp.act_as_anon();
 select pg_temp.expect_error($$select blocked_between('00000000-0000-0000-0000-00000000000a', '00000000-0000-0000-0000-00000000000b')$$, 'permission denied');
 do $$ begin
-  assert (select count(*) from media) = (select count(*) from posts where status = 'live' and media_id is not null), 'only media of live posts is public';
+  assert (select count(*) from media) = (select count(distinct x) from (
+    select media_id x from posts where status = 'live'
+    union select (c->>'media')::uuid from posts, jsonb_array_elements(coalesce(edit->'clips', '[]')) c where status = 'live') q), 'only media of live posts (and their clips) is public';
   assert not exists (select 1 from feed() f where f.storage_path is not null and not exists (select 1 from media m where m.storage_path = f.storage_path)), 'every feed video is still readable';
   assert (select count(*) from media where storage_path like '%packing-%' or storage_path like '%parcel-%') = 0, 'packing proof rows are hidden';
   assert (select count(*) from reviews) = 0, 'reviews hidden from signed out visitors';

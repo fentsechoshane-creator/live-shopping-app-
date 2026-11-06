@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
+import { editLength, locate, clipStartsAt, activeMarks, validateEdit,
   deliveryFee, deliveryPerk, PARCEL_SIZE_IDS,
   rand, formatRand, protectionFee, orderTotals, sellerFee, releasableAt, payoutDate, nextFriday, addWorkingDays,
   reserveFor, scoreFrom, tierFor, canUse, canForceOn, packingVideoProblems, validateListing, canTransition, returnReasonsFor, shipBy,
@@ -293,5 +293,29 @@ describe("auctions", () => {
     expect(timeLeft(90 * 1000)).toBe("1m 30s");
     expect(timeLeft((26 * 3600 + 60) * 1000)).toBe("1d 2h");
     expect(maskHandle("thandi.m")).toBe("t***m");
+  });
+});
+
+describe("video edits", () => {
+  const e = { clips: [{ start: 2, end: 6, muted: false, inApp: true }, { start: 0, end: 3, muted: true, inApp: false }], marks: [
+    { kind: "tag" as const, at: 0, productId: "a" }, { kind: "tag" as const, at: 4, productId: "b" },
+    { kind: "text" as const, at: 1, text: "Size M" }, { kind: "flaw" as const, at: 5, text: "Small mark" },
+  ], cover: 1 };
+  it("joins clips on one timeline", () => {
+    expect(editLength(e)).toBe(7);
+    expect(locate(e, 1)).toEqual({ index: 0, sourceTime: 3 });
+    expect(locate(e, 5)).toEqual({ index: 1, sourceTime: 1 });
+    expect(clipStartsAt(e, 1)).toBe(4);
+  });
+  it("shows the right tag, text and flaw at each moment", () => {
+    expect(activeMarks(e, 2).map((m) => m.productId ?? m.kind)).toEqual(["a", "text"]);
+    expect(activeMarks(e, 5).map((m) => m.productId ?? m.kind)).toEqual(["b", "flaw"]);
+    expect(activeMarks(e, 6.9).some((m) => m.productId === "b")).toBe(true);
+  });
+  it("checks limits", () => {
+    expect(validateEdit(e)).toEqual([]);
+    expect(validateEdit({ ...e, clips: [{ start: 1, end: 1.5, muted: false, inApp: true }] })[0]).toMatch(/too short/);
+    expect(validateEdit({ ...e, clips: [{ start: 0, end: 200, muted: false, inApp: true }], cover: 0 })[0]).toMatch(/3 minutes/);
+    expect(validateEdit({ ...e, marks: [{ kind: "text", at: 1, text: "" }] })[0]).toMatch(/empty/);
   });
 });

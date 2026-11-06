@@ -95,8 +95,14 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
     id: r.id, shopId: r.shop_id, shopName: r.shop_name, shopHandle: r.shop_handle, otherName: r.other_name, iAmSeller: r.i_am_seller,
     lastBody: r.last_body, lastAt: r.last_at, unread: r.unread, buyerId: r.buyer_id,
   });
+  /** The editor's clips and marks, ready for the player. Empty or missing means a plain one video post. */
+  const playEdit = (edit: any, clips: any): FeedItem["edit"] => (edit && Array.isArray(clips) && clips.length ? {
+    clips: clips.map((c: any) => ({ start: Number(c.start), end: Number(c.end), muted: !!c.muted, inApp: !!c.inApp,
+      video: { muxPlaybackId: c.playbackId ?? null, url: videoUrl(c.path), kind: c.kind === "image" ? "image" : "video" } })),
+    marks: Array.isArray(edit.marks) ? edit.marks : [], cover: Number(edit.cover) || 0,
+  } : undefined);
   const feedItem = (r: any): FeedItem => ({
-    postId: r.post_id, caption: r.caption,
+    postId: r.post_id, caption: r.caption, edit: playEdit(r.edit, r.clips),
     product: toProduct({ ...r, id: r.product_id, status: "live" }),
     shop: { id: r.shop_id, name: r.shop_name, handle: r.shop_handle, category: r.category, trustScore: r.trust_score, tier: r.tier },
     video: { muxPlaybackId: r.playback_id, url: videoUrl(r.storage_path), kind: isImage(r.storage_path) ? "image" : "video" },
@@ -142,12 +148,12 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
         id: s.shop_id, name: s.name, handle: s.handle, category: s.category as Category, bio: s.bio, trustScore: s.trust_score,
         tier: s.tier, sales: s.sales, followers: s.followers, founding: s.founding,
       };
-      const posts = check(await sb.from("posts").select(`id, caption, products!inner(${PRODUCT_COLS}), media(mux_playback_id, storage_path, status)`)
+      const posts = check(await sb.from("posts").select(`id, caption, edit, clips, products!inner(${PRODUCT_COLS}), media(mux_playback_id, storage_path, status)`)
         .eq("shop_id", s.shop_id).eq("status", "live").eq("products.status", "live").order("created_at", { ascending: false })) as any[];
       return {
         shop,
         items: posts.filter((p) => p.media?.status === "ready").map((p) => ({
-          postId: p.id, caption: p.caption, product: toProduct(p.products), shop,
+          postId: p.id, caption: p.caption, product: toProduct(p.products), shop, edit: playEdit(p.edit, p.clips),
           video: { muxPlaybackId: p.media.mux_playback_id, url: videoUrl(p.media.storage_path), kind: isImage(p.media.storage_path) ? "image" : "video" },
         })),
       };
@@ -457,10 +463,10 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
     async productItem(productId) {
       const p = (await sb.from("products").select(`${PRODUCT_COLS}, shops(id, name, handle, category)`).eq("id", productId).maybeSingle()).data as any;
       if (!p) return null;
-      const post = (await sb.from("posts").select("id, caption, media(mux_playback_id, storage_path)").eq("product_id", productId).order("created_at", { ascending: false }).limit(1).maybeSingle()).data as any;
+      const post = (await sb.from("posts").select("id, caption, edit, clips, media(mux_playback_id, storage_path)").eq("product_id", productId).order("created_at", { ascending: false }).limit(1).maybeSingle()).data as any;
       const m = post?.media;
       return {
-        postId: post?.id ?? p.id, caption: post?.caption ?? p.title, product: { ...toProduct(p), heldFor: p.held_for, heldUntil: p.held_until },
+        postId: post?.id ?? p.id, caption: post?.caption ?? p.title, edit: post ? playEdit(post.edit, post.clips) : undefined, product: { ...toProduct(p), heldFor: p.held_for, heldUntil: p.held_until },
         shop: { id: p.shops.id, name: p.shops.name, handle: p.shops.handle, category: p.shops.category, trustScore: 50, tier: "standard" },
         video: m ? { muxPlaybackId: m.mux_playback_id, url: videoUrl(m.storage_path), kind: isImage(m.storage_path) ? "image" : "video" } : {},
       };
@@ -555,7 +561,7 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
     async openShop() {
       check(await sb.rpc("open_shop"));
     },
-    async createListing(input: ListingInput, video, proof, onProgress, photos = []) {
+    async createListing(input: ListingInput, video, proof, onProgress, photos = [], edit = null) {
       const errors = validateListing({ title: input.title, description: input.description, price: input.priceCents, label: input.label,
         condition: input.condition ?? undefined, hasProof: !!proof, mode: input.mode });
       if (errors.length) throw new Error(errors[0]);
@@ -591,22 +597,32 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
         live = false;
         message = "We check the proof before designer items go live. This usually takes a day.";
       }
-      if (video) {
-        let mediaId: string;
-        const photo = video.type.startsWith("image/");
-        // Photos go straight to storage. Videos go to Mux when it is set up.
+      // One clip: photos go straight to storage, videos to Mux when it's set up.
+      const uploadClip = async (file: File, progress?: (pct: number) => void) => {
+        const photo = file.type.startsWith("image/");
         const up = photo ? { useStorage: true } as { useStorage?: boolean; mediaId?: string; uploadUrl?: string }
           : await call<{ useStorage?: boolean; mediaId?: string; uploadUrl?: string }>("mux-upload", {});
         if (up.useStorage) {
-          const path = await upload("videos", video, "clip");
-          onProgress?.(100);
-          mediaId = (check(await sb.from("media").insert({ owner_id: await uid(), kind: photo ? "image" : "video", storage_path: path, status: "ready" }).select("id").single()) as any).id;
-        } else {
-          await putWithProgress(up.uploadUrl!, video, onProgress);
-          mediaId = up.mediaId!;
+          const path = await upload("videos", file, "clip");
+          progress?.(100);
+          return (check(await sb.from("media").insert({ owner_id: await uid(), kind: photo ? "image" : "video", storage_path: path, status: "ready" }).select("id").single()) as any).id as string;
         }
-        const posted = await sb.from("posts").insert({ shop_id: shopId, product_id: productId, media_id: mediaId, caption: input.caption });
+        await putWithProgress(up.uploadUrl!, file, progress);
+        return up.mediaId!;
+      };
+      const files = edit?.files.length ? edit.files : video ? [video] : [];
+      if (files.length) {
+        // Every clip uploads once; progress is shared across them.
+        const ids: string[] = [];
+        for (const [i, f] of files.entries()) ids.push(await uploadClip(f, (pct) => onProgress?.(Math.round(((i + pct / 100) / files.length) * 100))));
+        const posted = await sb.from("posts").insert({ shop_id: shopId, product_id: productId, media_id: ids[0], caption: input.caption }).select("id").single();
         if (posted.error && live) message = "Saved. Your video posts once your shop is open.";
+        if (!posted.error && edit) {
+          const saved = await sb.rpc("set_post_edit", { p_post: (posted.data as any).id, p_edit: {
+            clips: edit.list.clips.map((c, i) => ({ ...c, media: ids[i] })),
+            marks: edit.list.marks.map((m) => (m.productId === "self" ? { ...m, productId } : m)), cover: edit.list.cover } });
+          if (saved.error) message = `Posted, but the edit wasn't saved: ${cleanError(saved.error.message)}`;
+        }
       }
       for (const [i, photo] of photos.slice(0, 9).entries()) {
         const path = await upload("videos", photo, "photo");

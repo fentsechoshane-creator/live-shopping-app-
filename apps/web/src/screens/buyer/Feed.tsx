@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FEATURES } from "../../features";
-import { LISTING_LABELS } from "@app/core";
+import { LISTING_LABELS, activeMarks } from "@app/core";
 import { api, type FeedItem } from "../../api";
 import { useLoad, useSession } from "../../session";
 import { ProductArt } from "../../components/Scene";
@@ -25,6 +25,7 @@ import type { AuctionInfo } from "../../api";
 import { useIsMine } from "../../lib/mine";
 import { useMyShopId } from "../../lib/mine";
 import { MakeOfferSheet } from "../../components/MakeOffer";
+import { ClipPlayer, type ClipPlayerApi } from "../../components/ClipPlayer";
 
 type Tab = "for_you" | "following" | "live";
 
@@ -158,7 +159,7 @@ export function FeedList({ items, start = 0, onNearEnd }: { items: FeedItem[]; s
     <>
       <div className="feed" ref={ref} aria-label="Video feed">
         {items.map((it) => <VideoCard key={it.postId} item={it} auction={auctions[it.product.id]} avatar={avatars[it.shop.id]} counts={counts[it.postId]} comments={commentCounts[it.postId] ?? 0}
-          onBrowse={() => setBrowse(it)} onBuy={() => startBuy(it)} onComments={() => setCommenting(it)} onMore={() => setMore(it)}
+          onBrowse={(x) => setBrowse(x)} onBuy={(x) => startBuy(x)} onComments={() => setCommenting(it)} onMore={() => setMore(it)}
           onQuickBid={(amount) => quickBid(it, amount)} onCustomBid={() => customFor(it)} needUser={needUser} onMessage={() => messageShop(it.shop.id, it.product.id)} />)}
       </div>
       {items.length > 1 && (
@@ -230,10 +231,24 @@ function statusChip(it: FeedItem, a?: AuctionInfo, now = Date.now()): { text: st
 const short = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1).replace(/\.0$/, "")}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1).replace(/\.0$/, "")}K` : String(n));
 
 function VideoCard({ item, auction, avatar, counts, comments, onBrowse, onBuy, onComments, onMore, onQuickBid, onCustomBid, needUser, onMessage }: {
-  item: FeedItem; auction?: AuctionInfo; avatar?: string; counts?: { likes: number; reposts: number }; comments: number; onBrowse: () => void; onBuy: () => void; onComments: () => void; onMore: () => void;
+  item: FeedItem; auction?: AuctionInfo; avatar?: string; counts?: { likes: number; reposts: number }; comments: number;
+  /** Called with the item on screen: a tagged item in a haul video, or the post's own item. */
+  onBrowse: (shown: FeedItem) => void; onBuy: (shown: FeedItem) => void; onComments: () => void; onMore: () => void;
   onQuickBid: (amountCents: number) => Promise<void>; onCustomBid: () => void; needUser: () => boolean; onMessage: () => void;
 }) {
-  const p = item.product;
+  // Edited videos: the time on the whole video decides which text, tag and flaw show.
+  const [t, setT] = useState(0);
+  const [clipIndex, setClipIndex] = useState(0);
+  const player = useRef<ClipPlayerApi | null>(null);
+  const edit = item.edit;
+  const marks = edit ? activeMarks(edit, t) : [];
+  const tagId = marks.find((m) => m.kind === "tag")?.productId;
+  const tagged = useTaggedItem(tagId && tagId !== item.product.id ? tagId : undefined);
+  const shown = tagged ?? item; // the item on screen right now
+  const p = shown.product;
+  const flaws = edit ? edit.marks.filter((m) => m.kind === "flaw").sort((a, b) => a.at - b.at) : [];
+  const tagCount = edit ? new Set(edit.marks.filter((m) => m.kind === "tag").map((m) => m.productId)).size : 0;
+  const nextFlaw = () => { const f = flaws.find((x) => x.at > t + 0.3) ?? flaws[0]; if (f) player.current?.seek(f.at); };
   const { following, toggleFollow, liked, reposted, toggleReaction, toast, withUser } = useSession();
   // Your own post: seller tools instead of Follow, Buy and Repost.
   const mine = useIsMine(item.shop.id);
@@ -249,7 +264,7 @@ function VideoCard({ item, auction, avatar, counts, comments, onBrowse, onBuy, o
   const nav = useNavigate();
   const now = useNow(item.product.mode === "auction");
   const chip = statusChip(item, auction, now);
-  const shownPrice = p.mode === "auction" ? (auction?.currentCents ?? auction?.startCents ?? p.priceCents) : p.priceCents;
+  const shownPrice = p.mode === "auction" && !tagged ? (auction?.currentCents ?? auction?.startCents ?? p.priceCents) : p.priceCents;
   const isFollowing = following.has(item.shop.id);
   const share = async () => { if ((await shareOrCopy(`/i/${p.id}`, `${p.title}, ${R(p.priceCents)} on myHaul`)) === "copied") toast("Link copied"); };
   const sub = [
@@ -259,13 +274,24 @@ function VideoCard({ item, auction, avatar, counts, comments, onBrowse, onBuy, o
 
   return (
     <section className="video-card" aria-label={`${p.title} from ${item.shop.name}`} {...swipe}>
-      <Video src={item.video} label={`Video: ${item.caption}`} productId={p.id} />
+      {edit
+        ? <ClipPlayer edit={edit} label={`Video: ${item.caption}`} onTime={(time, i) => { setT(time); setClipIndex(i); }} apiRef={(a) => { player.current = a; }} />
+        : <Video src={item.video} label={`Video: ${item.caption}`} productId={item.product.id} />}
       <div className="shade" />
+      {marks.filter((m) => m.kind === "text").map((m, i) => (
+        <div key={`${m.at}-${i}`} className={`overlay-text ${m.pos ?? "middle"}`}><span>{m.text}</span></div>
+      ))}
+      {marks.some((m) => m.kind === "flaw") && (
+        <div className="flaw-flash" role="status"><Icon name="flag" size={14} />{marks.find((m) => m.kind === "flaw")?.text || "Flaw shown here"}</div>
+      )}
       <div className="info">
-        {(item.repostedBy || chip) && (
-          <div className="row" style={{ gap: 6 }}>
+        {(item.repostedBy || chip || flaws.length > 0 || tagCount > 1 || edit?.clips[clipIndex]?.inApp) && (
+          <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
             {item.repostedBy && <span className="vchip vglass"><Icon name="repost" size={13} />Reposted by @{item.repostedBy}</span>}
-            {chip && <span className={`vchip vglass ${chip.tone}`}><span className="d" />{chip.text}</span>}
+            {chip && !tagged && <span className={`vchip vglass ${chip.tone}`}><span className="d" />{chip.text}</span>}
+            {tagCount > 1 && <span className="vchip vglass"><Icon name="bag" size={13} />{tagCount} items in this video</span>}
+            {flaws.length > 0 && <button className="vchip vglass flaws amber" onClick={nextFlaw} aria-label={`Show flaws (${flaws.length})`}><span className="d" />{flaws.length === 1 ? "1 flaw shown" : `${flaws.length} flaws shown`}</button>}
+            {edit?.clips[clipIndex]?.inApp && <span className="vchip vglass inapp"><span className="d" />Filmed in myHaul</span>}
           </div>
         )}
         <div className="seller-row">
@@ -282,9 +308,11 @@ function VideoCard({ item, auction, avatar, counts, comments, onBrowse, onBuy, o
         </div>
         <div className="caption">{item.caption}</div>
         <div className="prod-row">
-        <button className="product-chip vglass" onClick={onBrowse} style={{ textAlign: "left" }} aria-label={`See details: ${p.title}, ${R(p.priceCents)}`}>
-          <span className="sw art">{item.video.url
-            ? (item.video.kind === "image" ? <img src={item.video.url} alt="" /> : <video src={`${item.video.url}#t=0.1`} muted playsInline preload="metadata" />)
+        <button className="product-chip vglass" onClick={() => onBrowse(shown)} style={{ textAlign: "left" }} aria-label={`See details: ${p.title}, ${R(p.priceCents)}`}>
+          <span className="sw art">{shown.video.muxPlaybackId
+            ? <img src={`https://image.mux.com/${shown.video.muxPlaybackId}/thumbnail.jpg?width=120`} alt="" />
+            : shown.video.url
+            ? (shown.video.kind === "image" ? <img src={shown.video.url} alt="" /> : <video src={`${shown.video.url}#t=0.1`} muted playsInline preload="metadata" />)
             : <ProductArt productId={p.id} fallback="#555" />}</span>
           <span className="grow"><span className="t" style={{ display: "block" }}>{p.title}</span><span className="s" style={{ display: "block" }}>{sub}</span></span>
           <span className="p">{R(shownPrice)}</span>
@@ -302,18 +330,32 @@ function VideoCard({ item, auction, avatar, counts, comments, onBrowse, onBuy, o
           </button>
         </div>
         <div className="actions">
-          {mine ? <OwnerBar item={item} auction={auction} /> : p.mode === "auction" && auction && auctionButton(auction, now).kind === "bid" ? (
+          {mine ? <OwnerBar item={shown} auction={tagged ? undefined : auction} /> : !tagged && p.mode === "auction" && auction && auctionButton(auction, now).kind === "bid" ? (
             <div className="bid-actions">
               <button className="btn vglass" onClick={onCustomBid}>Custom</button>
               <HoldToBid label={`Hold to bid ${R(auction.minNextCents)}`} onConfirm={() => onQuickBid(auction.minNextCents)} onNeedUser={needUser} />
             </div>
-          ) : <BuyButton item={item} auction={auction} onClick={onBuy} />}
+          ) : <BuyButton item={shown} auction={tagged ? undefined : auction} onClick={() => onBuy(shown)} />}
           {!mine && <button className="vround vglass" onClick={onMessage} aria-label={`Message @${item.shop.handle}`}><Icon name="chat" /></button>}
           <button className="vround vglass" onClick={share} aria-label="Share"><Icon name="share" /></button>
         </div>
       </div>
     </section>
   );
+}
+
+const taggedCache = new Map<string, Promise<FeedItem | null>>();
+/** A tagged item in a haul video, loaded once and kept. */
+function useTaggedItem(productId: string | undefined): FeedItem | null {
+  const [it, setIt] = useState<FeedItem | null>(null);
+  useEffect(() => {
+    if (!productId) { setIt(null); return; }
+    if (!taggedCache.has(productId)) taggedCache.set(productId, api.productItem(productId).catch(() => null));
+    let live = true;
+    taggedCache.get(productId)!.then((x) => { if (live) setIt(x && x.product.status === "live" ? x : null); });
+    return () => { live = false; };
+  }, [productId]);
+  return productId ? it : null;
 }
 
 /** On your own post: what buyers see instead of Buy, and where to manage it. */

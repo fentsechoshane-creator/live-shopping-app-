@@ -35,6 +35,19 @@ export interface VideoSource {
   demo?: { bg: string; label: string; scene?: string };
 }
 
+/** A post made in the editor: clips in order (each with its own video), marks on top, and the cover moment. */
+export interface PlayEdit {
+  clips: (import("@app/core").EditClip & { video: VideoSource })[];
+  marks: import("@app/core").EditMark[];
+  cover: number;
+}
+
+/** What the editor hands to Create: the clip files and the edit list. */
+export interface EditDraft {
+  files: File[];
+  list: import("@app/core").EditList;
+}
+
 export interface FeedItem {
   postId: string;
   caption: string;
@@ -43,6 +56,8 @@ export interface FeedItem {
   video: VideoSource;
   /** Set when the post shows up because a followed shop reposted it. */
   repostedBy?: string;
+  /** Made in the editor: several clips, text, item tags and flaw marks. */
+  edit?: PlayEdit;
 }
 
 export type Reaction = "like" | "repost";
@@ -473,7 +488,7 @@ export interface Api {
   acceptRules(): Promise<void>;
   openShop(): Promise<void>;
   /** `video` is the cover (a video or a photo). `photos` are up to 9 extra photos shown in the item sheet. */
-  createListing(input: ListingInput, video: File | null, proof: File | null, onProgress?: (pct: number) => void, photos?: File[]): Promise<{ live: boolean; message?: string }>;
+  createListing(input: ListingInput, video: File | null, proof: File | null, onProgress?: (pct: number) => void, photos?: File[], edit?: EditDraft | null): Promise<{ live: boolean; message?: string }>;
   /** Extra photos of a listing, in order. */
   productPhotos(productId: string): Promise<string[]>;
   /** Suggested title, type, condition and price from a photo. Null when suggestions are not available. */
