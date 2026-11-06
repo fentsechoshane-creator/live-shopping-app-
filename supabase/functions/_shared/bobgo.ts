@@ -96,7 +96,15 @@ class BobGo implements Delivery {
       for (const r of pr.responses ?? []) if (r.status === "success" && typeof r.rate_amount === "number")
         options.push({ provider: pr.provider_slug, providerName: pr.provider_name ?? pr.provider_slug, level: r.service_level_code, amount: r.rate_amount });
     }
-    if (!options.length) throw new UserError("No courier can take this parcel right now. Check your pickup address, or try again in a few minutes.", 409);
+    if (!options.length) {
+      // Bob Go answers 200 even with no usable rates; the reason is in each courier's status and failed_reason.
+      const why = (rates?.provider_rate_requests ?? []).map((pr: any) =>
+        `${pr.provider_name ?? pr.provider_slug}: ${pr.status}${pr.failed_reason ? ` (${String(pr.failed_reason).slice(0, 120)})` : ""}`
+        + (pr.responses ?? []).filter((r: any) => r.status !== "success").map((r: any) => ` [${r.service_level_code}: ${r.status}${r.failed_reason ? ` ${String(r.failed_reason).slice(0, 80)}` : ""}]`).join(""));
+      console.error("bobgo no rates", rates?.id, JSON.stringify(why).slice(0, 1500));
+      const reason = why.length ? why.join("; ").slice(0, 300) : "no couriers answered";
+      throw new UserError(`No courier can take this parcel right now. Check your pickup address, or try again in a few minutes. (Courier said: ${reason})`, 409);
+    }
     const best = options.sort((a, z) => a.amount - z.amount)[0];
     // 2. Book it.
     const from = split(b.fromContact.name), to = split(b.toContact.name);
