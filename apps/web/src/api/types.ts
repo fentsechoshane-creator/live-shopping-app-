@@ -79,6 +79,18 @@ export interface Message {
   id: string; body: string; createdAt: string; mine: boolean; readAt: string | null; productId: string | null;
   imageUrl: string | null; offer: Offer | null;
 }
+/** Friends and sharing (migration 0033). Friends follow each other; following someone's shop counts. */
+export interface Person { id: string; name: string; handle: string; avatarUrl: string | null }
+export interface PersonPage extends Person {
+  bio: string; followers: number; following: number; shop: { handle: string; name: string } | null;
+  iFollow: boolean; followsMe: boolean; me: boolean; blocked: boolean;
+}
+export interface FoundPerson extends Person { iFollow: boolean; followsMe: boolean }
+export interface Friend extends Person { chatId: string | null }
+export interface FriendChat { id: string; other: Person; lastBody: string | null; lastShared: boolean; lastMine: boolean; lastAt: string; unread: number; friends: boolean }
+/** A post sent in a friend chat, shown as a card. `available` is false once it's sold or taken down. */
+export interface SharedPost { postId: string; productId: string; title: string; priceCents: Cents; mode: SaleMode; shopName: string; shopHandle: string; thumb: string | null; available: boolean }
+export interface FriendMessage { id: string; body: string; mine: boolean; createdAt: string; readAt: string | null; shared: boolean; post: SharedPost | null }
 export interface BlockedPerson { userId: string; name: string; shopId: string | null; shopHandle: string | null }
 export interface OpenReport { id: string; targetKind: ReportTarget; targetId: string; reason: ReportReason; details: string; createdAt: string; summary: string }
 export interface TeamAlert { id: string; kind: string; severity: "urgent" | "normal"; title: string; body: string; link: string | null; createdAt: string; seen: boolean }
@@ -454,6 +466,22 @@ export interface Api {
   addComment(postId: string, body: string): Promise<void>;
   deleteComment(id: string): Promise<void>;
   commentCounts(postIds: string[]): Promise<Record<string, number>>;
+
+  // Friends: follow people, chat with friends, send them posts
+  followPerson(userId: string, on: boolean): Promise<void>;
+  person(handle: string): Promise<PersonPage | null>;
+  findPeople(query: string): Promise<FoundPerson[]>;
+  /** People who follow you (or your shop) that you don't follow back yet. */
+  followBacks(): Promise<Person[]>;
+  friends(): Promise<Friend[]>;
+  friendChats(): Promise<FriendChat[]>;
+  /** Gets or starts the chat with a friend and returns its id. */
+  friendChatWith(userId: string): Promise<string>;
+  friendChat(chatId: string): Promise<{ other: Person; friends: boolean; messages: FriendMessage[] }>;
+  sendToFriend(userId: string, body: string): Promise<void>;
+  /** The Share sheet: one post to up to 20 friends, with an optional note. Returns how many it went to. */
+  sharePost(postId: string, userIds: string[], note?: string): Promise<number>;
+  readFriendChat(chatId: string): Promise<void>;
 
   // Messages between a buyer and a shop
   conversations(): Promise<Conversation[]>;

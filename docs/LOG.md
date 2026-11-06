@@ -66,7 +66,7 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 ## Next up
 
 - **Edit your own listing:** price, description, stock, pause, mark sold, delete (sellers can't change a listing after posting yet). [Claude]
-- **Friends and sharing in the inbox (decided 7 Nov):** people follow people; friends are mutual follows; Share opens a TikTok style sheet with friends' faces to send a post in app, plus WhatsApp, Copy link and More; friend chats sit with shop chats; shared posts show as a card with Buy. Direct messages 16 and older only. [Claude]
+- **Bob Go sandbox:** Ofentse adds `BOBGO_API_KEY` and `BOBGO_MODE=sandbox` in Supabase secrets and the "Tracking updated" webhook in Bob Go; then Claude tests a booking and confirms the sandbox address `api.sandbox.bobgo.co.za` [CONFIRM]. [Ofentse, Claude]
 - **Mux Robots:** check videos when they're ready (hold flagged posts), suggest covers and listing details. [Claude]
 - **Live selling on Mux:** go live from the phone, watch, buy or bid during a live. [Claude]
 - **Bob Go:** sandbox key and webhook secret in Supabase secrets (docs/SETUP.md section 4), then set `BOBGO_MODE=sandbox`. Everything else is already live. [Ofentse]
@@ -108,6 +108,16 @@ Debug as we go: anyone who finds or fixes a problem updates this list. Highest r
 Fixed in this round: Safari double back on the edge swipe (now only in the installed app), deleting an account now also deletes the person's photos and videos, React Router warnings.
 
 ## Log
+
+### 2026-11-07: Friends and sharing, Bob Go webhook without a secret
+
+- Friends like TikTok (decided with Ofentse): people follow people, friends are people who follow each other (following someone's shop counts as following them). Everyone is 18 or older already (sign up rule), so messaging just needs a finished account.
+- Share on a video now opens "Send to": friends' faces in a row (tap several), add a message, Send; below, WhatsApp, Copy link and More. Signed out people get the app row only.
+- Inbox Messages: a row of friends at the top (tap to chat) with Find friends first, then Friends chats, then Shops chats. Friend chats show a shared post as a card with the picture, price and Buy now (or Sold).
+- New screens: Find friends (/friends: search, "Follow back to be friends", your friends), person pages (/u/handle: counts, Follow, Follow back, Friends, Message once friends, their shop), friend chat (/chats/id: report, block).
+- Server rules (migration 0033): only friends can message; not blocked; paused accounts can't follow or message; friendly words only; 120 messages an hour; share to up to 20 friends at once; 200 follows a day; blocking unfollows both ways; strangers can't see anyone's chats or follows. Notifications for new followers, new friends and messages.
+- Bob Go's dashboard gives one API key and a webhook URL with no signing secret. The webhook now works without one: it only uses the parcel number and asks Bob Go for the real tracking. Courier charge updates are only used if a secret is ever set.
+- Tests: database tests for every friends rule; the app test follows, follows back, shares a post with a note and replies in the chat.
 
 ### 2026-11-07: Video editor
 

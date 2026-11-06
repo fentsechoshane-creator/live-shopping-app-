@@ -97,13 +97,13 @@ async function pickBirthday(scope, y, m, d) {
   await scope.getByLabel("Day", { exact: true }).selectOption(d);
 }
 
-async function signIn(email) {
+async function signIn(email, name) {
   await page.goto(`${BASE}/signin`);
   await page.getByLabel("Email").fill(email);
   await page.getByRole("button", { name: "Send code" }).click();
   await page.getByLabel("Code").fill("123456"); // signs in by itself once 6 digits are in
   await page.waitForURL((u) => !u.pathname.startsWith("/signin"));
-  await maybeSetup();
+  await maybeSetup(name);
   // Someone with a new surprise reward sees it first (for example a seller after a first sale).
   const surprise = page.getByRole("dialog", { name: "Surprise reward" });
   if (await surprise.waitFor({ timeout: 1500 }).then(() => true, () => false)) await surprise.getByRole("button", { name: "Nice!" }).click();
@@ -893,6 +893,56 @@ try {
   await proof.getByText("Strike given").waitFor();
   await page.goto(`${BASE}/team/log`);
   await page.getByText("Packing strike 1 of 3").first().waitFor();
+
+  // ===== Friends and sharing: follow, follow back, send a post from Share, chat =====
+  await signOut();
+  await signIn("nandi@test.co.za", "Nandi");
+  await page.goto(`${BASE}/friends`);
+  await page.getByLabel("Search people").fill("zola");
+  const zolaRow = page.locator(".cell").filter({ hasText: "@zola.vintage" });
+  await zolaRow.getByRole("button", { name: "Follow" }).click();
+  await zolaRow.getByRole("button", { name: "Following" }).waitFor();
+  // Not friends yet: no Message button, and a note on how to become friends.
+  await page.goto(`${BASE}/u/zola.vintage`);
+  await page.getByText("When they follow you back, you'll be friends.").waitFor();
+  await check(page.getByRole("button", { name: "Message" }).count().then((n) => n === 0), "no Message before friends");
+  await signOut();
+  await signIn("zola@example.com");
+  await page.goto(`${BASE}/inbox?tab=updates`);
+  await page.getByText("Nandi followed you").waitFor();
+  await page.goto(`${BASE}/friends`);
+  await page.getByRole("heading", { name: "Follow back to be friends" }).waitFor();
+  await page.locator(".cell").filter({ hasText: "Nandi" }).getByRole("button", { name: "Follow back" }).click();
+  await page.getByText("You and Nandi are friends now").waitFor();
+  // Share a post from the feed to Nandi, with a note.
+  await page.getByRole("link", { name: "Home" }).click();
+  await page.getByRole("button", { name: "Share" }).first().click();
+  const shareSheet = page.getByRole("dialog", { name: "Send to" });
+  await shareSheet.getByRole("button", { name: "Nandi" }).click();
+  await shareSheet.getByLabel("Add a message").fill("This is so you");
+  await shareSheet.getByRole("button", { name: "WhatsApp" }).waitFor();
+  await shot("share-sheet");
+  await shareSheet.getByRole("button", { name: "Send", exact: true }).click();
+  await page.getByText("Sent to Nandi").waitFor();
+  await signOut();
+  // Nandi sees it in the Inbox: friends row, a Friends chat with the post, Buy from the card.
+  await signIn("nandi@test.co.za");
+  await page.goto(`${BASE}/inbox?tab=messages`);
+  await page.getByRole("group", { name: "Friends" }).getByRole("button", { name: "Chat with Zola" }).waitFor();
+  const zolaChat = page.getByRole("link", { name: /Zola.*Sent you a post: This is so you/ });
+  await zolaChat.waitFor();
+  await shot("inbox-friends");
+  await zolaChat.click();
+  await page.locator(".shared-card").waitFor();
+  await page.getByText("This is so you").waitFor();
+  await page.getByLabel("Message").fill("Ordering it now!");
+  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByText("Ordering it now!").waitFor();
+  await shot("friend-chat");
+  await page.goto(`${BASE}/u/zola.vintage`);
+  await page.getByRole("button", { name: "Friends" }).waitFor();
+  await page.getByRole("button", { name: "Message" }).waitFor();
+  await shot("person-page");
 
   if (errors.length) throw new Error("Page errors: " + errors.join(" | "));
   if (consoleIssues.size) console.log("Console issues:\n  " + [...consoleIssues].join("\n  "));
