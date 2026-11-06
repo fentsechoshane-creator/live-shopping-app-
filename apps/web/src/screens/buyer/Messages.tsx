@@ -9,13 +9,16 @@ import { ErrorNote, Loading, R, Sheet, swatch, timeAgo, useAction, useGoBack } f
 import { CheckoutSheet } from "./Checkout";
 import { ReportSheet } from "../../components/Safety";
 import { askForNotifications } from "../../lib/push";
+import { useMyShopId } from "../../lib/mine";
 
 /** Opens (or starts) the chat with a shop. Signed out people go to sign in first. */
 export function useMessageShop() {
   const { toast, withUser } = useSession();
   const nav = useNavigate();
+  const myShop = useMyShopId();
   /** `productId` attaches that item to the chat, so the seller knows what you're asking about. */
   return (shopId: string, productId?: string) => withUser(async () => {
+    if (shopId === myShop) { toast("That's your own shop. Buyers message you from here."); return; }
     try {
       const id = await api.openConversation(shopId);
       nav(`/messages/${id}${productId ? `?about=${productId}` : ""}`);

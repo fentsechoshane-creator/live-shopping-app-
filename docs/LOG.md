@@ -65,6 +65,8 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 
 ## Next up
 
+- **Edit your own listing:** price, description, stock, pause, mark sold, delete (sellers can't change a listing after posting yet). [Claude]
+- **Basic video editing:** research done first, build when Ofentse says. [Claude]
 - **Test payment:** buy something on the live site, pay on TradeSafe's sandbox page, check the order turns Paid. [Ofentse, Claude]
 - **Bob Go:** sandbox key and webhook secret in Supabase secrets (docs/SETUP.md section 4), then set `BOBGO_MODE=sandbox`. Everything else is already live. [Ofentse]
 - **Mux:** token and webhook secret in Supabase secrets. Until then videos go to Supabase storage. [Ofentse]
@@ -106,6 +108,17 @@ Debug as we go: anyone who finds or fixes a problem updates this list. Highest r
 Fixed in this round: Safari double back on the edge swipe (now only in the installed app), deleting an account now also deletes the person's photos and videos, React Router warnings.
 
 ## Log
+
+### 2026-11-06: Your own posts look like yours
+
+- Ofentse could tap Message seller and Follow on his own posts. Now, like Depop (Edit on your own listing), Vinted (Bump) and TikTok (no Follow on yourself):
+  - Video: "Your post" label instead of Follow, no Repost, and a "Your listing" bar (stock, bids or sold out, taps to your orders) instead of Buy now or Hold to bid.
+  - Item details: "This is your listing" note; no Message seller or buyer protection; the sheet's footer is the same Your listing bar.
+  - The ... menu on your post or shop: My orders and My shop, no Report or Block.
+  - Your shop page: "This is your shop, as buyers see it" with Manage my shop and My orders instead of Follow and Message.
+  - Explore: "Your shop" instead of Follow. Messaging your own shop says it's yours instead of opening a chat.
+- `apps/web/src/lib/mine.ts` (useMyShopId, useIsMine) is the one place that knows which shop is yours.
+- Gap found: sellers can't edit, pause, mark sold or delete a listing yet. Next to build. [Claude, Ofentse]
 
 ### 2026-11-06: Special prices start at R50
 

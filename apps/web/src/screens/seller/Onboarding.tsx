@@ -5,6 +5,7 @@ import { api, type Category, type MyShop } from "../../api";
 import { useSession } from "../../session";
 import { Choice, ErrorNote, Field, Loading, Progress, useAction, useGoBack } from "../../components/ui";
 import { Icon } from "../../components/Icon";
+import { forgetMyShop } from "../../lib/mine";
 
 const CATEGORIES: { id: Category; title: string; sub: string }[] = [
   { id: "clothes", title: "Clothes and thrift", sub: "Pre loved and new fashion" },
@@ -74,7 +75,7 @@ function StepName({ category, onDone }: { category: Category; onDone: () => void
   const { busy, error, run } = useAction();
   useEffect(() => { if (!handle) setHandle(name.toLowerCase().replace(/[^a-z0-9]+/g, ".").replace(/^\.|\.$/g, "").slice(0, 30)); }, [name]); // eslint-disable-line
   return (
-    <form onSubmit={(e) => { e.preventDefault(); run(async () => { await api.startShop(name.trim(), handle, category); onDone(); }); }}>
+    <form onSubmit={(e) => { e.preventDefault(); run(async () => { await api.startShop(name.trim(), handle, category); forgetMyShop(); onDone(); }); }}>
       <h1>Name your shop</h1>
       <p className="muted">Buyers see this on every video. Signed in as {user?.email ?? user?.phone}.</p>
       <ErrorNote error={error} />

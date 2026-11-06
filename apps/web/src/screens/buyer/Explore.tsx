@@ -6,6 +6,7 @@ import { Icon } from "../../components/Icon";
 import { RewardChip } from "../../components/Rewards";
 import { ProductArt } from "../../components/Scene";
 import { ErrorNote, Loading, R, swatch } from "../../components/ui";
+import { useMyShopId } from "../../lib/mine";
 
 const CATS: { id: Category | "all"; label: string }[] = [
   { id: "all", label: "All" }, { id: "clothes", label: "Thrift" }, { id: "designer", label: "Designer" },
@@ -17,6 +18,7 @@ export function Explore() {
   const [q, setQ] = useState("");
   const [cat, setCat] = useState<Category | "all">("all");
   const { user, following, toggleFollow, withUser } = useSession();
+  const myShop = useMyShopId();
   const nav = useNavigate();
   const [params] = useSearchParams();
 
@@ -57,8 +59,10 @@ export function Explore() {
                 <button className="avatar" style={{ border: 0 }} onClick={() => nav(`/s/${s.handle}`)} aria-label={`Open ${s.name}`}>{s.name[0]}</button>
                 <b style={{ fontSize: 14 }}>{s.name}</b>
                 <span className="small muted">Trust {s.trustScore}</span>
-                <button className="btn" style={{ minHeight: 34, padding: "0 14px", fontSize: 13, background: following.has(s.id) ? "var(--surface-2)" : "var(--ink)", color: following.has(s.id) ? "var(--ink)" : "var(--bg)" }}
-                  onClick={() => withUser(() => toggleFollow(s.id), "Sign in to follow")}>{following.has(s.id) ? "Following" : "Follow"}</button>
+                {s.id === myShop ? <span className="small muted" style={{ minHeight: 34, display: "grid", placeItems: "center" }}>Your shop</span> : (
+                  <button className="btn" style={{ minHeight: 34, padding: "0 14px", fontSize: 13, background: following.has(s.id) ? "var(--surface-2)" : "var(--ink)", color: following.has(s.id) ? "var(--ink)" : "var(--bg)" }}
+                    onClick={() => withUser(() => toggleFollow(s.id), "Sign in to follow")}>{following.has(s.id) ? "Following" : "Follow"}</button>
+                )}
               </div>
             ))}
           </div>

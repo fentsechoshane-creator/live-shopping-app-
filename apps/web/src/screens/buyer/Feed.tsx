@@ -22,6 +22,8 @@ import { AuctionSheet, auctionButton, useAuctions, useNow } from "../../componen
 import { HoldToBid } from "../../components/HoldToBid";
 import { timeLeft } from "@app/core";
 import type { AuctionInfo } from "../../api";
+import { useIsMine } from "../../lib/mine";
+import { useMyShopId } from "../../lib/mine";
 
 type Tab = "for_you" | "following" | "live";
 
@@ -142,6 +144,7 @@ export function FeedList({ items, start = 0, onNearEnd }: { items: FeedItem[]; s
   const [commenting, setCommenting] = useState<FeedItem | null>(null);
   const [more, setMore] = useState<FeedItem | null>(null);
   const messageShop = useMessageShop();
+  const myShop = useMyShopId();
 
   const go = (d: number) => ref.current?.scrollTo({ top: (index + d) * ref.current.clientHeight, behavior: "smooth" });
   const startBuy = (it: FeedItem) => it.product.mode === "auction"
@@ -165,7 +168,7 @@ export function FeedList({ items, start = 0, onNearEnd }: { items: FeedItem[]; s
         </div>
       )}
       {browse && (
-        <Sheet title={browse.product.title} onClose={() => setBrowse(null)} footer={<BuyButton item={browse} auction={auctions[browse.product.id]} onClick={() => startBuy(browse)} block />}>
+        <Sheet title={browse.product.title} onClose={() => setBrowse(null)} footer={browse.shop.id === myShop ? <OwnerBar item={browse} auction={auctions[browse.product.id]} /> : <BuyButton item={browse} auction={auctions[browse.product.id]} onClick={() => startBuy(browse)} block />}>
           <ProductDetails item={browse} />
         </Sheet>
       )}
@@ -174,7 +177,7 @@ export function FeedList({ items, start = 0, onNearEnd }: { items: FeedItem[]; s
         onPay={() => { const it = bidding; setBidding(null); setBuy(it); }} />}
       {commenting && <CommentsSheet postId={commenting.postId} postOwnerShopHandle={commenting.shop.handle} onClose={() => setCommenting(null)}
         onCount={(n) => setCommentCounts((c) => ({ ...c, [commenting.postId]: n }))} />}
-      {more && <MoreSheet kind="post" targetId={more.postId} shopId={more.shop.id} shopHandle={more.shop.handle} onClose={() => setMore(null)}
+      {more && <MoreSheet kind="post" targetId={more.postId} shopId={more.shop.id} shopHandle={more.shop.handle} onClose={() => setMore(null)} mine={more.shop.id === myShop}
         onMessage={() => { setMore(null); messageShop(more.shop.id, more.product.id); }} />}
     </>
   );
@@ -227,6 +230,8 @@ function VideoCard({ item, auction, avatar, counts, comments, onBrowse, onBuy, o
 }) {
   const p = item.product;
   const { following, toggleFollow, liked, reposted, toggleReaction, toast, withUser } = useSession();
+  // Your own post: seller tools instead of Follow, Buy and Repost.
+  const mine = useIsMine(item.shop.id);
   const isLiked = liked.has(item.postId);
   const isReposted = reposted.has(item.postId);
   // Counts from the server already include the user's own reaction when it was loaded; nudge them on taps since then.
@@ -263,9 +268,11 @@ function VideoCard({ item, auction, avatar, counts, comments, onBrowse, onBuy, o
             <Avatar url={avatar} name={item.shop.name} />
             <span className="handle">@{item.shop.handle}</span>
           </Link>
-          <button className="follow-btn vglass" onClick={() => withUser(() => toggleFollow(item.shop.id), "Sign in to follow")} aria-pressed={isFollowing}>
-            {isFollowing ? "Following" : "Follow"}
-          </button>
+          {mine ? <span className="follow-btn vglass mine-tag"><Icon name="store" size={13} />Your post</span> : (
+            <button className="follow-btn vglass" onClick={() => withUser(() => toggleFollow(item.shop.id), "Sign in to follow")} aria-pressed={isFollowing}>
+              {isFollowing ? "Following" : "Follow"}
+            </button>
+          )}
           <button className="more-btn" onClick={onMore} aria-label="More options"><Icon name="more" size={20} strokeWidth={3} /></button>
         </div>
         <div className="caption">{item.caption}</div>
@@ -280,15 +287,17 @@ function VideoCard({ item, auction, avatar, counts, comments, onBrowse, onBuy, o
           <button className={`react vglass ${isLiked ? "on like" : ""}`} onClick={() => react("like")} aria-pressed={isLiked} aria-label={`Like, ${likes}`}>
             <Icon name="heart" size={20} /><span>{short(likes)}</span>
           </button>
-          <button className={`react vglass ${isReposted ? "on repost" : ""}`} onClick={() => react("repost")} aria-pressed={isReposted} aria-label={`Repost, ${reposts}`}>
-            <Icon name="repost" size={20} /><span>{short(reposts)}</span>
-          </button>
+          {!mine && (
+            <button className={`react vglass ${isReposted ? "on repost" : ""}`} onClick={() => react("repost")} aria-pressed={isReposted} aria-label={`Repost, ${reposts}`}>
+              <Icon name="repost" size={20} /><span>{short(reposts)}</span>
+            </button>
+          )}
           <button className="react vglass" onClick={onComments} aria-label={`Comments, ${comments}`}>
             <Icon name="comment" size={20} /><span>{short(comments)}</span>
           </button>
         </div>
         <div className="actions">
-          {p.mode === "auction" && auction && auctionButton(auction, now).kind === "bid" ? (
+          {mine ? <OwnerBar item={item} auction={auction} /> : p.mode === "auction" && auction && auctionButton(auction, now).kind === "bid" ? (
             <div className="bid-actions">
               <button className="btn vglass" onClick={onCustomBid}>Custom</button>
               <HoldToBid label={`Hold to bid ${R(auction.minNextCents)}`} onConfirm={() => onQuickBid(auction.minNextCents)} onNeedUser={needUser} />
@@ -301,9 +310,25 @@ function VideoCard({ item, auction, avatar, counts, comments, onBrowse, onBuy, o
   );
 }
 
+/** On your own post: what buyers see instead of Buy, and where to manage it. */
+function OwnerBar({ item, auction }: { item: FeedItem; auction?: AuctionInfo }) {
+  const nav = useNavigate();
+  const p = item.product;
+  const status = p.mode === "auction"
+    ? (auction?.bidCount ? `${auction.bidCount} ${auction.bidCount === 1 ? "bid" : "bids"}, top ${R(auction.currentCents ?? p.priceCents)}` : "No bids yet")
+    : p.status === "sold_out" || (p.mode === "buy_now" && p.stock < 1) ? "Sold out" : p.mode === "buy_now" ? `${p.stock} in stock` : "Taking orders";
+  return (
+    <button className="btn vglass grow owner-bar" onClick={() => nav("/sell/orders")} aria-label={`Your listing. ${status}. Open your orders`}>
+      <span className="grow" style={{ textAlign: "left" }}><b style={{ display: "block" }}>Your listing</b><span className="small" style={{ opacity: 0.8 }}>{status}</span></span>
+      <span className="small">Orders</span><Icon name="chevron" size={16} />
+    </button>
+  );
+}
+
 function ProductDetails({ item }: { item: FeedItem }) {
   const p = item.product;
   const messageShop = useMessageShop();
+  const mine = useIsMine(item.shop.id);
   const [photos] = useLoad(() => api.productPhotos(p.id), [p.id]);
   return (
     <div className="stack">
@@ -317,10 +342,11 @@ function ProductDetails({ item }: { item: FeedItem }) {
       {p.description && <p style={{ margin: 0, lineHeight: 1.5 }}>{p.description}</p>}
       {p.sizes.length > 0 && <div className="small muted">Sizes: {p.sizes.join(", ")}</div>}
       {p.allergens && <div className="note amber">Allergens: {p.allergens}</div>}
-      <div className="note">
+      {mine && <div className="note green-note"><b>This is your listing.</b> Buyers see Buy now and Message seller here.</div>}
+      {!mine && <div className="note">
         <b>Buyer protection.</b> Your money is held safely until {p.mode === "buy_now" ? "your 7 day return window closes" : "you have checked your order"}.
         {p.mode === "buy_now" ? " Change your mind? Send it back within 7 days of delivery." : " Made to order, so there are no change of mind returns."}
-      </div>
+      </div>}
       <Link to={`/s/${item.shop.handle}`} className="group" style={{ display: "block" }}>
         <div className="cell">
           <span className="avatar">{item.shop.name[0]}</span>
@@ -328,7 +354,7 @@ function ProductDetails({ item }: { item: FeedItem }) {
           <TierPill tier={item.shop.tier} />
         </div>
       </Link>
-      <button className="btn block" onClick={() => messageShop(item.shop.id, p.id)}><Icon name="chat" size={18} />Message seller about this</button>
+      {!mine && <button className="btn block" onClick={() => messageShop(item.shop.id, p.id)}><Icon name="chat" size={18} />Message seller about this</button>}
     </div>
   );
 }

@@ -1046,3 +1046,8 @@ button.g3 { border: 0; padding: 0; display: block; width: 100%; }
 .stamp-row span { width: 22px; height: 22px; border-radius: 50%; border: 1.5px dashed rgba(21, 128, 61, 0.5); }
 .stamp-row span.on { background: #16a34a; border: none; box-shadow: inset 0 0 0 3px rgba(255,255,255,.35); }
 .stamp-row span.next { border-style: solid; }
+
+/* Your own post: a quiet label instead of Follow, and your listing's status instead of Buy. */
+.follow-btn.mine-tag { display: inline-flex; align-items: center; gap: 5px; cursor: default; }
+.owner-bar { display: flex; align-items: center; gap: 8px; min-height: 52px; padding: 0 14px; color: var(--on-video, #fff); text-align: left; }
+.owner-bar b { font-size: 15px; }

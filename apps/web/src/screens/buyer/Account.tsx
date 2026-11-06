@@ -10,6 +10,7 @@ import { useTabSwipe } from "../../components/gestures";
 import { ConversationList, replyText, useMessageShop } from "./Messages";
 import { MoreSheet } from "../../components/Safety";
 import { Avatar } from "../../components/Avatar";
+import { useIsMine } from "../../lib/mine";
 
 export function SignIn() {
   const [params] = useSearchParams();
@@ -165,6 +166,8 @@ export function ShopPage() {
   const goBack = useGoBack("/explore");
   const loc = useLocation();
   const messageShop = useMessageShop();
+  const mine = useIsMine(data?.shop.id);
+  const nav = useNavigate();
   const [replyMin] = useLoad(() => (data ? api.shopReplyMinutes(data.shop.id) : Promise.resolve(null)), [data?.shop.id]);
   const [avatars] = useLoad(() => (data ? api.shopAvatars([data.shop.id]) : Promise.resolve({} as Record<string, string>)), [data?.shop.id]);
   const swipeShopTabs = useTabSwipe(["posts", "likes", "reposts"] as const, tab, setTab);
@@ -199,12 +202,22 @@ export function ShopPage() {
       </div>
       {shop.bio && <p className="pbio">{shop.bio}</p>}
       {replyText(replyMin) && <p className="pnote muted" style={{ marginTop: 4 }}><Icon name="chat" size={12} /> {replyText(replyMin)}</p>}
-      <div className="row" style={{ marginTop: 12, gap: 8 }}>
-        <button className={`btn grow ${isFollowing ? "" : "dark"}`} style={{ minHeight: 40 }}
-          onClick={() => withUser(() => toggleFollow(shop.id), "Sign in to follow")}>{isFollowing ? "Following" : "Follow"}</button>
-        <button className="btn grow" style={{ minHeight: 40 }} onClick={() => messageShop(shop.id)}><Icon name="chat" size={16} />Message</button>
-      </div>
-      {more && <MoreSheet kind="shop" targetId={shop.id} shopId={shop.id} shopHandle={shop.handle} onClose={() => setMore(false)} />}
+      {mine ? (
+        <>
+          <p className="pnote muted" style={{ marginTop: 8 }}><Icon name="store" size={12} /> This is your shop, as buyers see it.</p>
+          <div className="row" style={{ marginTop: 8, gap: 8 }}>
+            <button className="btn grow dark" style={{ minHeight: 40 }} onClick={() => nav("/me")}>Manage my shop</button>
+            <button className="btn grow" style={{ minHeight: 40 }} onClick={() => nav("/sell/orders")}><Icon name="bag" size={16} />My orders</button>
+          </div>
+        </>
+      ) : (
+        <div className="row" style={{ marginTop: 12, gap: 8 }}>
+          <button className={`btn grow ${isFollowing ? "" : "dark"}`} style={{ minHeight: 40 }}
+            onClick={() => withUser(() => toggleFollow(shop.id), "Sign in to follow")}>{isFollowing ? "Following" : "Follow"}</button>
+          <button className="btn grow" style={{ minHeight: 40 }} onClick={() => messageShop(shop.id)}><Icon name="chat" size={16} />Message</button>
+        </div>
+      )}
+      {more && <MoreSheet kind="shop" targetId={shop.id} shopId={shop.id} shopHandle={shop.handle} onClose={() => setMore(false)} mine={mine} />}
 
       <div className="ptabs" role="tablist" aria-label="Shop">
         <button role="tab" aria-selected={tab === "posts"} onClick={() => setTab("posts")}>Posts</button>
