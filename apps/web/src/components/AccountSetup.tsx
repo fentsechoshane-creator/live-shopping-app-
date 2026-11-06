@@ -16,6 +16,44 @@ function ageFrom(birthday: string) {
   return t.getFullYear() - b.getFullYear() - (t.getMonth() < b.getMonth() || (t.getMonth() === b.getMonth() && t.getDate() < b.getDate()) ? 1 : 0);
 }
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+// Each card is fully covered by an invisible native select, so a tap anywhere opens the iPhone wheel.
+function Wheel({ label, value, set, options, wide, placeholder }: { label: string; value: string; set: (v: string) => void;
+  options: { v: string; t: string }[]; wide?: boolean; placeholder: string }) {
+  return (
+    <div className={`bday-wheel ${wide ? "wide" : ""} ${value ? "set" : ""}`}>
+      <span className="cap">{label}</span>
+      <b>{options.find((o) => o.v === value)?.t ?? placeholder}</b>
+      <select value={value} onChange={(e) => set(e.target.value)} aria-label={label}>
+        <option value="" disabled>{placeholder}</option>
+        {options.map((o) => <option key={o.v} value={o.v}>{o.t}</option>)}
+      </select>
+    </div>
+  );
+}
+
+/** Day, month and year as three big wheels, centred. On an iPhone each opens the native scroll wheel. */
+function BirthdayPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [y0, m0, d0] = value ? value.split("-") : ["", "", ""];
+  const [d, setD] = useState(d0 ? String(Number(d0)) : "");
+  const [m, setM] = useState(m0 ? String(Number(m0)) : "");
+  const [y, setY] = useState(y0 ?? "");
+  const thisYear = new Date().getFullYear();
+  const days = m && y ? new Date(Number(y), Number(m), 0).getDate() : 31;
+  useEffect(() => {
+    if (d && m && y && Number(d) <= days) onChange(`${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`);
+    else onChange("");
+  }, [d, m, y]); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <div className="bday-picker" role="group" aria-label="Birthday">
+      <Wheel label="Day" value={d} set={setD} placeholder="DD" options={Array.from({ length: days }, (_, i) => ({ v: String(i + 1), t: String(i + 1) }))} />
+      <Wheel label="Month" value={m} set={setM} placeholder="MM" wide options={MONTHS.map((n, i) => ({ v: String(i + 1), t: n }))} />
+      <Wheel label="Year" value={y} set={setY} placeholder="YYYY" wide options={Array.from({ length: 100 }, (_, i) => String(thisYear - 13 - i)).map((n) => ({ v: n, t: n }))} />
+    </div>
+  );
+}
+
 /**
  * Create account, after the email code, like Instagram and TikTok:
  * 1. Birthday (an age check: 18 and over; the date itself isn't saved).
@@ -95,13 +133,14 @@ export function AccountSetup() {
       </div>
 
       {step === 0 && (
-        <form className="setup-body" onSubmit={(e) => { e.preventDefault(); if (age !== null && age >= 18) setStep(1); }}>
+        <form className="setup-body bday" onSubmit={(e) => { e.preventDefault(); if (age !== null && age >= 18) setStep(1); }}>
+          <div className="bday-icon" aria-hidden="true"><Icon name="gift" size={28} /></div>
           <h1>When's your birthday?</h1>
-          <p className="muted">It isn't shown on your profile. We only use it to check you're 18 or older.</p>
-          <label className="visually-hidden" htmlFor="bday">Birthday</label>
-          <input id="bday" className="setup-input" type="date" value={birthday} max={new Date().toISOString().slice(0, 10)} min="1900-01-01"
-            onChange={(e) => setBirthday(e.target.value)} />
-          {tooYoung && <div className="error" role="alert">You need to be 18 or older to use myHaul.</div>}
+          <p className="muted">Only to check you're 18 or older. It's never shown.</p>
+          <BirthdayPicker value={birthday} onChange={setBirthday} />
+          <div className={`bday-age ${age === null ? "" : tooYoung ? "bad" : "ok"}`} role={tooYoung ? "alert" : undefined}>
+            {age === null ? "Pick your day, month and year" : tooYoung ? "You need to be 18 or older to use myHaul" : <><Icon name="check" size={14} strokeWidth={2.6} />You're {age}</>}
+          </div>
           <div className="setup-foot">
             <button className="btn green block big" disabled={age === null || age < 18}>Next</button>
           </div>

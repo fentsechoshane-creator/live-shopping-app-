@@ -75,7 +75,7 @@ let setupCount = 0;
 async function maybeSetup(name = "Test Person") {
   const setup = page.getByRole("dialog", { name: "Create your account" });
   try { await setup.waitFor({ timeout: 2500 }); } catch { return false; }
-  await setup.getByLabel("Birthday").fill("1999-04-12");
+  await pickBirthday(setup, "1999", "4", "12");
   await setup.getByRole("button", { name: "Next" }).click();
   await setup.getByLabel("Name", { exact: true }).fill(name);
   const handle = `tester.${++setupCount}${Date.now() % 1000}`;
@@ -88,6 +88,13 @@ async function maybeSetup(name = "Test Person") {
   await setup.getByRole("button", { name: "Skip for now" }).click();
   await setup.waitFor({ state: "detached" });
   return true;
+}
+
+/** The birthday step: three wheels (day, month, year). */
+async function pickBirthday(scope, y, m, d) {
+  await scope.getByLabel("Year", { exact: true }).selectOption(y);
+  await scope.getByLabel("Month", { exact: true }).selectOption(m);
+  await scope.getByLabel("Day", { exact: true }).selectOption(d);
 }
 
 async function signIn(email) {
@@ -109,10 +116,10 @@ try {
   await page.goto(BASE);
   // First open: three welcome screens (swipe or Next), then pick interests.
   const welcome = page.getByRole("dialog", { name: "Welcome to myHaul" });
-  await welcome.getByText("Shop from short videos").waitFor();
+  await welcome.getByText("Watch. Tap. Buy.").waitFor();
   await shot("welcome");
   await swipe(".welcome", -150);
-  await welcome.getByText("Your money is held safely").waitFor();
+  await welcome.getByText("Your money is safe").waitFor();
   await welcome.getByRole("button", { name: "Skip" }).click();
   await welcome.getByRole("button", { name: /Bakes/ }).click();
   await check(welcome.getByRole("button", { name: /Bakes/ }).getAttribute("aria-pressed").then((v) => v === "true"), "interest picked");
@@ -120,7 +127,7 @@ try {
   await welcome.getByRole("button", { name: "Next" }).click();
   // Last step: the swipe up lesson over the feed. No button: swiping it away starts watching.
   const coach = page.getByRole("dialog", { name: "How to watch" });
-  await coach.getByText("Swipe up for more").waitFor();
+  await coach.getByText("Swipe up").waitFor();
   await page.waitForTimeout(700);
   await shot("welcome-swipe");
   await swipe(".coach", 0, -160, 0.5, 0.7);
@@ -142,10 +149,10 @@ try {
   // A new account: Create account first (age check, name, unique username, photo), then checkout opens by itself.
   const setup = page.getByRole("dialog", { name: "Create your account" });
   await setup.getByText("When's your birthday?").waitFor();
-  await setup.getByLabel("Birthday").fill("2012-01-01");
+  await pickBirthday(setup, "2012", "1", "1");
   await setup.getByText("You need to be 18 or older").waitFor();
   await check(setup.getByRole("button", { name: "Next" }).isDisabled(), "under 18 can't continue");
-  await setup.getByLabel("Birthday").fill("1999-04-12");
+  await pickBirthday(setup, "1999", "4", "12");
   await setup.getByRole("button", { name: "Next" }).click();
   await setup.getByLabel("Name", { exact: true }).fill("Thandi Mokoena");
   await setup.getByLabel("Username", { exact: true }).fill("lebo.m"); // a sample seller already has this one
