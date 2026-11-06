@@ -107,6 +107,14 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-06: First real sandbox payment, and matching payments to orders
+
+- First live test payment went through: R60 order paid with Ozow, TradeSafe shows "Funds Received & Cleared".
+- But the order stayed unpaid in myHaul: TradeSafe gave the payment its own reference code (TTSWKQPG) instead of our order number, so our server couldn't match its messages to the order and ignored them (safely).
+- Fixed: the payment message is matched by TradeSafe's transaction id (saved at checkout), falling back to our order number. We still ask TradeSafe for the real state before marking anything paid.
+- Backup: every 15 minutes, unpaid orders from the last day are checked with TradeSafe and marked paid if the money is in.
+- Live escrow-webhook, run-due and checkout need redeploying with these (waiting for Ofentse's OK). [Claude]
+
 ### 2026-11-06: TradeSafe minimum, R50 lowest price
 
 - First live test checkout (R25 item, collection) failed: TradeSafe refuses payments under about R49 ("value must be at least 42.6086956522", which is R49 with VAT).

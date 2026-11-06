@@ -6,6 +6,8 @@
 // plugin reads them; older examples wrap them in "data", so both are accepted.
 // We never trust the message itself: we ask TradeSafe for the transaction's real state, using the transaction id we
 // saved at checkout, before marking anything paid.
+// TradeSafe may replace our reference with its own code (seen live on 6 Nov 2026: "TTSWKQPG"), so we find the order
+// by TradeSafe's transaction id first and only fall back to our reference.
 import { json, sameSecret } from "../_shared/http.ts";
 import { adminClient } from "../_shared/supabase.ts";
 import { escrow, PAID_STATES } from "../_shared/escrow.ts";
@@ -22,10 +24,14 @@ Deno.serve(async (req) => {
   try { body = JSON.parse(raw); } catch { /* ignored below */ }
   const msg = body?.data && typeof body.data === "object" ? body.data : body;
   const reference = typeof msg?.reference === "string" ? msg.reference.trim() : "";
-  if (!UUID.test(reference)) return json({ ok: true, ignored: "no reference" });
+  const txId = typeof msg?.id === "string" ? msg.id.trim() : "";
+  const byTx = /^[A-Za-z0-9_-]{6,64}$/.test(txId);
+  if (!byTx && !UUID.test(reference)) return json({ ok: true, ignored: "no reference" });
 
   const db = adminClient();
-  const { data: order } = await db.from("orders").select("id, status, escrow_transaction_id").eq("id", reference).maybeSingle();
+  const cols = "id, status, escrow_transaction_id";
+  let order = byTx ? (await db.from("orders").select(cols).eq("escrow_transaction_id", txId).maybeSingle()).data : null;
+  if (!order && UUID.test(reference)) order = (await db.from("orders").select(cols).eq("id", reference).maybeSingle()).data;
   if (!order?.escrow_transaction_id) return json({ ok: true, ignored: "unknown order" });
 
   let es;
@@ -36,7 +42,8 @@ Deno.serve(async (req) => {
   let real;
   try { real = await es.transactionState(order.escrow_transaction_id); }
   catch (e) { console.error("tradesafe state", e); return json({ error: "try again" }, 500); }
-  if (!real || real.reference !== order.id) return json({ ok: true, ignored: "not confirmed" });
+  // We asked by the transaction id saved at checkout, so this answer is about this order.
+  if (!real) return json({ ok: true, ignored: "not confirmed" });
 
   if (order.status === "pending_payment" && PAID_STATES.includes(real.state)) {
     // How they paid decides Instant EFT delivery stamps later.

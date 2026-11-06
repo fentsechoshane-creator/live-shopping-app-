@@ -144,6 +144,21 @@ Deno.serve(async (req) => {
   }
 
   const dayAgo = new Date(now.getTime() - 86400_000).toISOString();
+  // Backup for missed or unmatched payment messages: recent unpaid orders are checked with TradeSafe every run.
+  if (es.mode === "live") {
+    const fiveMin = new Date(now.getTime() - 5 * 60_000).toISOString();
+    const { data: recent } = await db.from("orders").select("id, escrow_transaction_id").eq("status", "pending_payment")
+      .not("escrow_transaction_id", "is", null).gte("created_at", dayAgo).lt("created_at", fiveMin).limit(50);
+    for (const o of recent ?? []) {
+      try {
+        const st = await es.transactionState(o.escrow_transaction_id);
+        if (st && PAID_STATES.includes(st.state)) {
+          await db.from("orders").update({ status: "paid", payment_method: await es.paymentMethod(o.escrow_transaction_id) }).eq("id", o.id).eq("status", "pending_payment");
+          done.paidLate = (done.paidLate ?? 0) + 1;
+        }
+      } catch (e) { console.error("payment check", o.id, e); }
+    }
+  }
   const { data: stale } = await db.from("orders").select("id, escrow_transaction_id").eq("status", "pending_payment").lt("created_at", dayAgo).limit(200);
   for (const o of stale ?? []) {
     try {
