@@ -107,6 +107,11 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-06: Full screen on the iPhone home screen
+
+- Added Apple's home screen app settings (apple-mobile-web-app-capable, black-translucent status bar, title). Added to the home screen, myHaul now opens full screen and draws behind the clock and battery.
+- Pages, the profile and the team dashboard now leave room for the notch (safe area at the top). In Safari itself nothing changes.
+
 ### 2026-11-06: Instant payment feedback
 
 - Ofentse wants "Paid" to show straight away. Three layers now:
