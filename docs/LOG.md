@@ -66,7 +66,7 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 ## Next up
 
 - **Edit your own listing:** price, description, stock, pause, mark sold, delete (sellers can't change a listing after posting yet). [Claude]
-- **Bob Go sandbox:** Ofentse adds `BOBGO_API_KEY` and `BOBGO_MODE=sandbox` in Supabase secrets and the "Tracking updated" webhook in Bob Go; then Claude tests a booking and confirms the sandbox address `api.sandbox.bobgo.co.za` [CONFIRM]. [Ofentse, Claude]
+- **Bob Go sandbox:** key and sandbox mode are in and work. Ofentse adds the "Tracking updated" webhook in Bob Go (URL in docs/SETUP.md section 4: `.../functions/v1/bobgo-webhook`). Then test a full sandbox booking from a real order. Later: read "Shipment submission status" and "Shipment health status" to alert sellers when a booking fails or a parcel is stuck. [Ofentse, Claude]
 - **Mux Robots:** check videos when they're ready (hold flagged posts), suggest covers and listing details. [Claude]
 - **Live selling on Mux:** go live from the phone, watch, buy or bid during a live. [Claude]
 - **Bob Go:** sandbox key and webhook secret in Supabase secrets (docs/SETUP.md section 4), then set `BOBGO_MODE=sandbox`. Everything else is already live. [Ofentse]
@@ -108,6 +108,12 @@ Debug as we go: anyone who finds or fixes a problem updates this list. Highest r
 Fixed in this round: Safari double back on the edge swipe (now only in the installed app), deleting an account now also deletes the person's photos and videos, React Router warnings.
 
 ## Log
+
+### 2026-11-07: Live: friends and sharing, Bob Go sandbox connected
+
+- Deployed with Ofentse's OK ("apply everything"): migration 0033 (friends) live, the app pushed (site on 6fa3e67), bobgo-webhook and run-due redeployed.
+- Bob Go sandbox connected: Ofentse added the key and `BOBGO_MODE=sandbox`. The health check now asks Bob Go for lockers near Cape Town (read only) and got 15 back, so the key and the sandbox address `api.sandbox.bobgo.co.za` are confirmed.
+- Tracking backup now every 30 minutes (was 6 hours), up to 50 parcels every 5 minutes.
 
 ### 2026-11-07: Friends and sharing, Bob Go webhook without a secret
 
