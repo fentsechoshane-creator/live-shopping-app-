@@ -31,7 +31,7 @@ interface State {
   comments: { id: string; postId: string; userId: string; body: string; createdAt: string; hidden?: boolean }[];
   conversations: { id: string; buyerId: string; shopId: string; lastAt: string }[];
   messages: { id: string; conversationId: string; senderId: string; body: string; createdAt: string; readAt: string | null; productId?: string | null; image?: string | null; offerId?: string | null }[];
-  offers?: { id: string; conversationId: string; productIds: string[]; priceCents: number; expiresAt: string; status: "open" | "used" | "withdrawn" }[];
+  offers?: { id: string; conversationId: string; productIds: string[]; priceCents: number; expiresAt: string; status: "pending" | "open" | "used" | "withdrawn" | "declined"; madeBy?: "seller" | "buyer" }[];
   blocks: { blockerId: string; blockedId: string }[];
   reports: { id: string; reporterId: string; targetKind: ReportTarget; targetId: string; reason: ReportReason; details: string; createdAt: string; status: "open" | "actioned" | "dismissed" }[];
   delivery?: Record<string, SavedDelivery>;
@@ -396,7 +396,7 @@ export function createDemoApi(): Api {
     const of = oid ? (s.offers ?? []).find((x) => x.id === oid) : undefined;
     if (!of) return null;
     const listedCents = of.productIds.reduce((n, pid) => n + (s.products.find((p) => p.id === pid)?.priceCents ?? 0), 0);
-    return { id: of.id, productIds: of.productIds, priceCents: of.priceCents, listedCents, expiresAt: of.expiresAt, status: of.status };
+    return { id: of.id, productIds: of.productIds, priceCents: of.priceCents, listedCents, expiresAt: of.expiresAt, status: of.status, madeBy: of.madeBy ?? "seller" };
   };
   const blockedBetween = (a: string, b: string) => s.blocks.some((x) => (x.blockerId === a && x.blockedId === b) || (x.blockerId === b && x.blockedId === a));
   const toConv = (c: State["conversations"][number], viewer: string) => {
@@ -934,12 +934,43 @@ export function createDemoApi(): Api {
       if (!productIds.length || items.some((p) => !p || p.shopId !== c.shopId || p.status !== "live")) throw new Error("Offers can only include live items from your shop.");
       const listed = items.reduce((n, p) => n + p!.priceCents, 0);
       if (priceCents > listed) throw new Error(`An offer can't be more than the listed price (R${listed / 100}).`);
-      if (priceCents < 1000) throw new Error("Offers start at R10.");
+      if (priceCents < 5000) throw new Error("Special prices start at R50.");
       const of = { id: id(), conversationId: cid, productIds, priceCents, expiresAt: new Date(Date.now() + hours * 3600e3).toISOString(), status: "open" as const }; // real clock, not the demo time skip
       s.offers = [...(s.offers ?? []), of];
       s.messages.push({ id: id(), conversationId: cid, senderId: u.id, body: "", createdAt: now().toISOString(), readAt: null, offerId: of.id });
       c.lastAt = now().toISOString();
       notify(c.buyerId, "New offer", `${shopOf(c.shopId).name} sent you a special price.`, `/messages/${cid}`);
+      save();
+    },
+    async buyerOffer(cid, productId, priceCents) {
+      notSuspended();
+      const u = me();
+      const c = s.conversations.find((x) => x.id === cid);
+      if (!c || c.buyerId !== u.id) throw new Error("Only the buyer in this chat can make an offer.");
+      const p = s.products.find((x) => x.id === productId);
+      if (!p || p.shopId !== c.shopId || p.status !== "live") throw new Error("That item isn't available.");
+      if (p.mode !== "buy_now") throw new Error("Offers are only for Buy now items.");
+      if (priceCents < 5000) throw new Error("Offers start at R50.");
+      if (priceCents >= p.priceCents) throw new Error(`Offer less than the listed price (R${p.priceCents / 100}).`);
+      if (priceCents * 2 < p.priceCents) throw new Error(`Offers can't be less than half the price (R${Math.ceil(p.priceCents / 200)}).`);
+      if ((s.offers ?? []).some((o) => o.conversationId === cid && o.madeBy === "buyer" && o.status === "pending" && o.productIds.includes(productId)))
+        throw new Error("You already have an offer waiting on this item.");
+      const of = { id: id(), conversationId: cid, productIds: [productId], priceCents, expiresAt: new Date(Date.now() + 24 * 3600e3).toISOString(), status: "pending" as const, madeBy: "buyer" as const };
+      s.offers = [...(s.offers ?? []), of];
+      s.messages.push({ id: id(), conversationId: cid, senderId: u.id, body: "", createdAt: now().toISOString(), readAt: null, offerId: of.id });
+      c.lastAt = now().toISOString();
+      notify(shopOf(c.shopId).ownerId, `New offer: R${priceCents / 100}`, `Someone offered R${priceCents / 100} for ${p.title}.`, `/messages/${cid}`);
+      save();
+    },
+    async answerOffer(oid, accept) {
+      const u = me();
+      const of = (s.offers ?? []).find((x) => x.id === oid);
+      const c = of && s.conversations.find((x) => x.id === of.conversationId);
+      if (!of || !c || shopOf(c.shopId).ownerId !== u.id) throw new Error("Only the seller can answer this offer.");
+      if (of.status !== "pending") throw new Error("This offer has already been answered or has ended.");
+      of.status = accept ? "open" : "declined";
+      if (accept) of.expiresAt = new Date(Date.now() + 24 * 3600e3).toISOString();
+      notify(c.buyerId, accept ? "Offer accepted" : "Offer declined", accept ? "Pay within 24 hours to get it." : "The seller declined your offer.", `/messages/${c.id}`);
       save();
     },
     async holdProduct(productId, buyerId, hours) {

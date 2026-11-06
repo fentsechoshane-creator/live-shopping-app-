@@ -366,7 +366,7 @@ try {
   // Message a seller from the post menu. The sample shop replies; numbers get a warning.
   await teePost.scrollIntoViewIfNeeded();
   await teePost.getByRole("button", { name: "More options" }).click();
-  await page.getByRole("button", { name: "Message @thrift.with.lebo" }).click();
+  await page.getByRole("dialog", { name: "This post" }).getByRole("button", { name: "Message @thrift.with.lebo" }).click();
   await page.waitForURL(/\/messages\//);
   await page.getByText("Keep payments in the app").waitFor();
   // The item comes with you: "Asking about" the tee, with quick questions.
@@ -714,6 +714,38 @@ try {
   await page.waitForURL(/mock-pay/);
   await page.getByRole("button", { name: "Pay now" }).click();
   await page.waitForURL(/\/orders\//);
+
+  // ===== Buyer offers: offer from the item, the seller accepts, the buyer pays the accepted price =====
+  await page.goto(`${BASE}/i/p-denim`);
+  const den = page.getByRole("region", { name: /Vintage denim jacket/ });
+  await den.getByRole("button", { name: /Message @thrift.with.lebo/ }).waitFor(); // Message is right on the video
+  await den.getByRole("button", { name: /See details/ }).click();
+  await page.getByRole("dialog", { name: "Vintage denim jacket" }).getByRole("button", { name: "Make an offer" }).click();
+  const mo = page.getByRole("dialog", { name: "Make an offer" });
+  await mo.getByRole("group", { name: "Suggested offers" }).getByRole("button", { name: /R405/ }).waitFor();
+  await mo.getByLabel("Your offer (rand)").fill("100");
+  await mo.getByText("The lowest offer is R225.").waitFor(); // at least half the price
+  await mo.getByLabel("Your offer (rand)").fill("");
+  await mo.getByRole("group", { name: "Suggested offers" }).getByRole("button", { name: /R405/ }).click();
+  await shot("make-offer");
+  await mo.getByRole("button", { name: "Offer R405" }).click();
+  await page.waitForURL(/\/messages\//);
+  await page.getByText("Waiting for the seller", { exact: false }).waitFor();
+  await signOut();
+  await signIn("lebo@shop.demo");
+  await page.goto(`${BASE}/inbox?tab=messages`);
+  await page.locator(`a[href^="/messages/"]`).first().click(); // newest chat first
+  await page.getByText("Offer from the buyer").waitFor();
+  await shot("offer-seller");
+  await page.getByRole("button", { name: "Accept" }).click();
+  await page.getByText("Accepted", { exact: false }).first().waitFor();
+  await signOut();
+  await signIn("buyer@test.co.za");
+  await page.goto(`${BASE}/inbox?tab=messages`);
+  await page.getByRole("link", { name: /Lebo's Thrift/ }).first().click();
+  await page.getByRole("button", { name: "Buy for R405" }).click();
+  await page.getByRole("dialog", { name: "Checkout" }).getByText("R405").first().waitFor();
+  await page.getByRole("dialog", { name: "Checkout" }).getByRole("button", { name: "Close" }).click();
 
   // ===== Delivery through Bob Go: prices by parcel size, a street address, lockers =====
   await page.goto(`${BASE}/i/p-denim`);

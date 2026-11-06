@@ -24,6 +24,7 @@ import { timeLeft } from "@app/core";
 import type { AuctionInfo } from "../../api";
 import { useIsMine } from "../../lib/mine";
 import { useMyShopId } from "../../lib/mine";
+import { MakeOfferSheet } from "../../components/MakeOffer";
 
 type Tab = "for_you" | "following" | "live";
 
@@ -145,6 +146,8 @@ export function FeedList({ items, start = 0, onNearEnd }: { items: FeedItem[]; s
   const [more, setMore] = useState<FeedItem | null>(null);
   const messageShop = useMessageShop();
   const myShop = useMyShopId();
+  const [offering, setOffering] = useState<FeedItem | null>(null);
+  const navTo = useNavigate();
 
   const go = (d: number) => ref.current?.scrollTo({ top: (index + d) * ref.current.clientHeight, behavior: "smooth" });
   const startBuy = (it: FeedItem) => it.product.mode === "auction"
@@ -156,7 +159,7 @@ export function FeedList({ items, start = 0, onNearEnd }: { items: FeedItem[]; s
       <div className="feed" ref={ref} aria-label="Video feed">
         {items.map((it) => <VideoCard key={it.postId} item={it} auction={auctions[it.product.id]} avatar={avatars[it.shop.id]} counts={counts[it.postId]} comments={commentCounts[it.postId] ?? 0}
           onBrowse={() => setBrowse(it)} onBuy={() => startBuy(it)} onComments={() => setCommenting(it)} onMore={() => setMore(it)}
-          onQuickBid={(amount) => quickBid(it, amount)} onCustomBid={() => customFor(it)} needUser={needUser} />)}
+          onQuickBid={(amount) => quickBid(it, amount)} onCustomBid={() => customFor(it)} needUser={needUser} onMessage={() => messageShop(it.shop.id, it.product.id)} />)}
       </div>
       {items.length > 1 && (
         <div className="rail">
@@ -169,9 +172,11 @@ export function FeedList({ items, start = 0, onNearEnd }: { items: FeedItem[]; s
       )}
       {browse && (
         <Sheet title={browse.product.title} onClose={() => setBrowse(null)} footer={browse.shop.id === myShop ? <OwnerBar item={browse} auction={auctions[browse.product.id]} /> : <BuyButton item={browse} auction={auctions[browse.product.id]} onClick={() => startBuy(browse)} block />}>
-          <ProductDetails item={browse} />
+          <ProductDetails item={browse} onOffer={() => withUser(() => { setOffering(browse); setBrowse(null); }, "Sign in to make an offer")} />
         </Sheet>
       )}
+      {offering && <MakeOfferSheet item={{ productId: offering.product.id, shopId: offering.shop.id, title: offering.product.title, priceCents: offering.product.priceCents }}
+        onClose={() => setOffering(null)} onSent={(conv) => { setOffering(null); toast("Offer sent. The seller has 24 hours to reply."); navTo(`/messages/${conv}`); }} />}
       {buy && <CheckoutSheet item={buy} onClose={() => setBuy(null)} auctionPrice={buy.product.mode === "auction" ? auctions[buy.product.id]?.priceCents ?? null : null} />}
       {bidding && <AuctionSheet item={bidding} info={auctions[bidding.product.id]} onInfo={setAuction} onClose={() => setBidding(null)} focusCustom={customBid}
         onPay={() => { const it = bidding; setBidding(null); setBuy(it); }} />}
@@ -224,9 +229,9 @@ function statusChip(it: FeedItem, a?: AuctionInfo, now = Date.now()): { text: st
 /** Short count like TikTok: 1234 shows as 1.2K. */
 const short = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1).replace(/\.0$/, "")}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1).replace(/\.0$/, "")}K` : String(n));
 
-function VideoCard({ item, auction, avatar, counts, comments, onBrowse, onBuy, onComments, onMore, onQuickBid, onCustomBid, needUser }: {
+function VideoCard({ item, auction, avatar, counts, comments, onBrowse, onBuy, onComments, onMore, onQuickBid, onCustomBid, needUser, onMessage }: {
   item: FeedItem; auction?: AuctionInfo; avatar?: string; counts?: { likes: number; reposts: number }; comments: number; onBrowse: () => void; onBuy: () => void; onComments: () => void; onMore: () => void;
-  onQuickBid: (amountCents: number) => Promise<void>; onCustomBid: () => void; needUser: () => boolean;
+  onQuickBid: (amountCents: number) => Promise<void>; onCustomBid: () => void; needUser: () => boolean; onMessage: () => void;
 }) {
   const p = item.product;
   const { following, toggleFollow, liked, reposted, toggleReaction, toast, withUser } = useSession();
@@ -303,6 +308,7 @@ function VideoCard({ item, auction, avatar, counts, comments, onBrowse, onBuy, o
               <HoldToBid label={`Hold to bid ${R(auction.minNextCents)}`} onConfirm={() => onQuickBid(auction.minNextCents)} onNeedUser={needUser} />
             </div>
           ) : <BuyButton item={item} auction={auction} onClick={onBuy} />}
+          {!mine && <button className="vround vglass" onClick={onMessage} aria-label={`Message @${item.shop.handle}`}><Icon name="chat" /></button>}
           <button className="vround vglass" onClick={share} aria-label="Share"><Icon name="share" /></button>
         </div>
       </div>
@@ -325,7 +331,7 @@ function OwnerBar({ item, auction }: { item: FeedItem; auction?: AuctionInfo }) 
   );
 }
 
-function ProductDetails({ item }: { item: FeedItem }) {
+function ProductDetails({ item, onOffer }: { item: FeedItem; onOffer: () => void }) {
   const p = item.product;
   const messageShop = useMessageShop();
   const mine = useIsMine(item.shop.id);
@@ -354,7 +360,12 @@ function ProductDetails({ item }: { item: FeedItem }) {
           <TierPill tier={item.shop.tier} />
         </div>
       </Link>
-      {!mine && <button className="btn block" onClick={() => messageShop(item.shop.id, p.id)}><Icon name="chat" size={18} />Message seller about this</button>}
+      {!mine && (
+        <div className="row" style={{ gap: 8 }}>
+          <button className="btn grow" onClick={() => messageShop(item.shop.id, p.id)}><Icon name="chat" size={18} />Message seller</button>
+          {p.mode === "buy_now" && p.status === "live" && <button className="btn grow" onClick={onOffer}><Icon name="payout" size={18} />Make an offer</button>}
+        </div>
+      )}
     </div>
   );
 }

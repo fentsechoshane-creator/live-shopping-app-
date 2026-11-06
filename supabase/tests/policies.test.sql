@@ -383,6 +383,25 @@ do $$ begin
   assert shop_reply_minutes((select id from shops where handle = 'other.shop')) is not null, 'reply time works';
 end $$;
 reset role;
+-- Buyer offers: the buyer offers, the seller answers. Limits: R50, under the listed price, at least half, one waiting per item.
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000d');
+select pg_temp.expect_error($$select buyer_offer((select id from conversations limit 1), (select id from products where title = 'Satin scarf'), 4000)$$, 'start at R50');
+select pg_temp.expect_error($$select buyer_offer((select id from conversations limit 1), (select id from products where title = 'Satin scarf'), 20000)$$, 'less than the listed price');
+select pg_temp.expect_error($$select buyer_offer((select id from conversations limit 1), (select id from products where title = 'Satin scarf'), 9000)$$, 'less than half');
+select buyer_offer((select id from conversations limit 1), (select id from products where title = 'Satin scarf'), 16000);
+select pg_temp.expect_error($$select buyer_offer((select id from conversations limit 1), (select id from products where title = 'Satin scarf'), 17000)$$, 'already have an offer waiting');
+insert into messages (conversation_id, sender_id, body, offer_id) select c.id, '00000000-0000-0000-0000-00000000000d', '', o.id from conversations c, offers o where o.made_by = 'buyer';
+select pg_temp.expect_error($$select answer_offer((select id from offers where made_by = 'buyer'), true)$$, 'Only the seller');
+reset role;
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000e');
+select pg_temp.expect_error($$select buyer_offer((select id from conversations limit 1), (select id from products where title = 'Satin scarf'), 16000)$$, 'Only the buyer');
+select answer_offer((select id from offers where made_by = 'buyer'), true);
+select pg_temp.expect_error($$select answer_offer((select id from offers where made_by = 'buyer'), false)$$, 'already been answered');
+select pg_temp.expect_error($$select make_offer((select id from conversations limit 1), array[(select id from products where title = 'Satin scarf')], 4000)$$, 'start at R50');
+do $$ begin assert (select status from offers where made_by = 'buyer') = 'open', 'accepted offer can be paid'; end $$;
+reset role;
+do $$ begin assert (select count(*) from notifications where kind = 'offer') >= 2, 'both sides told'; end $$;
+reset role;
 select 'offer, hold and reply time tests passed' as result;
 -- Device tokens: your own only; removed when the account is deleted.
 select pg_temp.act_as('00000000-0000-0000-0000-00000000000d');

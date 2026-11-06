@@ -439,7 +439,7 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
       const convs = (check(await sb.rpc("my_conversations")) as any[]).map(toConversation);
       const conversation = convs.find((c) => c.id === conversationId);
       if (!conversation) throw new Error("This chat isn't available.");
-      const rows = check(await sb.from("messages").select("id, body, created_at, sender_id, read_at, product_id, image_path, offers(id, product_ids, price_cents, expires_at, status)")
+      const rows = check(await sb.from("messages").select("id, body, created_at, sender_id, read_at, product_id, image_path, offers(id, product_ids, price_cents, expires_at, status, made_by)")
         .eq("conversation_id", conversationId).order("created_at")) as any[];
       const offerIds = rows.flatMap((r) => r.offers?.product_ids ?? []);
       const prices = offerIds.length ? Object.fromEntries(((await sb.from("products").select("id, price_cents").in("id", offerIds)).data ?? []).map((p: any) => [p.id, p.price_cents])) : {};
@@ -447,7 +447,7 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
       await sb.from("messages").update({ read_at: new Date().toISOString() }).eq("conversation_id", conversationId).neq("sender_id", me).is("read_at", null);
       return { conversation, messages: rows.map((r, i) => ({ id: r.id, body: r.body, createdAt: r.created_at, mine: r.sender_id === me, readAt: r.read_at, productId: r.product_id,
         imageUrl: images[i],
-        offer: r.offers ? { id: r.offers.id, productIds: r.offers.product_ids, priceCents: r.offers.price_cents, expiresAt: r.offers.expires_at, status: r.offers.status,
+        offer: r.offers ? { id: r.offers.id, productIds: r.offers.product_ids, priceCents: r.offers.price_cents, expiresAt: r.offers.expires_at, status: r.offers.status, madeBy: r.offers.made_by ?? "seller",
           listedCents: r.offers.product_ids.reduce((n: number, id: string) => n + (prices[id] ?? 0), 0) } : null })) };
     },
     async sendMessage(conversationId, body, productId, image) {
@@ -468,6 +468,13 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
     async makeOffer(conversationId, productIds, priceCents, hours) {
       const offerId = check(await sb.rpc("make_offer", { p_conversation: conversationId, p_products: productIds, p_price: priceCents, p_hours: hours })) as string;
       check(await sb.from("messages").insert({ conversation_id: conversationId, sender_id: await uid(), body: "", offer_id: offerId }));
+    },
+    async buyerOffer(conversationId, productId, priceCents) {
+      const offerId = check(await sb.rpc("buyer_offer", { p_conversation: conversationId, p_product: productId, p_price: priceCents })) as string;
+      check(await sb.from("messages").insert({ conversation_id: conversationId, sender_id: await uid(), body: "", offer_id: offerId }));
+    },
+    async answerOffer(offerId, accept) {
+      check(await sb.rpc("answer_offer", { p_offer: offerId, p_accept: accept }));
     },
     async holdProduct(productId, buyerId, hours) {
       check(await sb.rpc("hold_product", { p_product: productId, p_buyer: buyerId, p_hours: hours }));

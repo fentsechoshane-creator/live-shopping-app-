@@ -57,7 +57,9 @@ export interface Conversation {
   id: string; shopId: string; shopName: string; shopHandle: string; otherName: string; iAmSeller: boolean;
   lastBody: string | null; lastAt: string; unread: number; buyerId: string;
 }
-export interface Offer { id: string; productIds: string[]; priceCents: Cents; listedCents: Cents; expiresAt: string; status: "open" | "used" | "withdrawn" }
+export interface Offer { id: string; productIds: string[]; priceCents: Cents; listedCents: Cents; expiresAt: string;
+  /** pending: a buyer's offer waiting for the seller. open: can be paid. */
+  status: "pending" | "open" | "used" | "withdrawn" | "declined"; madeBy: "seller" | "buyer" }
 export interface Message {
   id: string; body: string; createdAt: string; mine: boolean; readAt: string | null; productId: string | null;
   imageUrl: string | null; offer: Offer | null;
@@ -450,6 +452,9 @@ export interface Api {
   productItem(productId: string): Promise<FeedItem | null>;
   /** Seller: a special price for one item or a bundle, sent as a message. */
   makeOffer(conversationId: string, productIds: string[], priceCents: Cents, hours: number): Promise<void>;
+  /** The buyer offers a price on one Buy now item; the seller accepts, counters or declines. */
+  buyerOffer(conversationId: string, productId: string, priceCents: Cents): Promise<void>;
+  answerOffer(offerId: string, accept: boolean): Promise<void>;
   /** Seller: hold an item for this buyer (0 hours releases it). */
   holdProduct(productId: string, buyerId: string, hours: number): Promise<void>;
   /** Median minutes a shop takes to answer a new chat, or null if not enough chats yet. */

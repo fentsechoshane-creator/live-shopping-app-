@@ -295,7 +295,7 @@ a { color: inherit; text-decoration: none; }
 .product-chip .t { font-weight: 650; font-size: 13px; letter-spacing: -0.005em; }
 .product-chip .s { font-size: 11.5px; color: var(--on-video-2); }
 .product-chip .p { font-weight: 700; font-size: 14px; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; flex-shrink: 0; }
-.actions { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.actions { display: grid; grid-auto-flow: column; grid-template-columns: 1fr; grid-auto-columns: auto; gap: 8px; }
 .actions .btn { min-height: 46px; }
 .vround { width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; border: 0; }
 .vround svg { width: 20px; height: 20px; }
@@ -699,7 +699,7 @@ button.g3 { border: 0; padding: 0; display: block; width: 100%; }
 .chat-foot { background: transparent; border-top: 0; }
 .quick .edit { color: var(--blue); }
 .chat-photo { display: block; width: 100%; max-width: 230px; border-radius: 12px; margin: -3px -6px 6px; object-fit: cover; }
-.bubble.has-offer { min-width: 230px; }
+.bubble.has-offer { min-width: 268px; }
 .offer-card { display: flex; flex-direction: column; gap: 6px; padding: 10px; margin: -3px -6px 6px; border-radius: 13px; background: rgba(255, 255, 255, 0.6); color: var(--ink); }
 .bubble:not(.mine) .offer-card { background: var(--surface-2); }
 .offer-tag { align-self: flex-start; padding: 2px 8px; border-radius: 999px; background: var(--green); color: #052e16; font-size: 11px; font-weight: 800; }
@@ -1116,3 +1116,18 @@ button.g3 { border: 0; padding: 0; display: block; width: 100%; }
   font-size: 14px; font-weight: 600; color: var(--ink-2); background: var(--surface-2); }
 .bday-age.ok { color: var(--green-text); background: var(--green-soft); }
 .bday-age.bad { color: var(--red-text); background: var(--red-soft, rgba(255, 59, 48, 0.12)); }
+
+/* Make an offer */
+.mo-item { display: flex; flex-direction: column; gap: 2px; margin-bottom: 14px; }
+.mo-picks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
+.mo-picks button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px 6px; border: 0; border-radius: 16px; font: inherit; color: var(--ink);
+  background: var(--surface); box-shadow: inset 0 0 0 1px var(--hairline); cursor: pointer; transition: transform 0.15s; }
+.mo-picks button b { font-size: 18px; font-variant-numeric: tabular-nums; }
+.mo-picks button span { font-size: 12px; color: var(--ink-2); }
+.mo-picks button.on { box-shadow: inset 0 0 0 2px var(--green); background: var(--green-soft); }
+.mo-picks button:active { transform: scale(0.97); }
+.mo-how { display: flex; gap: 6px; align-items: flex-start; margin-top: 12px; line-height: 1.4; }
+.offer-actions { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-top: 4px; }
+.offer-actions .btn { min-height: 38px; font-size: 13px; padding: 0 4px; white-space: nowrap; }
+.offer-card.declined .offer-price b, .offer-card.withdrawn .offer-price b { text-decoration: line-through; opacity: 0.6; }
+.quick .offer-chip { display: inline-flex; align-items: center; gap: 5px; font-weight: 700; color: var(--green-text); box-shadow: inset 0 0 0 1px var(--green); }

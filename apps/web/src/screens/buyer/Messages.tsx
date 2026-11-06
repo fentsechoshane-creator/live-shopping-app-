@@ -10,6 +10,7 @@ import { CheckoutSheet } from "./Checkout";
 import { ReportSheet } from "../../components/Safety";
 import { askForNotifications } from "../../lib/push";
 import { useMyShopId } from "../../lib/mine";
+import { MakeOfferSheet } from "../../components/MakeOffer";
 
 /** Opens (or starts) the chat with a shop. Signed out people go to sign in first. */
 export function useMessageShop() {
@@ -77,6 +78,9 @@ export function Thread() {
   const [menu, setMenu] = useState(false);
   const [plus, setPlus] = useState(false);
   const [sheet, setSheet] = useState<null | "offer" | "hold" | "replies">(null);
+  // The seller answers a buyer's offer with their own price; the buyer offers on an item.
+  const [counter, setCounter] = useState<Offer | null>(null);
+  const [offering, setOffering] = useState<FeedItem | null>(null);
   const [buying, setBuying] = useState<{ item: FeedItem; offer?: Offer } | null>(null);
   const [reporting, setReporting] = useState(false);
   const { busy, error: sendError, run, setError } = useAction();
@@ -153,7 +157,9 @@ export function Thread() {
         ) : (
           <div key={l.m.id} className={`bubble ${l.m.mine ? "mine" : ""} ${l.m.offer ? "has-offer" : ""}`}>
             {l.m.productId && <ChatProduct productId={l.m.productId} canBuy={!c.iAmSeller} onBuy={() => buy(l.m.productId!)} />}
-            {l.m.offer && <OfferCard offer={l.m.offer} buyer={!c.iAmSeller} onBuy={() => buy(l.m.offer!.productIds[0], l.m.offer!)} />}
+            {l.m.offer && <OfferCard offer={l.m.offer} buyer={!c.iAmSeller} onBuy={() => buy(l.m.offer!.productIds[0], l.m.offer!)}
+              onAnswer={(accept) => run(async () => { await api.answerOffer(l.m.offer!.id, accept); toast(accept ? "Offer accepted. The buyer has 24 hours to pay." : "Offer declined"); reload(); })}
+              onCounter={() => setCounter(l.m.offer!)} />}
             {l.m.imageUrl && <img className="chat-photo" src={l.m.imageUrl} alt="Photo" />}
             {l.m.body}
             <span className="when">{timeAgo(l.m.createdAt)}{l.m.mine && l.m.readAt ? " · Seen" : ""}</span>
@@ -182,6 +188,13 @@ export function Thread() {
         )}
         {!text && (
           <div className="quick" role="group" aria-label={c.iAmSeller ? "Saved replies" : "Quick questions"}>
+            {!c.iAmSeller && (about ?? lastProduct) && (
+              <button type="button" className="offer-chip" onClick={() => api.productItem((about ?? lastProduct)!).then((it) => {
+                if (!it || it.product.status !== "live") return toast("This item isn't available any more.");
+                if (it.product.mode !== "buy_now") return toast("Offers are only for Buy now items.");
+                setOffering(it);
+              })}><Icon name="payout" size={14} />Make an offer</button>
+            )}
             {(c.iAmSeller ? replies : about ? ["Is this still available?", "What sizes do you have?", "Can I see more photos?", "When can you ship?"] : []).map((q) => (
               <button key={q} type="button" onClick={() => (c.iAmSeller ? send(q) : setText(q))}>{q}</button>
             ))}
@@ -201,6 +214,7 @@ export function Thread() {
           <div className="mini-menu" role="menu" style={{ position: "absolute", left: 12, right: 12, bottom: 12 }}>
             <button role="menuitem" onClick={() => { setPlus(false); photoRef.current?.click(); }}><Icon name="grid" size={16} />Send a photo</button>
             {c.iAmSeller && <button role="menuitem" onClick={() => { setPlus(false); setSheet("offer"); }}><Icon name="payout" size={16} />Send a special price</button>}
+            {!c.iAmSeller && (about ?? lastProduct) && <button role="menuitem" onClick={() => { setPlus(false); api.productItem((about ?? lastProduct)!).then((it) => it && it.product.mode === "buy_now" && it.product.status === "live" ? setOffering(it) : toast("Offers are only for Buy now items that are still available.")); }}><Icon name="payout" size={16} />Make an offer</button>}
             {c.iAmSeller && <button role="menuitem" onClick={() => { setPlus(false); setSheet("hold"); }}><Icon name="lock" size={16} />Hold an item for them</button>}
             {c.iAmSeller && <button role="menuitem" onClick={() => { setPlus(false); setSheet("replies"); }}><Icon name="chat" size={16} />Saved replies</button>}
             <button role="menuitem" onClick={() => setPlus(false)}>Cancel</button>
@@ -225,6 +239,10 @@ export function Thread() {
         onDone={(msg) => { setSheet(null); toast(msg); send(msg.startsWith("Holding") ? `I'm holding this for you: ${msg.replace("Holding ", "")}` : "I've released the hold."); }} />}
       {sheet === "replies" && c.iAmSeller && <RepliesSheet replies={replies} onClose={() => setSheet(null)} onSave={(r) => { setReplies(r); saveReplies(c.shopId, r); setSheet(null); }} />}
       {buying && <CheckoutSheet item={buying.item} offer={buying.offer} onClose={() => setBuying(null)} />}
+      {offering && <MakeOfferSheet conversationId={id} item={{ productId: offering.product.id, shopId: offering.shop.id, title: offering.product.title, priceCents: offering.product.priceCents }}
+        onClose={() => setOffering(null)} onSent={() => { setOffering(null); if (about) setParams({}, { replace: true }); reload(); toast("Offer sent. The seller has 24 hours to reply."); }} />}
+      {counter && shop && <OfferSheet shop={shop} conversationId={id} preselect={counter.productIds[0]} counterTo={counter} onClose={() => setCounter(null)}
+        onSent={() => run(async () => { await api.answerOffer(counter.id, false).catch(() => {}); setCounter(null); reload(); toast("Counter offer sent"); })} />}
     </div>
   );
 }
@@ -256,24 +274,43 @@ function ChatProduct({ productId, compact, canBuy, onBuy }: { productId: string;
 }
 
 /** A special price from the seller, for one item or a bundle. */
-function OfferCard({ offer, buyer, onBuy }: { offer: Offer; buyer: boolean; onBuy: () => void }) {
-  const ended = offer.status !== "open" || new Date(offer.expiresAt) < new Date();
+/** A price in the chat: the seller's special price, or the buyer's offer with Accept, Counter and Decline for the seller. */
+function OfferCard({ offer, buyer, onBuy, onAnswer, onCounter }: { offer: Offer; buyer: boolean; onBuy: () => void;
+  onAnswer: (accept: boolean) => void; onCounter: () => void }) {
+  const expired = new Date(offer.expiresAt) < new Date();
   const hours = Math.max(0, Math.round((new Date(offer.expiresAt).getTime() - Date.now()) / 3600e3));
+  const left = hours < 1 ? "under an hour" : `${hours} ${hours === 1 ? "hour" : "hours"}`;
   const bundle = offer.productIds.length > 1;
+  const fromBuyer = offer.madeBy === "buyer";
+  const pending = offer.status === "pending" && !expired;
+  const payable = offer.status === "open" && !expired;
+  const status = offer.status === "used" ? "Bought"
+    : offer.status === "declined" ? "Declined"
+    : pending ? (buyer ? `Waiting for the seller · ${left} left` : `Reply within ${left}`)
+    : payable ? (fromBuyer ? `Accepted · pay within ${left}` : `Ends in ${left}`)
+    : "This offer has ended";
   return (
-    <span className="offer-card">
-      <span className="offer-tag">{bundle ? `Bundle of ${offer.productIds.length}` : "Special price"}</span>
+    <span className={`offer-card ${fromBuyer ? "from-buyer" : ""} ${offer.status}`}>
+      <span className="offer-tag">{fromBuyer ? (buyer ? "Your offer" : "Offer from the buyer") : bundle ? `Bundle of ${offer.productIds.length}` : "Special price"}</span>
       <span className="offer-price">
         {offer.listedCents > offer.priceCents && <s>{R(offer.listedCents)}</s>}
         <b>{R(offer.priceCents)}</b>
       </span>
-      <span className="small" style={{ opacity: 0.75 }}>{offer.status === "used" ? "Bought" : ended ? "This offer has ended" : `Ends in ${hours < 1 ? "under an hour" : `${hours} ${hours === 1 ? "hour" : "hours"}`}`}</span>
-      {buyer && !ended && <button className="btn green block" onClick={onBuy}>Buy for {R(offer.priceCents)}</button>}
+      <span className="small" style={{ opacity: 0.8 }}>{status}</span>
+      {buyer && payable && <button className="btn green block" onClick={onBuy}>Buy for {R(offer.priceCents)}</button>}
+      {!buyer && pending && (
+        <span className="offer-actions">
+          <button className="btn green" onClick={() => onAnswer(true)}>Accept</button>
+          <button className="btn" onClick={onCounter}>Counter</button>
+          <button className="btn line" onClick={() => onAnswer(false)}>Decline</button>
+        </span>
+      )}
     </span>
   );
 }
 
-function OfferSheet({ shop, conversationId, preselect, onClose, onSent }: { shop: MyShop; conversationId: string; preselect: string | null; onClose: () => void; onSent: () => void }) {
+function OfferSheet({ shop, conversationId, preselect, onClose, onSent, counterTo }: { shop: MyShop; conversationId: string; preselect: string | null; onClose: () => void; onSent: () => void;
+  /** Countering a buyer's offer: show what they offered. */ counterTo?: Offer }) {
   const live = shop.products.filter((p) => p.status === "live");
   const [picked, setPicked] = useState<string[]>(preselect && live.some((p) => p.id === preselect) ? [preselect] : live[0] ? [live[0].id] : []);
   const listed = live.filter((p) => picked.includes(p.id)).reduce((n, p) => n + p.priceCents, 0);
@@ -282,11 +319,13 @@ function OfferSheet({ shop, conversationId, preselect, onClose, onSent }: { shop
   const { busy, error, run } = useAction();
   const cents = Math.round((Number(price) || 0) * 100);
   return (
-    <Sheet title="Send a special price" onClose={onClose}
+    <Sheet title={counterTo ? "Counter offer" : "Send a special price"} onClose={onClose}
       footer={<button className="btn green block big" disabled={busy || !picked.length || cents < MIN_PRICE || cents > listed}
         onClick={() => run(async () => { await api.makeOffer(conversationId, picked, cents, hours); onSent(); })}>Send {cents ? R(cents) : "offer"}</button>}>
       <ErrorNote error={error} />
-      <p className="small muted" style={{ marginTop: 0 }}>Pick one item, or several for a bundle with one delivery fee. The buyer pays in the app, so the money is still protected.</p>
+      {counterTo
+        ? <div className="note" style={{ marginBottom: 12 }}>The buyer offered <b>{R(counterTo.priceCents)}</b> (listed {R(counterTo.listedCents)}). Send your price; their offer is declined.</div>
+        : <p className="small muted" style={{ marginTop: 0 }}>Pick one item, or several for a bundle with one delivery fee. The buyer pays in the app, so the money is still protected.</p>}
       <div className="group">
         {live.map((p) => (
           <button key={p.id} className="cell" onClick={() => setPicked((cur) => (cur.includes(p.id) ? cur.filter((x) => x !== p.id) : [...cur, p.id]))} aria-pressed={picked.includes(p.id)}>

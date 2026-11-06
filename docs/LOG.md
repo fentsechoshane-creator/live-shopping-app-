@@ -109,6 +109,14 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-07: Design pass, buyer offers, Message button
+
+- Design: birthday at sign up is now three big centred wheels (day, month, year) with a clear "You're 27" or "18 or older" answer. Welcome screens are see-through over the real feed, a few words each with a small animated picture, and end in a small pointing hand that swipes up on a loop. Chat bubbles have a subtle liquid glass rim and sheen. Sheets are solid enough to read (they were see-through), pop up messages are compact pills at the top, and text on bright videos has a stronger shadow and darker bands top and bottom.
+- Buyer offers (migration 0031, like Vinted and Depop): Make an offer from the item details or as a suggested chip in chat. Three suggested prices (10, 15, 20% off, rounded) or your own. Rules on the server: at least R50, under the listed price, at least half, one waiting offer per item, 5 a day per chat, Buy now items only. Seller gets Accept, Counter (sends their own special price and declines the offer) or Decline; both sides get a notification. An accepted offer is payable for 24 hours. Seller special prices also start at R50 now.
+- Message button: right on every video next to Buy now, and Message seller plus Make an offer side by side in the item details.
+- Tests: database tests for every offer rule; the app test now offers, accepts and checks out at the offer price.
+- Live: migration 0031 and the server functions need Ofentse's OK to deploy. [Claude]
+
 ### 2026-11-06: Mux Robots
 
 - Added to `docs/VIDEO_EDITING.md`: Mux Robots (AI jobs on our videos, 100,000 free units a month). Best fits: moderation on every upload, cover suggestion, listing details from the video, suggested haul tags and flaw marks for the seller to confirm, captions.
