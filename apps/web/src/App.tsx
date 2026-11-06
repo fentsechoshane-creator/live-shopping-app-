@@ -57,6 +57,11 @@ function Tabs() {
   const [shop] = useLoad(() => (user ? api.myShop() : Promise.resolve(null)), [user?.id, loc.pathname]);
   // Inbox count: unread chats plus new updates. Me gets a dot when a seller has orders to ship.
   const [bump, setBump] = useState(0);
+  // Your own photo on the Me tab, like social apps. Refreshed when you change it.
+  const [photoBump, setPhotoBump] = useState(0);
+  useEffect(() => { const on = () => setPhotoBump((n) => n + 1); window.addEventListener("photo-changed", on); return () => window.removeEventListener("photo-changed", on); }, []);
+  const [myPhoto, setMyPhoto] = useState<string | null>(null);
+  useEffect(() => { if (!user) { setMyPhoto(null); return; } api.myProfile().then((p) => setMyPhoto(p.avatarUrl ?? null)).catch(() => {}); }, [user?.id, photoBump]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { const on = () => setBump((n) => n + 1); window.addEventListener("inbox-read", on); return () => window.removeEventListener("inbox-read", on); }, []);
   useEffect(() => {
     if (!user) { setInbox(0); return setToShip(0); }
@@ -84,7 +89,9 @@ function Tabs() {
       <NavLink to="/inbox" aria-label={`Inbox${inbox ? `, ${inbox} new` : ""}`}>
         <Icon name="chat" /><span>Inbox</span>{inbox > 0 && <span className="badge">{inbox > 99 ? "99+" : inbox}</span>}
       </NavLink>
-      <NavLink to="/me" aria-label={`Me${toShip ? `, ${toShip} to ship` : ""}`}><Icon name="user" /><span>Me</span>{toShip > 0 && <span className="dot" />}</NavLink>
+      <NavLink to="/me" aria-label={`Me${toShip ? `, ${toShip} to ship` : ""}`}>
+        {myPhoto ? <span className="tab-avatar"><img src={myPhoto} alt="" /></span> : <Icon name="user" />}<span>Me</span>{toShip > 0 && <span className="dot" />}
+      </NavLink>
     </nav>
     <SellerGate open={ask} onClose={() => setAsk(false)} onYes={() => setAsk(false)} unfinished={!!shop} />
     </>

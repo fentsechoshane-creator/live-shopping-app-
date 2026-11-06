@@ -109,6 +109,12 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-07: Inbox like a social app, your photo on Me
+
+- Messages is now one list (friends and shops together, newest first) with round pictures, "You:" when the last message was yours, a green dot for unread, a Shop tag and badge on shop chats, and search once there are more than 5 chats. A pencil at the top starts a new message (Find friends). Friends sit in a row of faces with a green ring, like stories. Chats keep our liquid glass bubbles.
+- Shop chats now carry pictures: the shop owner's for a buyer, the buyer's for a seller (migration 0036, `my_conversations` returns `other_avatar` and `last_mine`).
+- The Me tab shows your own photo in a circle once you have one; it updates when you change it.
+
 ### 2026-11-07: Cancelling paid orders
 
 - Decided with Ofentse: buyers cancel freely within 1 hour of paying (not shipped yet); after that they ask, and the seller has 24 hours to accept or ship it. No answer cancels it. No trust points lost either way. Sellers can cancel before shipping and lose 5 trust points like not shipping, unless the courier couldn't book or the buyer had asked. Our team can cancel and refund any order with a reason (team log).

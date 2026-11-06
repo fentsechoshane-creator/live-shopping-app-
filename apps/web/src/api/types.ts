@@ -71,6 +71,8 @@ export interface Comment {
 export interface Conversation {
   id: string; shopId: string; shopName: string; shopHandle: string; otherName: string; iAmSeller: boolean;
   lastBody: string | null; lastAt: string; unread: number; buyerId: string;
+  /** The other side's picture (the shop owner's for a buyer, the buyer's for a seller), and whether the last message was mine. */
+  otherAvatarUrl?: string | null; lastMine?: boolean;
 }
 export interface Offer { id: string; productIds: string[]; priceCents: Cents; listedCents: Cents; expiresAt: string;
   /** pending: a buyer's offer waiting for the seller. open: can be paid. */

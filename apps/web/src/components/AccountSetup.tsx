@@ -110,7 +110,7 @@ export function AccountSetup() {
     setStep(2);
   });
   const savePhoto = (withPhoto: boolean) => run(async () => {
-    if (withPhoto && photo) await api.setAvatar(photo.blob);
+    if (withPhoto && photo) { await api.setAvatar(photo.blob); window.dispatchEvent(new Event("photo-changed")); }
     setStep(3);
   });
   // Closing the setup (refreshing the profile) only at the very end.

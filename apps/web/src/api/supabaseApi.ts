@@ -95,6 +95,7 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
   const toConversation = (r: any): Conversation => ({
     id: r.id, shopId: r.shop_id, shopName: r.shop_name, shopHandle: r.shop_handle, otherName: r.other_name, iAmSeller: r.i_am_seller,
     lastBody: r.last_body, lastAt: r.last_at, unread: r.unread, buyerId: r.buyer_id,
+    otherAvatarUrl: avatarUrl(r.other_avatar), lastMine: !!r.last_mine,
   });
   /** The editor's clips and marks, ready for the player. Empty or missing means a plain one video post. */
   const playEdit = (edit: any, clips: any): FeedItem["edit"] => (edit && Array.isArray(clips) && clips.length ? {

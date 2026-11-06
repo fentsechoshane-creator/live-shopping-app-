@@ -303,7 +303,7 @@ function EditProfile({ profile, onClose, onSaved }: { profile: MyProfile; onClos
   }, [handle, changed, problem]);
   const pick = async (f: File | undefined) => { if (f) { const blob = await squarePhoto(f); setPhoto({ blob, url: URL.createObjectURL(blob) }); } };
   const save = () => run(async () => {
-    if (photo) await api.setAvatar(photo.blob);
+    if (photo) { await api.setAvatar(photo.blob); window.dispatchEvent(new Event("photo-changed")); }
     if (changed) await api.setUsername(handle);
     await api.updateProfile(name, bio);
     onSaved();

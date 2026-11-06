@@ -7,8 +7,9 @@ import { safePath, useGoBack, BackButton, ErrorNote, Field, Loading, R, Segmente
 import { PostGrid } from "../../components/PostGrid";
 import { shareOrCopy } from "../../native";
 import { useTabSwipe } from "../../components/gestures";
-import { ConversationList, replyText, useMessageShop } from "./Messages";
-import { FriendChatCell, FriendsRow } from "./Friends";
+import { replyText, useMessageShop } from "./Messages";
+import { FriendsRow } from "./Friends";
+import { DmList } from "../../components/DmList";
 import { MoreSheet } from "../../components/Safety";
 import { Avatar } from "../../components/Avatar";
 import { useIsMine } from "../../lib/mine";
@@ -129,7 +130,10 @@ export function Inbox() {
   return (
     <div className="screen" {...handlers}>
       {pull > 0 && <div className="pull-hint" style={{ height: pull }}>{pull >= 70 ? "Let go to refresh" : "Pull to refresh"}</div>}
-      <h1 className="large-title">Inbox</h1>
+      <div className="row between inbox-head">
+        <h1 className="large-title">Inbox</h1>
+        <Link to="/friends" className="icon-btn" aria-label="New message"><Icon name="edit" size={20} /></Link>
+      </div>
       <Segmented<InboxTab> label="Inbox" value={tab} onChange={setTab} options={[
         { value: "messages", label: <>Messages{unreadChats > 0 && <span className="count">{unreadChats}</span>}</> },
         { value: "updates", label: <>Updates{unreadUpdates > 0 && <span className="count">{unreadUpdates}</span>}</> },
@@ -138,14 +142,7 @@ export function Inbox() {
         {tab === "messages" && (chats && friendChats ? (
           <>
             {friends && <FriendsRow friends={friends} />}
-            {friendChats.length > 0 && (
-              <>
-                <h2 className="section-title">Friends</h2>
-                <div className="group">{friendChats.map((c) => <FriendChatCell key={c.id} c={c} />)}</div>
-                <h2 className="section-title">Shops</h2>
-              </>
-            )}
-            <ConversationList list={chats} />
+            <DmList friends={friendChats} shops={chats} />
           </>
         ) : <Loading />)}
         {tab === "updates" && (

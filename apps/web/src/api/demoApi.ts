@@ -453,7 +453,9 @@ export function createDemoApi(): Api {
     return { id: c.id, shopId: sh.id, shopName: sh.name, shopHandle: sh.handle,
       otherName: c.buyerId === viewer ? sh.name : s.users.find((x) => x.id === c.buyerId)?.displayName || "Buyer",
       iAmSeller: c.buyerId !== viewer, lastBody: last?.body ?? null, lastAt: c.lastAt,
-      unread: msgs.filter((m) => m.senderId !== viewer && !m.readAt).length, buyerId: c.buyerId };
+      unread: msgs.filter((m) => m.senderId !== viewer && !m.readAt).length, buyerId: c.buyerId,
+      otherAvatarUrl: (() => { const a = s.users.find((x) => x.id === (c.buyerId === viewer ? sh.ownerId : c.buyerId))?.avatar; return a ? mediaUrl(a) : null; })(),
+      lastMine: lastMsg?.senderId === viewer };
   };
   const visible = (po: DPost) => {
     const p = s.products.find((x) => x.id === po.productId);
