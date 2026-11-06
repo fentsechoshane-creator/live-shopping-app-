@@ -4,7 +4,9 @@ import { api } from "../api";
 import { platform } from "../native";
 
 declare const __APP_VERSION__: string | undefined;
+declare const __BUILT_AT__: string | undefined;
 export const APP_VERSION = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev";
+export const BUILT_AT = typeof __BUILT_AT__ !== "undefined" ? __BUILT_AT__ : "";
 
 const seen = new Set<string>();
 let sent = 0;

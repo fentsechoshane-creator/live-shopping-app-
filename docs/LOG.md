@@ -107,6 +107,12 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-06: Version line in the menu
+
+- The bottom of the menu now says which update the app is running, like "Version 0.1.0+62b259e, updated 6 Nov, 19:05". The 7 letters match the newest commit on GitHub, so anyone can check the Netlify site is up to date.
+- Checked: Netlify's exact build (`npm ci && npm run build:live`) passes on a clean copy of main. The wallet button only shows once someone has a reward, so seeing it with nothing in it means the site is running an old build.
+- [CONFIRM] Netlify is still building from main on every push (Ofentse to check Deploys in Netlify).
+
 ### 2026-11-06: Everything deployed to live
 
 - Ofentse approved: "Yes, deploy everything to live".

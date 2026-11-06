@@ -24,6 +24,7 @@ import { Post, SellerGate } from "./screens/seller/Post";
 import { TeamApp } from "./screens/team/Team";
 import { Thread } from "./screens/buyer/Messages";
 import { BlockedAccounts, DeliverySettings, DeleteAccountSheet, Privacy, Terms, CONTACT } from "./screens/Settings";
+import { APP_VERSION, BUILT_AT } from "./lib/report";
 
 function RequireUser({ children }: { children: ReactNode }) {
   const { user, ready } = useSession();
@@ -154,6 +155,7 @@ function SideMenu() {
         </button>
         <button className="link" style={{ marginTop: 14, color: "var(--red-text)", alignSelf: "center" }} onClick={() => setDeleting(true)}>Delete my account</button>
         {api.demo && <button className="btn line block" style={{ marginTop: 8 }} onClick={() => { setMenuOpen(false); api.demo!.reset().then(() => nav("/")); }}>Reset demo data</button>}
+        <p className="small muted" style={{ textAlign: "center", marginTop: 14, marginBottom: 0 }}>Version {APP_VERSION}{BUILT_AT ? `, updated ${BUILT_AT}` : ""}</p>
       </aside>
     </div>
   );
