@@ -72,6 +72,12 @@
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body, #root { height: 100%; margin: 0; }
+/* Opened from the iPhone home screen, "100%" stops short of the bottom and leaves a white bar. Pin the app to the
+   whole screen instead, edge to edge, behind the clock and the home bar. */
+@media (display-mode: standalone) {
+  html, body { height: 100vh; background: #0b0b0d; }
+  #root { position: fixed; inset: 0; height: auto; }
+}
 body { background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 15px; -webkit-font-smoothing: antialiased; overscroll-behavior: none; -webkit-text-size-adjust: 100%; }
 button, a { touch-action: manipulation; -webkit-user-select: none; user-select: none; }
 button, input, select, textarea { font: inherit; color: inherit; }
