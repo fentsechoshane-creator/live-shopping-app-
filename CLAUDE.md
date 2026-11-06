@@ -12,3 +12,4 @@ Working with Ofentse (founder, not the developer):
 - When asked for a document or design, return the full regenerated version, not a diff.
 - Never ask for or commit secret keys. Only public `VITE_` values go in the web app.
 - Ofentse tests on an iPhone. Build and check phone first (393 x 720, touch).
+- After every push, check the live site (https://myhaul.pages.dev, Cloudflare Pages, about 2 minutes) is serving the new version (the version line at the bottom of the menu, "0.1.0+<commit>") and tell Ofentse it's live. Don't wait to be asked. Same for live server changes: confirm they're live.
