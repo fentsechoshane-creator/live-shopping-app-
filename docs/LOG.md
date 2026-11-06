@@ -109,6 +109,11 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-07: Live: Bob Go checks, cancelling, Inbox
+
+- Deployed with Ofentse's OK: migrations 0034 (booking safety net), 0035 (cancelling), 0036 (Inbox pictures); functions checkout, delivery, order-action and run-due (trimmed bundles, the repo is the source); the app pushed. Health check and a normal run-due pass after the deploy.
+- Unread count badges (Messages tab and Inbox on the tab bar) now have the number centred.
+
 ### 2026-11-07: Inbox like a social app, your photo on Me
 
 - Messages is now one list (friends and shops together, newest first) with round pictures, "You:" when the last message was yours, a green dot for unread, a Shop tag and badge on shop chats, and search once there are more than 5 chats. A pencil at the top starts a new message (Find friends). Friends sit in a row of faces with a green ring, like stories. Chats keep our liquid glass bubbles.
