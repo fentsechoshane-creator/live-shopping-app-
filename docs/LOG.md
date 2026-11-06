@@ -115,7 +115,7 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 - Buyer offers (migration 0031, like Vinted and Depop): Make an offer from the item details or as a suggested chip in chat. Three suggested prices (10, 15, 20% off, rounded) or your own. Rules on the server: at least R50, under the listed price, at least half, one waiting offer per item, 5 a day per chat, Buy now items only. Seller gets Accept, Counter (sends their own special price and declines the offer) or Decline; both sides get a notification. An accepted offer is payable for 24 hours. Seller special prices also start at R50 now.
 - Message button: right on every video next to Buy now, and Message seller plus Make an offer side by side in the item details.
 - Tests: database tests for every offer rule; the app test now offers, accepts and checks out at the offer price.
-- Live: migration 0031 and the server functions need Ofentse's OK to deploy. [Claude]
+- Deployed with Ofentse's OK (7 Nov): migration 0031, checkout, order-action, escrow-webhook, run-due; run-due now every 5 minutes. The R60 sandbox test order turned Paid (OZOW) on the first run: the whole payment loop works. Site on 8245025.
 
 ### 2026-11-06: Mux Robots
 
