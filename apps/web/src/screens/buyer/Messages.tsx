@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { isRude, looksOffApp, ORDER_STATUS_TEXT } from "@app/core";
+import { isRude, looksOffApp, ORDER_STATUS_TEXT, MIN_PRICE } from "@app/core";
 import { api, type Conversation, type FeedItem, type MyShop, type Offer, type Order } from "../../api";
 import { ProductArt } from "../../components/Scene";
 import { useLoad, useSession } from "../../session";
@@ -280,7 +280,7 @@ function OfferSheet({ shop, conversationId, preselect, onClose, onSent }: { shop
   const cents = Math.round((Number(price) || 0) * 100);
   return (
     <Sheet title="Send a special price" onClose={onClose}
-      footer={<button className="btn green block big" disabled={busy || !picked.length || cents < 1000 || cents > listed}
+      footer={<button className="btn green block big" disabled={busy || !picked.length || cents < MIN_PRICE || cents > listed}
         onClick={() => run(async () => { await api.makeOffer(conversationId, picked, cents, hours); onSent(); })}>Send {cents ? R(cents) : "offer"}</button>}>
       <ErrorNote error={error} />
       <p className="small muted" style={{ marginTop: 0 }}>Pick one item, or several for a bundle with one delivery fee. The buyer pays in the app, so the money is still protected.</p>
@@ -295,6 +295,8 @@ function OfferSheet({ shop, conversationId, preselect, onClose, onSent }: { shop
       <label className="wz-label" htmlFor="offer-price">Your price {picked.length > 1 ? `for all ${picked.length}` : ""} <span className="muted">(listed {R(listed)})</span></label>
       <div className="wz-price"><span>R</span><input id="offer-price" value={price} onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, ""))} inputMode="decimal" placeholder={String(Math.round(listed * 0.9 / 100))} aria-label="Offer price (rand)" /></div>
       {cents > listed && <div className="small" style={{ color: "var(--red-text)", marginTop: 6 }}>It can't be more than the listed price.</div>}
+      {cents > 0 && cents < MIN_PRICE && <p className="small" style={{ color: "var(--red-text)", margin: "4px 0 10px" }}>The lowest special price is {R(MIN_PRICE)}. Our payment partner can't take smaller amounts.</p>}
+      {cents > listed && listed > 0 && <p className="small" style={{ color: "var(--red-text)", margin: "4px 0 10px" }}>A special price can't be more than the listed price.</p>}
       <div className="wz-label">Offer lasts</div>
       <div className="seg" role="group" aria-label="Offer lasts">
         {[6, 24, 48].map((h) => <button key={h} aria-pressed={hours === h} onClick={() => setHours(h)}>{h} hours</button>)}

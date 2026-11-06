@@ -107,6 +107,10 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-06: Special prices start at R50
+
+- The special price sheet in chat accepted R10 and up, which TradeSafe would refuse at checkout. It now needs R50 or more and says why, and says when the price is above the listed price.
+
 ### 2026-11-06: Full screen on the iPhone home screen
 
 - Added Apple's home screen app settings (apple-mobile-web-app-capable, black-translucent status bar, title). Added to the home screen, myHaul now opens full screen and draws behind the clock and battery.
