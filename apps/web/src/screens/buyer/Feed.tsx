@@ -14,7 +14,8 @@ import { CheckoutSheet } from "./Checkout";
 import { CommentsSheet } from "../../components/Comments";
 import { MoreSheet } from "../../components/Safety";
 import { useSwipe } from "../../components/gestures";
-import { shareOrCopy, tap } from "../../native";
+import { tap } from "../../native";
+import { ShareSheet } from "../../components/ShareSheet";
 import { useMessageShop } from "./Messages";
 import { rankFeed } from "../../lib/rank";
 import { Avatar } from "../../components/Avatar";
@@ -266,7 +267,8 @@ function VideoCard({ item, auction, avatar, counts, comments, onBrowse, onBuy, o
   const chip = statusChip(item, auction, now);
   const shownPrice = p.mode === "auction" && !tagged ? (auction?.currentCents ?? auction?.startCents ?? p.priceCents) : p.priceCents;
   const isFollowing = following.has(item.shop.id);
-  const share = async () => { if ((await shareOrCopy(`/i/${p.id}`, `${p.title}, ${R(p.priceCents)} on myHaul`)) === "copied") toast("Link copied"); };
+  const [sharing, setSharing] = useState(false);
+  const share = () => { tap(); setSharing(true); };
   const sub = [
     p.sizes.length ? (p.sizes.length > 1 ? `Sizes ${p.sizes[0]} to ${p.sizes[p.sizes.length - 1]}` : `Size ${p.sizes[0]}`) : LISTING_LABELS[p.label].label,
     p.mode === "buy_now" && p.stock > 1 ? `${p.stock} left` : null,
@@ -340,6 +342,7 @@ function VideoCard({ item, auction, avatar, counts, comments, onBrowse, onBuy, o
           <button className="vround vglass" onClick={share} aria-label="Share"><Icon name="share" /></button>
         </div>
       </div>
+      {sharing && <ShareSheet postId={item.postId} productId={p.id} title={p.title} priceCents={p.priceCents} onClose={() => setSharing(false)} />}
     </section>
   );
 }

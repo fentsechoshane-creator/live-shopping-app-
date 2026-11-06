@@ -1072,3 +1072,80 @@ select pg_temp.act_as('00000000-0000-0000-0000-00000000000b');
 do $$ begin assert (select count(*) from delivery_stamps) = 0, 'you do not see others'' stamps'; end $$;
 reset role;
 select 'delivery perk tests passed' as result;
+
+-- ===== Friends and sharing (migration 0033) =====
+reset role;
+insert into auth.users (id, email) values ('00000000-0000-0000-0000-0000000000b1', 'thandi@test.co.za'), ('00000000-0000-0000-0000-0000000000b2', 'sipho@test.co.za'),
+  ('00000000-0000-0000-0000-0000000000b3', 'stranger@test.co.za'), ('00000000-0000-0000-0000-0000000000b4', 'unfinished@test.co.za');
+update profiles set handle = 'thandi', display_name = 'Thandi', adult_confirmed_at = now() where id = '00000000-0000-0000-0000-0000000000b1';
+update profiles set handle = 'sipho', display_name = 'Sipho', adult_confirmed_at = now() where id = '00000000-0000-0000-0000-0000000000b2';
+update profiles set handle = 'stranger', adult_confirmed_at = now() where id = '00000000-0000-0000-0000-0000000000b3';
+-- An unfinished account can't follow or message.
+select pg_temp.act_as('00000000-0000-0000-0000-0000000000b4');
+select pg_temp.expect_error($$select follow_person('00000000-0000-0000-0000-0000000000b1', true)$$, 'Finish setting up');
+reset role;
+-- Thandi follows Sipho: not friends yet, so no messages. Sipho is told.
+select pg_temp.act_as('00000000-0000-0000-0000-0000000000b1');
+select pg_temp.expect_error($$select follow_person('00000000-0000-0000-0000-0000000000b1', true)$$, 'yourself');
+select follow_person('00000000-0000-0000-0000-0000000000b2', true);
+select follow_person('00000000-0000-0000-0000-0000000000b2', true); -- twice is fine
+select pg_temp.expect_error($$select send_to_friend('00000000-0000-0000-0000-0000000000b2', 'hi')$$, 'follow you back');
+select pg_temp.expect_error($$select friend_chat_with('00000000-0000-0000-0000-0000000000b2')$$, 'follow you back');
+do $$ begin assert (person_page('sipho')->>'iFollow')::boolean and not (person_page('sipho')->>'followsMe')::boolean, 'Thandi follows Sipho'; end $$;
+do $$ begin assert (select count(*) from my_friends()) = 0, 'no friends yet'; end $$;
+-- People can't write follows directly.
+select pg_temp.expect_error($$insert into people_follows values ('00000000-0000-0000-0000-0000000000b3', '00000000-0000-0000-0000-0000000000b2')$$, 'permission denied');
+reset role;
+do $$ begin assert (select count(*) from notifications where user_id = '00000000-0000-0000-0000-0000000000b2' and kind = 'follow') = 1, 'Sipho told once'; end $$;
+-- Sipho follows back: friends, and Thandi is told.
+select pg_temp.act_as('00000000-0000-0000-0000-0000000000b2');
+do $$ begin assert (select handle from follow_backs() limit 1) = 'thandi', 'Thandi shows under follow back'; end $$;
+select follow_person('00000000-0000-0000-0000-0000000000b1', true);
+do $$ begin assert (select count(*) from my_friends()) = 1, 'Sipho has one friend'; end $$;
+do $$ begin assert (select count(*) from follow_backs()) = 0, 'nobody left to follow back'; end $$;
+do $$ begin assert (select handle from find_people('tha') limit 1) = 'thandi', 'find people by username'; end $$;
+do $$ begin assert (select count(*) from find_people('t')) = 0, 'search needs 2 letters'; end $$;
+reset role;
+do $$ begin assert exists (select 1 from notifications where user_id = '00000000-0000-0000-0000-0000000000b1' and title like '%You''re friends now%'), 'Thandi told they are friends'; end $$;
+-- Thandi shares a live post with Sipho and a note; strangers and fakes are refused.
+select pg_temp.act_as('00000000-0000-0000-0000-0000000000b1');
+select pg_temp.expect_error($$select share_post((select id from posts where status = 'live' limit 1), array['00000000-0000-0000-0000-0000000000b3']::uuid[])$$, 'follow you back');
+select pg_temp.expect_error($$select share_post((select id from posts where status = 'live' limit 1), array[]::uuid[])$$, 'at least one');
+select pg_temp.expect_error($$select send_to_friend('00000000-0000-0000-0000-0000000000b2', '   ')$$, 'Write a message');
+select pg_temp.expect_error($$select send_to_friend('00000000-0000-0000-0000-0000000000b2', 'you bitch')$$, 'friendly');
+select pg_temp.expect_error($$select send_to_friend('00000000-0000-0000-0000-0000000000b2', '', '00000000-0000-0000-0000-000000000000')$$, 'isn''t available');
+do $$ begin assert share_post((select id from posts where status = 'live' limit 1), array['00000000-0000-0000-0000-0000000000b2', '00000000-0000-0000-0000-0000000000b2']::uuid[], 'Look at this') = 1, 'one share, duplicates once'; end $$;
+select pg_temp.expect_error($$insert into friend_messages (chat_id, sender_id, body) select id, '00000000-0000-0000-0000-0000000000b1', 'sneaky' from friend_chats$$, 'permission denied');
+do $$ begin assert (select count(*) from friend_messages) = 1, 'Thandi sees the message'; end $$;
+do $$ begin assert (select last_shared and last_mine from my_friend_chats() limit 1), 'chat list shows the shared post'; end $$;
+reset role;
+do $$ begin assert exists (select 1 from notifications where user_id = '00000000-0000-0000-0000-0000000000b2' and kind = 'friend_message' and body = 'Sent you a post: Look at this'), 'Sipho told about the post'; end $$;
+-- Sipho sees it unread with the post card, reads it, replies.
+select pg_temp.act_as('00000000-0000-0000-0000-0000000000b2');
+do $$ begin assert (select unread from my_friend_chats() limit 1) = 1, 'unread for Sipho'; end $$;
+do $$ begin assert shared_post_card((select post_id from friend_messages limit 1))->>'title' is not null, 'Sipho sees the card'; end $$;
+select read_friend_chat((select id from friend_chats limit 1));
+do $$ begin assert (select unread from my_friend_chats() limit 1) = 0, 'read'; end $$;
+select send_to_friend('00000000-0000-0000-0000-0000000000b1', 'Love it!');
+reset role;
+-- A stranger sees nothing of their chat, and no card.
+select pg_temp.act_as('00000000-0000-0000-0000-0000000000b3');
+do $$ begin assert (select count(*) from friend_chats) = 0 and (select count(*) from friend_messages) = 0, 'strangers see no chats'; end $$;
+do $$ begin assert shared_post_card((select id from posts where status = 'live' limit 1)) is null, 'strangers get no card'; end $$;
+do $$ begin assert (select count(*) from people_follows) = 0, 'strangers do not see others'' follows'; end $$;
+reset role;
+-- Blocking unfriends both ways and stops messages.
+select pg_temp.act_as('00000000-0000-0000-0000-0000000000b2');
+insert into blocks (blocker_id, blocked_id) values ('00000000-0000-0000-0000-0000000000b2', '00000000-0000-0000-0000-0000000000b1');
+reset role;
+select pg_temp.act_as('00000000-0000-0000-0000-0000000000b1');
+select pg_temp.expect_error($$select send_to_friend('00000000-0000-0000-0000-0000000000b2', 'hello?')$$, 'follow you back');
+do $$ begin assert (select count(*) from people_follows) = 0, 'unfollowed both ways'; end $$;
+do $$ begin assert person_page('sipho') is not null and (person_page('sipho')->>'blocked')::boolean, 'blocked shows'; end $$;
+reset role;
+-- A paused account can't follow anyone.
+insert into suspensions (user_id, reason) values ('00000000-0000-0000-0000-0000000000b3', 'test');
+select pg_temp.act_as('00000000-0000-0000-0000-0000000000b3');
+select pg_temp.expect_error($$select follow_person('00000000-0000-0000-0000-0000000000b1', true)$$, 'paused');
+reset role;
+select 'friends and sharing tests passed' as result;

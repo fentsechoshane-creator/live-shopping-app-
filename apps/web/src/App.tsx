@@ -16,6 +16,7 @@ import { Feed } from "./screens/buyer/Feed";
 import { Explore } from "./screens/buyer/Explore";
 import { MockPay, OrderDetail, Orders } from "./screens/buyer/Orders";
 import { Inbox, ShopPage, SignIn, SignInSheet } from "./screens/buyer/Account";
+import { FindFriends, FriendThread, PersonPage } from "./screens/buyer/Friends";
 import { RewardSurprise } from "./components/Rewards";
 import { Profile } from "./screens/buyer/Profile";
 import { Onboarding } from "./screens/seller/Onboarding";
@@ -59,8 +60,8 @@ function Tabs() {
   useEffect(() => { const on = () => setBump((n) => n + 1); window.addEventListener("inbox-read", on); return () => window.removeEventListener("inbox-read", on); }, []);
   useEffect(() => {
     if (!user) { setInbox(0); return setToShip(0); }
-    Promise.all([api.notifications(), api.conversations()]).then(([n, c]) =>
-      setInbox(n.filter((x) => !x.readAt && !(x.link ?? "").startsWith("/messages/")).length + c.reduce((a, x) => a + x.unread, 0))).catch(() => {});
+    Promise.all([api.notifications(), api.conversations(), api.friendChats().catch(() => [])]).then(([n, c, f]) =>
+      setInbox(n.filter((x) => !x.readAt && !/^\/(messages|chats)\//.test(x.link ?? "")).length + c.reduce((a, x) => a + x.unread, 0) + f.reduce((a, x) => a + x.unread, 0))).catch(() => {});
   }, [user, loc.pathname, bump]);
   useEffect(() => {
     if (!shop || shop.status === "onboarding") return setToShip(0);
@@ -253,6 +254,9 @@ export function App() {
           <Route path="/sell/payouts" element={guard(<Payouts />)} />
           <Route path="/admin" element={<Navigate to="/team" replace />} />
           <Route path="/messages/:id" element={guard(<Thread />)} />
+          <Route path="/chats/:id" element={guard(<FriendThread />)} />
+          <Route path="/friends" element={guard(<FindFriends />)} />
+          <Route path="/u/:handle" element={guard(<PersonPage />)} />
           <Route path="/settings/blocked" element={guard(<BlockedAccounts />)} />
           <Route path="/settings/delivery" element={guard(<DeliverySettings />)} />
           <Route path="/privacy" element={<Privacy />} />

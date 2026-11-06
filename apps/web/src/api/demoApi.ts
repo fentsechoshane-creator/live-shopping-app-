@@ -5,7 +5,7 @@ import {
   RETURN_POSTAGE_PAYER, ACCOUNT_FEATURE_KEYS, canForceOn, featureOffMessage, type AccountFeature, type OrderStatus, type TrustEventKind, bookedByUs, deliveryFee, PARCEL_SIZES, orderParcelSize, DELIVERY_PERKS, validateEdit } from "@app/core";
 import { handleProblem } from "../lib/handle";
 import type {
-  Api, Category, ReportReason, ReportTarget, CheckoutInput, FeedItem, ListingInput, MyShop, Notification, Order, Payout, PendingReview, ProductPublic, ReviewStatus,
+  Api, Person, SharedPost, Category, ReportReason, ReportTarget, CheckoutInput, FeedItem, ListingInput, MyShop, Notification, Order, Payout, PendingReview, ProductPublic, ReviewStatus,
   ShopPublic, User, SavedDelivery, AppError, PickupPoint, ShopPickup, ShipmentEvent, AuctionInfo, TeamAlert, TeamOverview, TeamPerson, TeamPersonDetail, TeamOrder, TeamListing, TeamLogEntry, TeamFeature, Reward,
 } from "./types";
 
@@ -50,6 +50,10 @@ interface State {
   teamLog?: TeamLogEntry[];
   trustLog?: { userId: string; kind: string; points: number; at: string }[];
   alerts?: (TeamAlert & { dedupe: string })[];
+  /** Friends and sharing (0033). */
+  peopleFollows?: { followerId: string; followeeId: string; at: string }[];
+  friendChats?: { id: string; a: string; b: string; lastAt: string }[];
+  friendMessages?: { id: string; chatId: string; senderId: string; body: string; postId: string | null; shared: boolean; readAt: string | null; createdAt: string }[];
 }
 
 // Sample lockers for testing (the real list comes from Bob Go).
@@ -399,6 +403,40 @@ export function createDemoApi(): Api {
     const listedCents = of.productIds.reduce((n, pid) => n + (s.products.find((p) => p.id === pid)?.priceCents ?? 0), 0);
     return { id: of.id, productIds: of.productIds, priceCents: of.priceCents, listedCents, expiresAt: of.expiresAt, status: of.status, madeBy: of.madeBy ?? "seller" };
   };
+  // ----- Friends (same rules as migration 0033) -----
+  const pf = () => (s.peopleFollows ??= []);
+  const fchats = () => (s.friendChats ??= []);
+  const fmsgs = () => (s.friendMessages ??= []);
+  const followsPerson = (x: string, y: string) => pf().some((f) => f.followerId === x && f.followeeId === y)
+    || s.follows.some((f) => f.userId === x && shopOf(f.shopId)?.ownerId === y);
+  const areFriends = (a: string, b: string) => a !== b && followsPerson(a, b) && followsPerson(b, a);
+  const personOf = (u: DUser): Person => ({ id: u.id, name: u.displayName || `@${u.handle}`, handle: u.handle ?? "", avatarUrl: u.avatar ? mediaUrl(u.avatar) : null });
+  const setUp = (u: DUser) => !!u.handle && !!u.adult;
+  const chatBetween = (a: string, b: string) => fchats().find((c) => (c.a === a && c.b === b) || (c.a === b && c.b === a));
+  const sharedCard = (postId: string | null): SharedPost | null => {
+    const po = postId ? s.posts.find((x) => x.id === postId) : null;
+    if (!po) return null;
+    const p = s.products.find((x) => x.id === po.productId)!;
+    const sh = shopOf(po.shopId);
+    const first = po.edit?.clips[0]?.video ?? po.video;
+    return { postId: po.id, productId: p.id, title: p.title, priceCents: p.priceCents, mode: p.mode, shopName: sh.name, shopHandle: sh.handle,
+      thumb: po.photos?.[0] ? mediaUrl(po.photos[0]) : first.kind === "image" ? mediaUrl(first.url) : null, available: p.status === "live" && sh.status === "open" };
+  };
+  const sendFriend = (from: DUser, to: string, body: string, postId: string | null) => {
+    const b = body.trim();
+    if (!setUp(from)) throw new Error("Finish setting up your account first.");
+    if (!areFriends(from.id, to)) throw new Error("You can message friends: people you follow who follow you back.");
+    if (blockedBetween(from.id, to) || s.suspensions?.[to]) throw new Error("You can't message this account.");
+    if (!b && !postId) throw new Error("Write a message first.");
+    if (b.length > 1000) throw new Error("Keep messages under 1000 characters.");
+    if (b && isRude(b)) throw new Error("Please keep it friendly. That message has words we don't allow.");
+    if (postId && !s.posts.some((x) => x.id === postId)) throw new Error("That post isn't available any more.");
+    let c = chatBetween(from.id, to);
+    if (!c) { c = { id: id(), a: from.id, b: to, lastAt: now().toISOString() }; fchats().push(c); }
+    c.lastAt = now().toISOString();
+    fmsgs().push({ id: id(), chatId: c.id, senderId: from.id, body: b, postId, shared: !!postId, readAt: null, createdAt: now().toISOString() });
+    notify(to, from.displayName || `@${from.handle}`, postId ? `Sent you a post${b ? `: ${b.slice(0, 80)}` : ""}` : b.slice(0, 120), `/chats/${c.id}`);
+  };
   const blockedBetween = (a: string, b: string) => s.blocks.some((x) => (x.blockerId === a && x.blockedId === b) || (x.blockerId === b && x.blockedId === a));
   const toConv = (c: State["conversations"][number], viewer: string) => {
     const sh = shopOf(c.shopId);
@@ -704,6 +742,7 @@ export function createDemoApi(): Api {
       const who = target.userId ?? (target.shopId ? shopOf(target.shopId).ownerId : undefined);
       if (!who || who === u.id) throw new Error("You can't block that account.");
       if (!s.blocks.some((b) => b.blockerId === u.id && b.blockedId === who)) s.blocks.push({ blockerId: u.id, blockedId: who });
+      s.peopleFollows = pf().filter((f) => !((f.followerId === u.id && f.followeeId === who) || (f.followerId === who && f.followeeId === u.id)));
       save();
     },
     async unblock(userId) {
@@ -893,6 +932,97 @@ export function createDemoApi(): Api {
     },
     async commentCounts(ids) {
       return Object.fromEntries(ids.map((pid) => [pid, s.comments.filter((c) => c.postId === pid && !c.hidden).length]));
+    },
+
+    // ----- Friends and sharing -----
+    async followPerson(userId, on) {
+      const u = me();
+      if (!setUp(u)) throw new Error("Finish setting up your account first.");
+      if (userId === u.id) throw new Error("You can't follow yourself.");
+      if (on && s.suspensions?.[u.id]) throw new Error("Your account is paused, so you can't follow people.");
+      if (!on) { s.peopleFollows = pf().filter((f) => !(f.followerId === u.id && f.followeeId === userId)); save(); return; }
+      if (blockedBetween(u.id, userId)) throw new Error("You can't follow this account.");
+      const was = followsPerson(u.id, userId);
+      if (!pf().some((f) => f.followerId === u.id && f.followeeId === userId)) pf().push({ followerId: u.id, followeeId: userId, at: now().toISOString() });
+      if (!was) {
+        const name = u.displayName || `@${u.handle}`;
+        if (followsPerson(userId, u.id)) notify(userId, `${name} followed you back. You're friends now.`, "You can send each other posts and messages.", `/u/${u.handle}`);
+        else notify(userId, `${name} followed you`, "Follow back to be friends.", `/u/${u.handle}`);
+      }
+      save();
+    },
+    async person(handle) {
+      const p = s.users.find((x) => x.handle === handle.toLowerCase());
+      if (!p || s.suspensions?.[p.id]) return null;
+      const viewer = s.currentUserId ?? "";
+      const sh = s.shops.find((x) => x.ownerId === p.id && x.status === "open");
+      return { ...personOf(p), bio: p.bio ?? "", followers: pf().filter((f) => f.followeeId === p.id).length, following: pf().filter((f) => f.followerId === p.id).length,
+        shop: sh ? { handle: sh.handle, name: sh.name } : null, iFollow: followsPerson(viewer, p.id), followsMe: followsPerson(p.id, viewer),
+        me: p.id === viewer, blocked: blockedBetween(viewer, p.id) };
+    },
+    async findPeople(query) {
+      const u = me();
+      const q = query.trim().toLowerCase();
+      if (q.length < 2) return [];
+      return s.users.filter((x) => x.id !== u.id && x.handle && !s.suspensions?.[x.id] && !blockedBetween(u.id, x.id)
+        && (x.handle.startsWith(q) || x.displayName.toLowerCase().includes(q))).slice(0, 20)
+        .map((x) => ({ ...personOf(x), iFollow: followsPerson(u.id, x.id), followsMe: followsPerson(x.id, u.id) }));
+    },
+    async followBacks() {
+      const u = me();
+      return s.users.filter((x) => x.id !== u.id && x.handle && followsPerson(x.id, u.id) && !followsPerson(u.id, x.id) && !blockedBetween(u.id, x.id) && !s.suspensions?.[x.id]).map(personOf);
+    },
+    async friends() {
+      const u = me();
+      return s.users.filter((x) => areFriends(u.id, x.id) && !blockedBetween(u.id, x.id) && !s.suspensions?.[x.id])
+        .map((x) => ({ ...personOf(x), chatId: chatBetween(u.id, x.id)?.id ?? null }))
+        .sort((a, b) => (a.chatId ? chatBetween(u.id, a.id)!.lastAt : "").localeCompare(b.chatId ? chatBetween(u.id, b.id)!.lastAt : "") * -1 || a.name.localeCompare(b.name));
+    },
+    async friendChats() {
+      const u = s.users.find((x) => x.id === s.currentUserId);
+      if (!u) return [];
+      return fchats().filter((c) => (c.a === u.id || c.b === u.id)).map((c) => {
+        const other = s.users.find((x) => x.id === (c.a === u.id ? c.b : c.a))!;
+        const msgs = fmsgs().filter((m) => m.chatId === c.id);
+        const last = msgs[msgs.length - 1];
+        return { id: c.id, other: personOf(other), lastBody: last?.body ?? null, lastShared: !!last?.shared, lastMine: last?.senderId === u.id, lastAt: c.lastAt,
+          unread: msgs.filter((m) => m.senderId !== u.id && !m.readAt).length, friends: areFriends(u.id, other.id) };
+      }).filter((c) => !blockedBetween(u.id, c.other.id)).sort((a, b) => b.lastAt.localeCompare(a.lastAt));
+    },
+    async friendChatWith(userId) {
+      const u = me();
+      const c = chatBetween(u.id, userId);
+      if (c) return c.id;
+      if (!areFriends(u.id, userId)) throw new Error("You can message friends: people you follow who follow you back.");
+      const n = { id: id(), a: u.id, b: userId, lastAt: now().toISOString() };
+      fchats().push(n); save();
+      return n.id;
+    },
+    async friendChat(chatId) {
+      const u = me();
+      const c = fchats().find((x) => x.id === chatId && (x.a === u.id || x.b === u.id));
+      if (!c || blockedBetween(c.a, c.b)) throw new Error("This chat isn't available.");
+      const other = s.users.find((x) => x.id === (c.a === u.id ? c.b : c.a))!;
+      return { other: personOf(other), friends: areFriends(u.id, other.id), messages: fmsgs().filter((m) => m.chatId === chatId).map((m) => ({
+        id: m.id, body: m.body, mine: m.senderId === u.id, createdAt: m.createdAt, readAt: m.readAt, shared: m.shared, post: sharedCard(m.postId) })) };
+    },
+    async sendToFriend(userId, body) {
+      await wait(150);
+      sendFriend(me(), userId, body, null); save();
+    },
+    async sharePost(postId, userIds, note) {
+      const u = me();
+      const to = [...new Set(userIds)];
+      if (!to.length) throw new Error("Pick at least one friend.");
+      if (to.length > 20) throw new Error("Send to up to 20 friends at a time.");
+      for (const t of to) sendFriend(u, t, note ?? "", postId);
+      save();
+      return to.length;
+    },
+    async readFriendChat(chatId) {
+      const u = me();
+      fmsgs().forEach((m) => { if (m.chatId === chatId && m.senderId !== u.id && !m.readAt) m.readAt = now().toISOString(); });
+      save();
     },
 
     async conversations() {

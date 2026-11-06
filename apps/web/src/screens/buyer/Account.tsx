@@ -8,6 +8,7 @@ import { PostGrid } from "../../components/PostGrid";
 import { shareOrCopy } from "../../native";
 import { useTabSwipe } from "../../components/gestures";
 import { ConversationList, replyText, useMessageShop } from "./Messages";
+import { FriendChatCell, FriendsRow } from "./Friends";
 import { MoreSheet } from "../../components/Safety";
 import { Avatar } from "../../components/Avatar";
 import { useIsMine } from "../../lib/mine";
@@ -87,7 +88,7 @@ export function SignInForm({ onDone }: { onDone: () => void }) {
 }
 
 type InboxTab = "messages" | "updates";
-const isChat = (n: { link: string | null }) => !!n.link && n.link.startsWith("/messages/");
+const isChat = (n: { link: string | null }) => !!n.link && /^\/(messages|chats)\//.test(n.link);
 
 /** Pull down at the top of a list to reload it, like every phone app. */
 export function usePullRefresh(onRefresh: () => void) {
@@ -108,15 +109,17 @@ export function Inbox() {
   const [params, setParams] = useSearchParams();
   const [items, error, reloadItems] = useLoad(() => api.notifications(), []);
   const [chats, , reloadChats] = useLoad(() => api.conversations(), []);
+  const [friendChats, , reloadFriendChats] = useLoad(() => api.friendChats(), []);
+  const [friends, , reloadFriends] = useLoad(() => api.friends(), []);
   const updates = items?.filter((n) => !isChat(n));
   const unreadUpdates = updates?.filter((n) => !n.readAt).length ?? 0;
-  const unreadChats = chats?.reduce((n, c) => n + c.unread, 0) ?? 0;
+  const unreadChats = (chats?.reduce((n, c) => n + c.unread, 0) ?? 0) + (friendChats?.reduce((n, c) => n + c.unread, 0) ?? 0);
   // Open on what's new: Messages unless only updates are waiting.
   const asked = params.get("tab") as InboxTab | null;
   const tab: InboxTab = asked === "messages" || asked === "updates" ? asked : unreadChats === 0 && unreadUpdates > 0 ? "updates" : "messages";
   const setTab = (v: InboxTab) => setParams({ tab: v }, { replace: true });
   const swipeTabs = useTabSwipe(["messages", "updates"] as const, tab, setTab);
-  const reload = () => { reloadItems(); reloadChats(); };
+  const reload = () => { reloadItems(); reloadChats(); reloadFriendChats(); reloadFriends(); };
   const { pull, handlers } = usePullRefresh(reload);
   useEffect(() => {
     if (tab === "updates" && unreadUpdates) api.markAllRead().then(() => window.dispatchEvent(new Event("inbox-read"))).catch(() => {});
@@ -132,7 +135,19 @@ export function Inbox() {
         { value: "updates", label: <>Updates{unreadUpdates > 0 && <span className="count">{unreadUpdates}</span>}</> },
       ]} />
       <div style={{ marginTop: 16 }} {...swipeTabs} className="swipe-area">
-        {tab === "messages" && (chats ? <ConversationList list={chats} /> : <Loading />)}
+        {tab === "messages" && (chats && friendChats ? (
+          <>
+            {friends && <FriendsRow friends={friends} />}
+            {friendChats.length > 0 && (
+              <>
+                <h2 className="section-title">Friends</h2>
+                <div className="group">{friendChats.map((c) => <FriendChatCell key={c.id} c={c} />)}</div>
+                <h2 className="section-title">Shops</h2>
+              </>
+            )}
+            <ConversationList list={chats} />
+          </>
+        ) : <Loading />)}
         {tab === "updates" && (
           <>
             <ErrorNote error={error} />

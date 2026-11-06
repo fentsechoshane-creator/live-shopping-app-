@@ -2,7 +2,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { validateListing } from "@app/core";
 import type {
-  ListingSuggestion, Conversation, OpenReport,
+  ListingSuggestion, Conversation, OpenReport, SharedPost,
   MyProfile, ShopPublic,
   Api, BankInput, Category, CheckoutInput, FeedItem, ListingInput, MyShop, Notification, Order, Payout, PendingReview,
   ProductPublic, User, TeamPerson, TeamPersonDetail, Reward,
@@ -428,6 +428,62 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
       if (!ids.length) return {};
       const rows = check(await sb.rpc("comment_counts", { p_ids: ids })) as any[];
       return Object.fromEntries(rows.map((r) => [r.post_id, r.comments]));
+    },
+
+    // ----- Friends and sharing (migration 0033) -----
+    async followPerson(userId, on) {
+      check(await sb.rpc("follow_person", { p_user: userId, p_on: on }));
+    },
+    async person(handle) {
+      const r = check(await sb.rpc("person_page", { p_handle: handle })) as any;
+      if (!r) return null;
+      return { id: r.id, name: r.name || `@${r.handle}`, handle: r.handle, avatarUrl: avatarUrl(r.avatarPath), bio: r.bio ?? "",
+        followers: r.followers, following: r.following, shop: r.shop ?? null, iFollow: !!r.iFollow, followsMe: !!r.followsMe, me: !!r.me, blocked: !!r.blocked };
+    },
+    async findPeople(query) {
+      if (query.trim().length < 2) return [];
+      const rows = check(await sb.rpc("find_people", { p_query: query })) as any[];
+      return rows.map((r) => ({ id: r.id, name: r.name || `@${r.handle}`, handle: r.handle, avatarUrl: avatarUrl(r.avatar_path), iFollow: r.i_follow, followsMe: r.follows_me }));
+    },
+    async followBacks() {
+      const rows = check(await sb.rpc("follow_backs")) as any[];
+      return rows.map((r) => ({ id: r.id, name: r.name || `@${r.handle}`, handle: r.handle, avatarUrl: avatarUrl(r.avatar_path) }));
+    },
+    async friends() {
+      const rows = check(await sb.rpc("my_friends")) as any[];
+      return rows.map((r) => ({ id: r.id, name: r.name || `@${r.handle}`, handle: r.handle, avatarUrl: avatarUrl(r.avatar_path), chatId: r.chat_id }));
+    },
+    async friendChats() {
+      const rows = check(await sb.rpc("my_friend_chats")) as any[];
+      return rows.map((r) => ({ id: r.id, other: { id: r.other_id, name: r.other_name || `@${r.other_handle}`, handle: r.other_handle, avatarUrl: avatarUrl(r.other_avatar) },
+        lastBody: r.last_body, lastShared: !!r.last_shared, lastMine: !!r.last_mine, lastAt: r.last_at, unread: r.unread, friends: !!r.friends }));
+    },
+    async friendChatWith(userId) {
+      return check(await sb.rpc("friend_chat_with", { p_user: userId })) as string;
+    },
+    async friendChat(chatId) {
+      const me = await uid();
+      const chats = await api.friendChats();
+      const chat = chats.find((c) => c.id === chatId);
+      if (!chat) throw new Error("This chat isn't available.");
+      const rows = check(await sb.from("friend_messages").select("id, body, created_at, sender_id, read_at, post_id, shared").eq("chat_id", chatId).order("created_at").limit(300)) as any[];
+      const cards = new Map<string, SharedPost | null>();
+      for (const id of new Set(rows.filter((r) => r.post_id).map((r) => r.post_id as string))) {
+        const c = check(await sb.rpc("shared_post_card", { p_post: id })) as any;
+        cards.set(id, c ? { postId: c.postId, productId: c.productId, title: c.title, priceCents: c.priceCents, mode: c.mode, shopName: c.shopName, shopHandle: c.shopHandle,
+          thumb: c.playbackId ? `https://image.mux.com/${c.playbackId}/thumbnail.jpg?width=360&time=${c.cover ?? 0}` : c.kind === "image" ? videoUrl(c.path) : null, available: !!c.available } : null);
+      }
+      return { other: chat.other, friends: chat.friends, messages: rows.map((r) => ({ id: r.id, body: r.body, mine: r.sender_id === me, createdAt: r.created_at, readAt: r.read_at,
+        shared: r.shared, post: r.post_id ? cards.get(r.post_id) ?? null : null })) };
+    },
+    async sendToFriend(userId, body) {
+      check(await sb.rpc("send_to_friend", { p_to: userId, p_body: body, p_post: null }));
+    },
+    async sharePost(postId, userIds, note) {
+      return check(await sb.rpc("share_post", { p_post: postId, p_to: userIds, p_note: note?.trim() || null })) as number;
+    },
+    async readFriendChat(chatId) {
+      check(await sb.rpc("read_friend_chat", { p_chat: chatId }));
     },
 
     async conversations() {
