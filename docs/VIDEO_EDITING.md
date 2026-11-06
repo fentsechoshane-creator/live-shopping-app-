@@ -44,6 +44,19 @@ Same basics as TikTok, plus tools no one else has, built around trust and buying
 - A music library (licensing through SAMRO and the record labels, cost and takedowns). Sellers can keep the sound they recorded.
 - Heavy effects and transitions (later, if sellers ask).
 
+## 3b. Mux Robots (AI on our own videos)
+
+Mux Robots runs AI jobs on videos already in Mux, by API or automatically on every upload ("Directives"). The first 100,000 units a month are free for every self service customer, including the Free plan; it's a hard cap, and a job that would go over doesn't run. Example costs: about 500 units for a caption fix, about 1,600 units per language to translate captions on a 3 minute video. API keys need Robots included. ([Mux Robots guide](https://www.mux.com/docs/guides/robots.md), [Mux blog](https://www.mux.com/blog/getting-started-with-mux-robots-just-got-easier-and-cheaper), [Directives](https://www.mux.com/blog/dev-talks-building-automated-ai-workflows-with-mux-robots-directives-api))
+
+How it fits myHaul (AI that helps the real seller, not fake avatars):
+- **Moderation on every upload:** flag nudity or violence before a video goes live. Helps with the App Store and Play Store rules on user content.
+- **Best thumbnail:** suggest the cover frame in the editor.
+- **Summary (title, description, tags):** fill in the listing from the video. Could replace our `suggest-listing` function, which needs an Anthropic key.
+- **Key moments and "ask a question":** suggest haul tags ("which items appear, and when?") and flaw marks ("is any damage visible, and when?"). The seller confirms; nothing is added without them.
+- **Captions:** auto captions, so videos work with the sound off. [CONFIRM] which South African languages translation supports.
+
+Watch the free cap: plan on moderation plus one helper job per upload, and check the unit cost per job before turning on more.
+
 ## 4. How to build it (technical)
 
 **Key idea: an "edit list" instead of rendering a new video.** We save the edit as data: which clips, in what order, each clip's start and end, sound on or off, text, tags, flaw marks and the cover. The app plays the clips one after another and draws text, tags and stickers on top. Nothing is re-encoded on the phone. Text and tags stay editable after posting.

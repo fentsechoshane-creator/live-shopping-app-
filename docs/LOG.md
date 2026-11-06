@@ -109,6 +109,11 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-06: Mux Robots
+
+- Added to `docs/VIDEO_EDITING.md`: Mux Robots (AI jobs on our videos, 100,000 free units a month). Best fits: moderation on every upload, cover suggestion, listing details from the video, suggested haul tags and flaw marks for the seller to confirm, captions.
+- Mux token must include Robots when Ofentse creates it.
+
 ### 2026-11-06: Video editing research, round two (TikTok Shop is the competitor)
 
 - Ofentse: trim only isn't enough; the timeline (gallery clips joined into one video) matters, and TikTok Shop is the real competitor, so we must be different.
