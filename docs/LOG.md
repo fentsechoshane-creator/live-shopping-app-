@@ -65,7 +65,7 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 
 ## Next up
 
-- **Web host:** finish the move to Cloudflare Pages (see the log entry of 6 Nov). [Ofentse, Claude]
+- **Web host:** now https://myhaul.pages.dev. Still to point at it: `APP_URL` secret, Supabase Site URL and redirect URLs, TradeSafe app links. [Ofentse]
 - **Test payment:** buy something on the live site, pay on TradeSafe's sandbox page, check the order turns Paid. [Ofentse, Claude]
 - **Bob Go:** sandbox key and webhook secret in Supabase secrets (docs/SETUP.md section 4), then set `BOBGO_MODE=sandbox`. Everything else is already live. [Ofentse]
 - **Mux:** token and webhook secret in Supabase secrets. Until then videos go to Supabase storage. [Ofentse]
@@ -115,6 +115,7 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 - Ready in the repo: `apps/web/public/_headers` (same security headers as netlify.toml), `functions/i/[key].ts` and `functions/s/[key].ts` (WhatsApp link previews, tested), `.nvmrc` (Node 22). Single page routing needs nothing extra on Cloudflare.
 - Fixed while moving: the security headers blocked the phone's location, so "Near me" in the locker search could never work. Now allowed for our own site only.
 - Cloudflare settings: root directory blank, build command `npm ci && npm run build:live`, output `apps/web/dist`, variables `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (public).
+- Live at https://myhaul.pages.dev (Cloudflare project `myhaul`, builds from main). Checked: serves e8cc2b6, security headers, location allowed, deep links, .well-known as JSON.
 - After it's live: Supabase Site URL and redirect URLs, the `APP_URL` secret, and TradeSafe's app links move to the new address. [Ofentse, Claude]
 
 ### 2026-11-06: Version line in the menu
