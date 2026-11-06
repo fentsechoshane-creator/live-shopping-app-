@@ -538,6 +538,10 @@ export function createDemoApi(): Api {
       if (ap) Object.assign(ap, { auctionState: "paid", status: "sold_out", stock: 0 });
       save();
     },
+    async checkPayment(orderId) {
+      const o = s.orders.find((x) => x.id === orderId && x.buyerId === me().id);
+      return !!o && !["pending_payment", "cancelled"].includes(o.status);
+    },
     async myOrders() {
       runDue();
       const u = me();

@@ -107,6 +107,15 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-06: Instant payment feedback
+
+- Ofentse wants "Paid" to show straight away. Three layers now:
+  1. TradeSafe's message (seconds after paying), now matched by transaction id.
+  2. When the buyer lands back on My orders or the order page, the app asks the server to check with TradeSafe straight away, then every 4 seconds for 3 minutes, and again whenever the app comes back to the front (`check_payment` in order-action, buyer or team only, at most 300 checks an hour).
+  3. The server's own sweep of recent unpaid orders (every 15 minutes, proposed every 5).
+- The order page says "Already paid? This updates by itself within a few seconds."
+- Waiting for Ofentse's OK to deploy checkout, order-action, escrow-webhook, run-due, and to run run-due every 5 minutes. [Claude]
+
 ### 2026-11-06: First real sandbox payment, and matching payments to orders
 
 - First live test payment went through: R60 order paid with Ozow, TradeSafe shows "Funds Received & Cleared".

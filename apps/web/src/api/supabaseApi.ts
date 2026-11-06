@@ -158,6 +158,9 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
     async mockPay(orderId) {
       await call("order-action", { orderId, action: "mock_pay" });
     },
+    async checkPayment(orderId) {
+      return (await call<{ paid: boolean }>("order-action", { orderId, action: "check_payment" })).paid === true;
+    },
     async myOrders() {
       const me = await uid();
       return (check(await sb.from("orders").select(ORDER_SELECT).eq("buyer_id", me).order("created_at", { ascending: false })) as any[]).map(toOrder);

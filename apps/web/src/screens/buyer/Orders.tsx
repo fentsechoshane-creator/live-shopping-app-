@@ -16,6 +16,29 @@ const REASON_TEXT: Record<ReturnReason, string> = {
   faulty: "Faulty or damaged",
 };
 
+/**
+ * Instant payment feedback. TradeSafe tells our server the moment money arrives, but when you come back from the
+ * payment page we also ask straight away, then every few seconds for 3 minutes, so "Paid" shows without waiting.
+ */
+export function useWatchPayments(orders: Order[] | null | undefined, onPaid: () => void) {
+  const ids = (orders ?? []).filter((o) => o.status === "pending_payment" && o.checkoutUrl).map((o) => o.id).join(",");
+  useEffect(() => {
+    if (!ids) return;
+    let tries = 0, stop = false;
+    const check = async () => {
+      if (stop || document.visibilityState !== "visible") return;
+      tries++;
+      const paid = await Promise.all(ids.split(",").map((id) => api.checkPayment(id).catch(() => false)));
+      if (!stop && paid.some(Boolean)) onPaid();
+    };
+    check();
+    const t = window.setInterval(() => { if (tries >= 45) window.clearInterval(t); else check(); }, 4000);
+    const back = () => { tries = 0; check(); };
+    document.addEventListener("visibilitychange", back);
+    return () => { stop = true; window.clearInterval(t); document.removeEventListener("visibilitychange", back); };
+  }, [ids]); // eslint-disable-line react-hooks/exhaustive-deps
+}
+
 export function statusPill(o: Order, side: "buyer" | "seller") {
   const cls = ["refunded", "cancelled"].includes(o.status) ? "" : o.status === "completed" ? "green" : o.status.startsWith("return") || o.status === "pending_payment" ? "amber" : "green";
   return <span className={`pill ${cls}`}>{ORDER_STATUS_TEXT[o.status][side]}</span>;
@@ -42,7 +65,9 @@ export function OrderList({ orders }: { orders: Order[] | undefined }) {
 }
 
 export function Orders() {
-  const [orders, error] = useLoad(() => api.myOrders(), []);
+  const [orders, error, reload] = useLoad(() => api.myOrders(), []);
+  const { toast } = useSession();
+  useWatchPayments(orders, () => { toast("Payment received. Your order is placed."); reload(); });
   return (
     <div className="screen">
       <BackButton />
@@ -65,6 +90,7 @@ export function OrderDetail() {
   const [stars, setStars] = useState(0);
   const [comment, setComment] = useState("");
   const messageShop = useMessageShop();
+  useWatchPayments(o ? [o] : null, () => { toast("Payment received. Your order is placed."); reload(); });
   // Right after paying is when "tell me when it ships" makes sense, so that's when we ask about notifications.
   useEffect(() => { if (o?.status === "paid") askForNotifications(); }, [o?.status]);
 
@@ -96,6 +122,7 @@ export function OrderDetail() {
 
       {o.status === "pending_payment" && (
         <div className="stack">
+          {o.checkoutUrl && <p className="small muted" style={{ margin: "0 0 4px" }}>Already paid? This updates by itself within a few seconds.</p>}
           {o.checkoutUrl && <a className="btn green block big" href={o.checkoutUrl}>Pay {R(o.totals.total)}</a>}
           <button className="btn line block" disabled={busy} onClick={() => act(() => api.cancelUnpaid(o.id), "Order cancelled")}>Cancel order</button>
         </div>

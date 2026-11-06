@@ -2,11 +2,11 @@
 // Simple buyer actions (confirm received, request return, review) are database functions instead.
 import { handler, json, UserError } from "../_shared/http.ts";
 import { adminClient, requireUser, isAdmin, must } from "../_shared/supabase.ts";
-import { escrow } from "../_shared/escrow.ts";
+import { escrow, PAID_STATES } from "../_shared/escrow.ts";
 import { requireDelivery, type Province } from "../_shared/bobgo.ts";
 import { bookedByUs, type DeliveryOption } from "../_shared/core/index.ts";
 
-type Action = "mock_pay" | "cancel_unpaid" | "ship" | "label" | "accept_return" | "return_received" | "dispute_return" | "decide_return";
+type Action = "mock_pay" | "check_payment" | "cancel_unpaid" | "ship" | "label" | "accept_return" | "return_received" | "dispute_return" | "decide_return";
 
 Deno.serve(handler(async (req, body) => {
   const db = adminClient();
@@ -30,6 +30,19 @@ Deno.serve(handler(async (req, body) => {
       if (!isBuyer || order.status !== "pending_payment") throw new UserError("Nothing to pay.");
       await setStatus("paid", { payment_method: await es.paymentMethod(order.escrow_transaction_id ?? "") });
       break;
+    }
+    case "check_payment": {
+      // The buyer just came back from TradeSafe's page: ask TradeSafe now instead of waiting for its message.
+      if (!(isBuyer || admin)) throw new UserError("Not your order.", 403);
+      if (order.status !== "pending_payment") return json({ paid: order.status !== "cancelled" });
+      if (es.mode !== "live" || !order.escrow_transaction_id) return json({ paid: false });
+      const { data: allowed } = await db.rpc("take_usage", { p_user: uid, p_kind: "payment_check", p_max: 300, p_window: "1 hour" });
+      if (allowed !== true) return json({ paid: false });
+      const st = await es.transactionState(order.escrow_transaction_id);
+      if (!st || !PAID_STATES.includes(st.state)) return json({ paid: false });
+      await db.from("orders").update({ status: "paid", payment_method: await es.paymentMethod(order.escrow_transaction_id) })
+        .eq("id", orderId).eq("status", "pending_payment");
+      return json({ paid: true });
     }
     case "cancel_unpaid": {
       if (!isBuyer || order.status !== "pending_payment") throw new UserError("Only unpaid orders can be cancelled.");

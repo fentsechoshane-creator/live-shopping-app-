@@ -355,6 +355,8 @@ export interface Api {
   shop(handle: string): Promise<{ shop: ShopPublic; items: FeedItem[] } | null>;
   checkout(input: CheckoutInput): Promise<{ orderId: string; checkoutUrl: string; totals: OrderTotals }>;
   mockPay(orderId: string): Promise<void>;
+  /** Ask TradeSafe straight away whether this unpaid order has been paid. True once it's paid. */
+  checkPayment(orderId: string): Promise<boolean>;
   myOrders(): Promise<Order[]>;
   order(id: string): Promise<Order | null>;
   cancelUnpaid(id: string): Promise<void>;
