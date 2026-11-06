@@ -11,11 +11,11 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 | Area | Status |
 | --- | --- |
 | Business rules (fees, credit, returns, payouts, trust) | Done and tested |
-| Database, security rules, server functions | Done. Live database fully up to date (0001 to 0014). Server functions still to deploy [Lehloma] |
+| Database, security rules, server functions | Done. Live database up to date (0001 to 0030) and every server function deployed (6 Nov) |
 | Seller side (sign up, checks, listings, orders, payouts) | Done in the web app |
 | Buyer side (feed, Explore, checkout, orders, returns) | Done in the web app |
 | Design (Liquid Glass, iPhone first, TikTok style profile) | Done, keeps improving |
-| Real payments (TradeSafe escrow) | Built, waiting for sandbox keys [Lehloma] |
+| Real payments (TradeSafe escrow) | Live in TradeSafe sandbox: sign in works, banks mapped. Next: one test payment |
 | Real video (Mux) | Built, waiting for keys [Lehloma] |
 | Sign in by code on the live project | Waiting for 2 Supabase settings [Ofentse] |
 | Mobile app (iPhone and Android) | Built with Capacitor. Android test build on GitHub; iPhone needs a Mac with Xcode |
@@ -65,8 +65,9 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 
 ## Next up
 
-- **Bob Go:** sandbox key and webhook secret in Supabase secrets (docs/SETUP.md section 4), then deploy 0028 and the functions. [Ofentse, Claude]
-- **Apply migration 0027 live** (live check fixes) once Ofentse says yes. [Claude]
+- **Test payment:** buy something on the live site, pay on TradeSafe's sandbox page, check the order turns Paid. [Ofentse, Claude]
+- **Bob Go:** sandbox key and webhook secret in Supabase secrets (docs/SETUP.md section 4), then set `BOBGO_MODE=sandbox`. Everything else is already live. [Ofentse]
+- **Mux:** token and webhook secret in Supabase secrets. Until then videos go to Supabase storage. [Ofentse]
 - **Make Ofentse a team member (one line, Ofentse):** Supabase > SQL Editor, run `update profiles set role = 'admin' where id = (select id from auth.users where email = 'fentsechoshane@gmail.com');` Claude was not allowed to grant team access itself.
 - **Secrets (Ofentse or Lehloma, in Supabase > Edge Functions > Secrets):** `TRADESAFE_MODE=mock` and `APP_URL=https://myhaul-app.netlify.app` while testing. Payments are refused until TRADESAFE_MODE is set. Later: Mux, Anthropic, Telegram, Resend, Firebase and Apple push keys.
 - **Supabase settings:** turn on leaked password protection (Authentication > Sign in / Providers > Password). [Ofentse]
@@ -105,6 +106,16 @@ Debug as we go: anyone who finds or fixes a problem updates this list. Highest r
 Fixed in this round: Safari double back on the edge swipe (now only in the installed app), deleting an account now also deletes the person's photos and videos, React Router warnings.
 
 ## Log
+
+### 2026-11-06: Everything deployed to live
+
+- Ofentse approved: "Yes, deploy everything to live".
+- Live database: 0027 (live check fixes), 0028 (Bob Go delivery), 0029 (delivery perks), 0030 (stamps count INSTANT_EFT as well as OZOW).
+- Server functions deployed: run-due, escrow-webhook, checkout, order-action, seller-bank, mux-upload, mux-webhook, and new delivery (locker search) and bobgo-webhook. The two new ones were deployed with only the code they use (same behaviour as the repo).
+- TradeSafe sandbox health check: sign in ok, our own account found, all 9 banks mapped, savings and cheque, ID type NATIONAL, payouts IMMEDIATE. Pay methods TradeSafe lists include OZOW and INSTANT_EFT, so both now earn stamps.
+- Not set yet: Bob Go key and webhook secret, Mux token and webhook secret. Courier, locker and Mux paths stay off until then and the app says so plainly.
+- [CONFIRM] TradeSafe's transaction state names (the health check used the wrong enum name, harmless). Questions for TradeSafe still open: agent accept, buyer texts, refunds after delivery, saved cards, volume rates.
+- `scripts/push-live.mjs` knows the new live migration versions.
 
 ### 2026-11-06: Delivery perks (Instant EFT stamps, big order delivery)
 

@@ -298,7 +298,7 @@ export function createDemoApi(): Api {
     if (to === "completed") {
       trust(o.shopOwnerId, "order_kept"); schedulePayout(o);
       // A delivery stamp for an Instant EFT order of R200 or more, like the database (0029).
-      if (/ozow/i.test(o.paymentMethod ?? "") && o.totals.itemPrice >= DELIVERY_PERKS.stampMinOrder && !(s.stamps ?? []).some((x) => x.earnedOrderId === o.id)) {
+      if (/ozow|instant.?eft/i.test(o.paymentMethod ?? "") && o.totals.itemPrice >= DELIVERY_PERKS.stampMinOrder && !(s.stamps ?? []).some((x) => x.earnedOrderId === o.id)) {
         s.stamps = [...(s.stamps ?? []), { userId: o.buyerId, earnedOrderId: o.id, usedOrderId: null }];
         const n = s.stamps.filter((x) => x.userId === o.buyerId && !x.usedOrderId).length;
         notify(o.buyerId, n >= 5 ? "Half price delivery unlocked" : `Delivery stamp ${n} of 5`,

@@ -251,7 +251,7 @@ class TradeSafe implements Escrow {
   }
 
   async paymentMethod(transactionId: string) {
-    // Their plugin reads transaction { deposits { method } }. [CONFIRM] the exact Ozow code; we match "ozow" in it.
+    // Their plugin reads transaction { deposits { method } }. Seen in the live list: OZOW and INSTANT_EFT; both earn stamps.
     try {
       const d = await this.gql<{ transaction: { deposits: { method: string | null; processed: boolean | null }[] | null } | null }>(
         `query m($id: ID!) { transaction(id: $id) { deposits { method processed } } }`, { id: transactionId });
