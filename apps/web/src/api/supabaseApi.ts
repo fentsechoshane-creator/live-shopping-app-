@@ -115,7 +115,7 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
     },
     async sendCode(contact) {
       const res = contact.includes("@")
-        ? await sb.auth.signInWithOtp({ email: contact.trim(), options: { shouldCreateUser: true } })
+        ? await sb.auth.signInWithOtp({ email: contact.trim(), options: { shouldCreateUser: true, emailRedirectTo: backHere() } })
         : await sb.auth.signInWithOtp({ phone: toE164(contact) });
       if (res.error) throw new Error(res.error.message);
     },
@@ -782,6 +782,18 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
 }
 
 /** 082 123 4567 -> +27821234567 */
+/**
+ * Where the sign in link in the email should land: the page you were on (like /team), not the home page.
+ * Only pages on our own site; Supabase also checks it against its list of allowed addresses.
+ */
+function backHere(): string | undefined {
+  if (typeof location === "undefined" || !/^https?:$/.test(location.protocol)) return undefined;
+  let path = location.pathname + location.search;
+  if (location.pathname.startsWith("/signin")) path = new URLSearchParams(location.search).get("next") ?? "/";
+  if (!path.startsWith("/") || path.startsWith("//")) path = "/";
+  return location.origin + path;
+}
+
 function toE164(phone: string): string {
   const d = phone.replace(/\D/g, "");
   if (d.startsWith("27")) return "+" + d;

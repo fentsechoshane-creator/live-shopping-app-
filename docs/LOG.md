@@ -107,6 +107,11 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-06: Email sign in link brings you back to where you were
+
+- Ofentse signed in on /team with the email code and landed in the app instead. The sign in email can carry a link, and that link always went to the home page. Now it goes back to the page you started from (like /team), only on our own site; Supabase also checks it against the allowed addresses.
+- Typing the 6 digit code on /team already kept you on /team.
+
 ### 2026-11-06: Moving the web app to Cloudflare Pages
 
 - Found the reason the site looked old: Netlify's free plan gives 300 credits a month and every update costs 15 (about 20 a month). We used them all, so Netlify skipped the last 23 updates and the site was stuck on 4 November (8034e43). If the credits hit zero the whole site goes offline.
