@@ -76,6 +76,18 @@ class TradeSafe implements Escrow {
   mode = "live" as const;
   private token: { value: string; expires: number } | null = null;
   private enums = new Map<string, { name: string; description: string | null }[]>();
+  private agent: string | null = null;
+
+  /** Our own TradeSafe token (the AGENT that receives our fees). TRADESAFE_AGENT_TOKEN if set, otherwise the
+   * application's own token from apiProfile, which is what TradeSafe's plugin uses. */
+  private async agentToken(): Promise<string> {
+    if (this.agent) return this.agent;
+    const set = Deno.env.get("TRADESAFE_AGENT_TOKEN");
+    if (set) return (this.agent = set);
+    const d = await this.gql<{ apiProfile: { token: string | null } | null }>("query { apiProfile { token } }", {});
+    if (!d.apiProfile?.token) throw new Error("TradeSafe returned no application token");
+    return (this.agent = d.apiProfile.token);
+  }
 
   private async accessToken(): Promise<string> {
     if (this.token && this.token.expires > Date.now() + 60_000) return this.token.value;
@@ -182,7 +194,7 @@ class TradeSafe implements Escrow {
             create: [
               { token: t.buyerToken, role: "BUYER" },
               { token: t.sellerToken, role: "SELLER" },
-              { token: env("TRADESAFE_AGENT_TOKEN"), role: "AGENT", fee: t.agentFeeCents / 100, feeType: "FLAT", feeAllocation: "SELLER" },
+              { token: await this.agentToken(), role: "AGENT", fee: t.agentFeeCents / 100, feeType: "FLAT", feeAllocation: "SELLER" },
             ],
           },
         },

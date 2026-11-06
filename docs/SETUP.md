@@ -86,8 +86,8 @@ Our code was checked on 6 Nov 2026 against TradeSafe's API spec and their own op
 1. In the TradeSafe developer portal, create an application. Copy the Client ID and Secret (the secret is shown once).
 2. Set the API callback to: `https://<ref>.supabase.co/functions/v1/escrow-webhook?secret=<TRADESAFE_CALLBACK_SECRET>` (make up a long random secret). TradeSafe doesn't sign callbacks, so this secret plus asking TradeSafe for the real state is what protects it.
 3. Set the success and failure URLs to your app's `/orders` page.
-4. Create the platform's own token (role AGENT, with our business bank account). This is where our fees and the courier money go. Put its id in `TRADESAFE_AGENT_TOKEN`.
-5. Secrets (Supabase, Edge Functions, Secrets): `TRADESAFE_MODE=live`, `TRADESAFE_CLIENT_ID`, `TRADESAFE_CLIENT_SECRET`, `TRADESAFE_AGENT_TOKEN`, `TRADESAFE_CALLBACK_SECRET`, and for the sandbox `TRADESAFE_API_URL=https://api-developer.tradesafe.dev/graphql` (leave it out for live: the default is `https://api.tradesafe.co.za/graphql`).
+4. Our fees and the courier money go to the application's own TradeSafe account (found automatically from `apiProfile`, as TradeSafe's plugin does). Add our business bank account to it in the TradeSafe Business Dashboard. `TRADESAFE_AGENT_TOKEN` is only needed to override it.
+5. Secrets (Supabase, Edge Functions, Secrets): `TRADESAFE_MODE=live`, `TRADESAFE_CLIENT_ID`, `TRADESAFE_CLIENT_SECRET`, `TRADESAFE_CALLBACK_SECRET`, and for the sandbox `TRADESAFE_API_URL=https://api-developer.tradesafe.dev/graphql` (leave it out for live: the default is `https://api.tradesafe.co.za/graphql`).
 6. Bank codes, account types, ID type and payout timing are looked up from TradeSafe's own list, so they don't need setting. Sellers' payouts are set to Immediate.
 
 **Questions to ask TradeSafe before going live** (email support@tradesafe.co.za):

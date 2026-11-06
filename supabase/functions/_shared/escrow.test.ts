@@ -74,6 +74,17 @@ Deno.test("transaction, payment link and refund send the documented shapes", asy
   } finally { ts.restore(); }
 });
 
+Deno.test("without TRADESAFE_AGENT_TOKEN our own token comes from apiProfile", async () => {
+  setEnv(); Deno.env.delete("TRADESAFE_AGENT_TOKEN");
+  const ts = fakeTradeSafe((q) => q.includes("apiProfile") ? { apiProfile: { token: "APP_TOKEN" } } : { transactionCreate: { id: "TX", allocations: [{ id: "AL" }] } });
+  try {
+    await escrow().createTransaction({ reference: "00000000-0000-0000-0000-000000000001", title: "Tee", description: "Tee",
+      buyerToken: "B", sellerToken: "S", amountCents: 10000, agentFeeCents: 1000, daysToDeliver: 10, daysToInspect: 7 });
+    const input = ts.calls.find((c) => c.body.query.includes("transactionCreate"))!.body.variables.input;
+    assert(input.parties.create[2].token === "APP_TOKEN");
+  } finally { ts.restore(); }
+});
+
 Deno.test("a payment link that isn't https is refused", async () => {
   setEnv();
   const ts = fakeTradeSafe(() => ({ checkoutLink: "javascript:alert(1)" }));
