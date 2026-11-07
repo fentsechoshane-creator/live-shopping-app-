@@ -357,8 +357,8 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
       return call("delivery", where);
     },
     async checkDelivery(c) {
-      const r = await call<{ ok: boolean; message?: string | null }>("delivery", { check: "route", ...c });
-      return { ok: r.ok, message: r.message ?? null };
+      const r = await call<{ ok: boolean; message?: string | null; quoteCents?: number | null }>("delivery", { check: "route", ...c });
+      return { ok: r.ok, message: r.message ?? null, quoteCents: typeof r.quoteCents === "number" && r.quoteCents > 0 ? r.quoteCents : null };
     },
     async shopPickup() {
       const shopId = await myShopId();

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FEATURES } from "../../features";
-import { bookedByUs, DELIVERY_OPTIONS, DELIVERY_PERKS, deliveryFee, orderParcelSize, orderTotals, PARCEL_SIZES, type DeliveryOption, type ParcelSize } from "@app/core";
+import { bookedByUs, DELIVERY_OPTIONS, DELIVERY_PERKS, deliveryFee, orderParcelSize, orderTotals, PARCEL_SIZES, quotedDeliveryFee, type DeliveryOption, type ParcelSize } from "@app/core";
 import { api, type FeedItem, type Offer, type PickupPoint, type SavedDelivery, type StreetAddress } from "../../api";
 import { AddressFields, addressLine, addressOk, EMPTY_ADDRESS, LockerPicker } from "../../components/Address";
 import { useSession } from "../../session";
@@ -71,7 +71,7 @@ export function CheckoutSheet({ item, onClose, offer, auctionPrice }: { item: Fe
   // Ask couriers before the buyer pays: only offer a locker or address Bob Go can actually book (decided 7 Nov).
   const routeKey = delivery === "pudo_locker" && point ? `L${point.provider}:${point.id}`
     : delivery === "courier" && addressOk(address) ? `C${address.street}|${address.suburb}|${address.city}|${address.province}|${address.postalCode}` : null;
-  const [route, setRoute] = useState<{ key: string; ok: boolean; message: string | null } | null>(null);
+  const [route, setRoute] = useState<{ key: string; ok: boolean; message: string | null; quoteCents: number | null } | null>(null);
   useEffect(() => {
     if (!routeKey) return;
     let live = true;
@@ -79,7 +79,7 @@ export function CheckoutSheet({ item, onClose, offer, auctionPrice }: { item: Fe
       api.checkDelivery({ productId: p.id, delivery: delivery as "courier" | "pudo_locker",
         ...(delivery === "pudo_locker" && point ? { pickupPoint: { id: point.id, provider: point.provider } } : { address: { ...address } }) })
         .then((r) => { if (live) setRoute({ key: routeKey, ...r }); })
-        .catch(() => { if (live) setRoute({ key: routeKey, ok: true, message: null }); }); // can't check: don't block, checkout checks again
+        .catch(() => { if (live) setRoute({ key: routeKey, ok: true, message: null, quoteCents: null }); }); // can't check: don't block, checkout checks again
     }, 500);
     return () => { live = false; window.clearTimeout(t); };
   }, [routeKey]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -105,8 +105,10 @@ export function CheckoutSheet({ item, onClose, offer, auctionPrice }: { item: Fe
   const earnsStamp = price >= DELIVERY_PERKS.stampMinOrder && !food;
   // A nudge when a bigger order would make delivery half price.
   const toHalf = DELIVERY_PERKS.halfPriceFrom - price;
-  const t = useMemo(() => feeFor(delivery) === null ? null : orderTotals({ itemPrice: price, delivery, parcelSize: parcel, welcomeCreditAvailable: credit, stampsReady: stamps >= DELIVERY_PERKS.stampsNeeded }),
-    [price, delivery, credit, parcel, stamps]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Couriers and lockers cost what Bob Go quotes for this route, rounded up to R5 (decided 7 Nov). Flat fee until it answers.
+  const quote = routeNow?.ok && routeNow.quoteCents ? routeNow.quoteCents : null;
+  const t = useMemo(() => feeFor(delivery) === null ? null : orderTotals({ itemPrice: price, delivery, parcelSize: parcel, welcomeCreditAvailable: credit, stampsReady: stamps >= DELIVERY_PERKS.stampsNeeded, quotedDeliveryCents: quote }),
+    [price, delivery, credit, parcel, stamps, quote]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pay = () => run(async () => {
     if (offerSave && remember) {
@@ -170,7 +172,7 @@ export function CheckoutSheet({ item, onClose, offer, auctionPrice }: { item: Fe
 
       <h3 style={{ fontSize: 15, margin: "0 0 8px" }}>Delivery</h3>
       {options.map((d) => {
-        const fee = feeFor(d);
+        const fee = d === delivery && quote && feeFor(d) !== null ? quotedDeliveryFee(quote) : feeFor(d);
         return (
           <Choice key={d} on={delivery === d} onClick={() => setDelivery(d)} title={DELIVERY_OPTIONS[d].label}
             sub={fee === null ? `Too big for a locker (${PARCEL_SIZES[parcel].label.toLowerCase()} parcel)` : DELIVERY_OPTIONS[d].days}

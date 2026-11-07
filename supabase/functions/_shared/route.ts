@@ -10,6 +10,8 @@ export interface RouteCheck {
   ok: boolean;
   verdict: QuoteVerdict | "no_pickup";
   message: string | null;
+  /** Bob Go's price for this route in cents, when it gave one. The buyer pays this rounded up to R5. */
+  quoteCents?: number | null;
 }
 
 export async function checkRoute(db: SupabaseClient, dl: Delivery, r: {
@@ -30,7 +32,7 @@ export async function checkRoute(db: SupabaseClient, dl: Delivery, r: {
   }
   const locker = !!r.toPoint;
   switch (q.verdict) {
-    case "ok": return { ok: true, verdict: "ok", message: null };
+    case "ok": return { ok: true, verdict: "ok", message: null, quoteCents: q.cheapest ? Math.round(q.cheapest.amount * 100) : null };
     case "try_later": return { ok: true, verdict: "try_later", message: null };
     case "low_balance":
       // Our Bob Go account needs topping up. Never the buyer's problem: take the order and tell the team now.

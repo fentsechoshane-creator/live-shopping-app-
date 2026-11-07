@@ -868,9 +868,10 @@ export function createDemoApi(): Api {
       await wait(200);
       const p = s.products.find((x) => x.id === c.productId);
       if (!p || p.status !== "live") throw new Error("That item isn't available.");
-      if (c.delivery === "pudo_locker" && (p.parcelSize ?? "small") === "large") return { ok: false, message: "This parcel is too big for a locker. Pick courier or collection." };
-      if (c.delivery === "pudo_locker" && c.pickupPoint?.id === 9999) return { ok: false, message: "Couriers can't reach that locker from this seller right now. Pick another locker, or courier to your door." };
-      return { ok: true, message: null };
+      if (c.delivery === "pudo_locker" && (p.parcelSize ?? "small") === "large") return { ok: false, message: "This parcel is too big for a locker. Pick courier or collection.", quoteCents: null };
+      if (c.delivery === "pudo_locker" && c.pickupPoint?.id === 9999) return { ok: false, message: "Couriers can't reach that locker from this seller right now. Pick another locker, or courier to your door.", quoteCents: null };
+      // Demo has no courier price list, so it charges the flat fee (null means "use the flat fee").
+      return { ok: true, message: null, quoteCents: null };
     },
     async shopPickup() {
       const sh = s.shops.find((x) => x.ownerId === me().id);

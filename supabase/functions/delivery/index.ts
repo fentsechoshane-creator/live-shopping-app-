@@ -36,11 +36,11 @@ Deno.serve(handler(async (req, body) => {
       const id = Number(body.pickupPoint?.id), provider = String(body.pickupPoint?.provider ?? "");
       if (!Number.isInteger(id) || !/^[a-z0-9_-]{2,30}$/.test(provider)) throw new UserError("Pick a locker.");
       const r = await checkRoute(db, dl, { shopId: product.shop_id, parcel, declaredValueCents: product.price_cents, toPoint: { id, provider } });
-      return json({ ok: r.ok, message: r.message });
+      return json({ ok: r.ok, message: r.message, quoteCents: r.quoteCents ?? null });
     }
     if (body.delivery === "courier") {
       const r = await checkRoute(db, dl, { shopId: product.shop_id, parcel, declaredValueCents: product.price_cents, to: cleanAddress(body.address, "delivery address") });
-      return json({ ok: r.ok, message: r.message });
+      return json({ ok: r.ok, message: r.message, quoteCents: r.quoteCents ?? null });
     }
     throw new UserError("Pick courier or locker.");
   }

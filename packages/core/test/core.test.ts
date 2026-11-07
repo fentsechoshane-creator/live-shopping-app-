@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { editLength, locate, clipStartsAt, activeMarks, validateEdit, tidyMark, EDIT_LIMITS,
+import { quotedDeliveryFee, editLength, locate, clipStartsAt, activeMarks, validateEdit, tidyMark, EDIT_LIMITS,
   deliveryFee, deliveryPerk, PARCEL_SIZE_IDS,
   rand, formatRand, protectionFee, orderTotals, sellerFee, releasableAt, payoutDate, nextFriday, addWorkingDays,
   reserveFor, scoreFrom, tierFor, canUse, canForceOn, packingVideoProblems, validateListing, canTransition, returnReasonsFor, shipBy,
@@ -332,5 +332,26 @@ describe("placeable text", () => {
     expect(validateEdit({ ...base, marks: [{ kind: "text", at: 1, text: "Hi", color: "#123456" }] })).toContain("Pick a text colour.");
     expect(validateEdit({ ...base, marks: [{ kind: "text", at: 1, text: "Hi", size: 7 }] })).toContain("Text size is out of range.");
     expect(validateEdit({ ...base, marks: [{ kind: "text", at: 2, until: 1, text: "Hi" }] })).toContain("A text ends before it starts.");
+  });
+});
+
+describe("quoted delivery prices", () => {
+  it("rounds Bob Go's quote up to the next R5", () => {
+    expect(quotedDeliveryFee(9601)).toBe(10000);
+    expect(quotedDeliveryFee(9500)).toBe(9500);
+    expect(quotedDeliveryFee(6001)).toBe(6500);
+  });
+  it("uses the quote for courier and locker, never for collection, and keeps it to pay Bob Go", () => {
+    const t = orderTotals({ itemPrice: rand(300), delivery: "courier", parcelSize: "small", quotedDeliveryCents: 9601 });
+    expect(t.deliveryFee).toBe(10000);
+    expect(t.deliveryKept).toBe(10000);
+    expect(t.total).toBe(rand(300) + 10000 + t.protectionFee);
+    expect(orderTotals({ itemPrice: rand(300), delivery: "collect_cpt", parcelSize: "small", quotedDeliveryCents: 9601 }).deliveryFee).toBe(0);
+    expect(orderTotals({ itemPrice: rand(300), delivery: "courier", parcelSize: "small", quotedDeliveryCents: null }).deliveryFee).toBe(rand(90));
+  });
+  it("big order perks still apply to the quoted price", () => {
+    const t = orderTotals({ itemPrice: rand(1600), delivery: "pudo_locker", parcelSize: "small", quotedDeliveryCents: 6001 });
+    expect(t.deliveryFee).toBe(6500);
+    expect(t.deliveryDiscount).toBe(6500); // free locker from R1,500
   });
 });

@@ -109,6 +109,14 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-07: Delivery costs what Bob Go quotes; lockers fixed
+
+- Decided with Ofentse: buyers pay Bob Go's real price for courier and locker delivery, rounded up to the next R5 (R96.01 becomes R100). The flat fee is the fallback when Bob Go hasn't answered or the seller has no pickup address yet. Perks (half price, free locker, stamps) apply to the quoted price.
+- Checkout shows the flat fee first, then the real price once couriers answer (about half a second after the locker or address is picked). The server quotes again when the buyer pays, so the charged price is the server's. A quote can change between the two, rarely [CONFIRM how often on live rates].
+- Lockers: we no longer send a declared value for locker parcels, which Bob Box refused. Door delivery still sends it.
+- Deployed checkout, delivery and order-action (OK from Ofentse).
+- Open: retry "Mark as shipped" on Yooo (MH 4383), and test a locker order end to end.
+
 ### 2026-11-07: First Bob Go delivery loop (sandbox)
 
 - Ofentse ran courier orders end to end on the live site: "Yesss" (MH 9126) and "Ferrari" (MH 7108) were booked with Bob Go's sandbox (Demo Couriers, tracking UASD8RS3 and UASDHM8L), shipped, Yesss marked delivered by the buyer, Ferrari tracked every 30 minutes (pending collection, as expected in a sandbox). No server errors.

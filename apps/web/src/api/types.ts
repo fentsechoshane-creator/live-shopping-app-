@@ -459,7 +459,7 @@ export interface Api {
   /** Lockers and pickup points near a spot or in a city. */
   pickupPoints(where: { lat: number; lng: number } | { city: string }): Promise<{ points: PickupPoint[]; cities: string[] }>;
   /** Can couriers take this item to this locker or address? Asked while the buyer picks, before paying. */
-  checkDelivery(c: { productId: string; delivery: "courier" | "pudo_locker"; pickupPoint?: { id: number; provider: string }; address?: Record<string, string> }): Promise<{ ok: boolean; message: string | null }>;
+  checkDelivery(c: { productId: string; delivery: "courier" | "pudo_locker"; pickupPoint?: { id: number; provider: string }; address?: Record<string, string> }): Promise<{ ok: boolean; message: string | null; quoteCents: number | null }>;
   /** The seller's pickup address for courier collections. */
   shopPickup(): Promise<ShopPickup | null>;
   saveShopPickup(p: ShopPickup): Promise<void>;

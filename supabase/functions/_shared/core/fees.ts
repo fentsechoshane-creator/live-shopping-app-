@@ -109,7 +109,13 @@ export interface OrderTotalsInput {
   perksOn?: boolean;
   foundingUntil?: Date | null;
   at?: Date;
+  /** The courier or locker price Bob Go quoted for this exact route, in cents. When given, the buyer pays this
+   * (rounded up to the next R5, see quotedDeliveryFee) instead of the flat fee. Decided with Ofentse 7 Nov 2026. */
+  quotedDeliveryCents?: Cents | null;
 }
+
+/** What the buyer pays for a quoted courier or locker price: rounded up to the next R5, so we never pay more than we took. */
+export const quotedDeliveryFee = (quoteCents: Cents): Cents => Math.ceil(Math.max(0, quoteCents) / 500) * 500;
 
 export interface OrderTotals {
   itemPrice: Cents;
@@ -136,8 +142,10 @@ export interface OrderTotals {
 }
 
 export function orderTotals(input: OrderTotalsInput): OrderTotals {
-  const fee0 = deliveryFee(input.delivery, input.parcelSize);
-  if (fee0 === null) throw new Error("That delivery option can't take this parcel size.");
+  const flat = deliveryFee(input.delivery, input.parcelSize);
+  if (flat === null) throw new Error("That delivery option can't take this parcel size.");
+  const fee0 = bookedByUs(input.delivery) && input.quotedDeliveryCents != null && input.quotedDeliveryCents > 0
+    ? quotedDeliveryFee(input.quotedDeliveryCents) : flat;
   const deliveryFeeCents = fee0;
   const deliveryKept = bookedByUs(input.delivery) ? deliveryFeeCents : 0;
   const protect = protectionFee(input.itemPrice);

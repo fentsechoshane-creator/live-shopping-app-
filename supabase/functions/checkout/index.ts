@@ -78,6 +78,7 @@ Deno.serve(handler(async (req, body) => {
   if (bookedByUs(delivery) && deliveryFee(delivery, parcelSize) === null)
     throw new UserError(`This parcel is ${PARCEL_SIZES[parcelSize].label.toLowerCase()}, too big for a locker. Pick courier or collection.`);
   let savedPoint: Record<string, unknown> | null = null;
+  let quotedDeliveryCents: number | null = null; // Bob Go's real price for this route, when it gave one
   if (bookedByUs(delivery)) {
     const dl = requireDelivery();
     if (!(deliveryDetails.name?.trim() && (deliveryDetails.phone ?? "").replace(/\D/g, "").length >= 9))
@@ -97,6 +98,7 @@ Deno.serve(handler(async (req, body) => {
     const route = await checkRoute(db, dl, { shopId: shop.id, parcel: parcelSize, declaredValueCents: itemPrice,
       ...(delivery === "courier" ? { to: cleanAddress(deliveryDetails, "delivery address") } : { toPoint: { id: Number(savedPoint!.id), provider: String(savedPoint!.provider) } }) });
     if (!route.ok) throw new UserError(route.message ?? "That delivery option isn't available. Pick another one.", 409);
+    quotedDeliveryCents = route.quoteCents ?? null;
   }
   if (product.mode === "order_now") {
     const earliest = new Date(Date.now() + (product.lead_days ?? 2) * 86400_000).toISOString().slice(0, 10);
@@ -121,6 +123,7 @@ Deno.serve(handler(async (req, body) => {
     welcomeCreditAvailable: creditOk === true,
     stampsReady: stampsReady === true,
     perksOn: perksOn === true,
+    quotedDeliveryCents,
     foundingUntil: shop.founding_until ? new Date(shop.founding_until) : null,
   });
 
