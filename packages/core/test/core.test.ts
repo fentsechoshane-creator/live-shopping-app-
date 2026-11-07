@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { quotedDeliveryFee, editLength, locate, clipStartsAt, activeMarks, validateEdit, tidyMark, EDIT_LIMITS,
+import { quotedDeliveryFee, CHARGE_QUOTES, PARCEL_SIZES, editLength, locate, clipStartsAt, activeMarks, validateEdit, tidyMark, EDIT_LIMITS,
   deliveryFee, deliveryPerk, PARCEL_SIZE_IDS,
   rand, formatRand, protectionFee, orderTotals, sellerFee, releasableAt, payoutDate, nextFriday, addWorkingDays,
   reserveFor, scoreFrom, tierFor, canUse, canForceOn, packingVideoProblems, validateListing, canTransition, returnReasonsFor, shipBy,
@@ -30,7 +30,7 @@ describe("fees", () => {
   });
   it("matches the prototype checkout: R349 tee to a PUDO locker", () => {
     const t = orderTotals({ itemPrice: rand(349), delivery: "pudo_locker" });
-    expect(t.total).toBe(rand(421));
+    expect(t.total).toBe(rand(349 + 95 + 12)); // item + small locker + protection
   });
   it("founding sellers pay no fee while the free period runs", () => {
     const until = new Date("2027-04-01");
@@ -63,18 +63,20 @@ describe("fees", () => {
 });
 
 describe("delivery by parcel size", () => {
-  it("prices courier and lockers by size, with no locker for large", () => {
-    expect(deliveryFee("courier", "small")).toBe(rand(90));
-    expect(deliveryFee("courier", "medium")).toBe(rand(120));
-    expect(deliveryFee("courier", "large")).toBe(rand(180));
-    expect(deliveryFee("pudo_locker", "small")).toBe(rand(60));
-    expect(deliveryFee("pudo_locker", "medium")).toBe(rand(80));
-    expect(deliveryFee("pudo_locker", "large")).toBeNull();
-    expect(() => orderTotals({ itemPrice: rand(500), delivery: "pudo_locker", parcelSize: "large" })).toThrow();
+  it("prices courier and lockers by size, every size fits a PUDO locker", () => {
+    expect(deliveryFee("courier", "small")).toBe(rand(110));
+    expect(deliveryFee("courier", "medium")).toBe(rand(190));
+    expect(deliveryFee("courier", "large")).toBe(rand(250));
+    expect(deliveryFee("pudo_locker", "small")).toBe(rand(95));
+    expect(deliveryFee("pudo_locker", "medium")).toBe(rand(130));
+    expect(deliveryFee("pudo_locker", "large")).toBe(rand(185));
+    // PUDO lockers are 60 x 41 cm, 8, 19 and 41 cm high.
+    expect(PARCEL_SIZES.small.box).toEqual({ length: 60, width: 41, height: 8 });
+    expect(PARCEL_SIZES.large.box.height).toBe(41);
   });
   it("keeps courier money for Bob Go and pays the seller item minus fee", () => {
     const t = orderTotals({ itemPrice: rand(400), delivery: "courier", parcelSize: "medium" });
-    expect(t.deliveryKept).toBe(rand(120));
+    expect(t.deliveryKept).toBe(rand(190));
     expect(t.sellerPayout).toBe(rand(400) - t.sellerFee);
     expect(t.total - t.escrowAgentFee).toBe(t.sellerPayout);
   });
@@ -341,17 +343,10 @@ describe("quoted delivery prices", () => {
     expect(quotedDeliveryFee(9500)).toBe(9500);
     expect(quotedDeliveryFee(6001)).toBe(6500);
   });
-  it("uses the quote for courier and locker, never for collection, and keeps it to pay Bob Go", () => {
+  it("charges the flat price while quotes are switched off", () => {
+    expect(CHARGE_QUOTES).toBe(false);
     const t = orderTotals({ itemPrice: rand(300), delivery: "courier", parcelSize: "small", quotedDeliveryCents: 9601 });
-    expect(t.deliveryFee).toBe(10000);
-    expect(t.deliveryKept).toBe(10000);
-    expect(t.total).toBe(rand(300) + 10000 + t.protectionFee);
-    expect(orderTotals({ itemPrice: rand(300), delivery: "collect_cpt", parcelSize: "small", quotedDeliveryCents: 9601 }).deliveryFee).toBe(0);
-    expect(orderTotals({ itemPrice: rand(300), delivery: "courier", parcelSize: "small", quotedDeliveryCents: null }).deliveryFee).toBe(rand(90));
-  });
-  it("big order perks still apply to the quoted price", () => {
-    const t = orderTotals({ itemPrice: rand(1600), delivery: "pudo_locker", parcelSize: "small", quotedDeliveryCents: 6001 });
-    expect(t.deliveryFee).toBe(6500);
-    expect(t.deliveryDiscount).toBe(6500); // free locker from R1,500
+    expect(t.deliveryFee).toBe(rand(110));
+    expect(t.deliveryKept).toBe(rand(110));
   });
 });

@@ -855,8 +855,8 @@ try {
   await runner.getByRole("button", { name: /See details/ }).click();
   await page.getByRole("dialog", { name: "Vintage denim jacket" }).getByRole("button", { name: "Buy now" }).click();
   const pay = page.getByRole("dialog", { name: "Checkout" });
-  await pay.getByRole("button", { name: /Courier to your door.*R90/ }).click();
-  await check(pay.getByRole("button", { name: /PUDO locker.*R60/ }).isVisible(), "small parcels: R90 door, R60 locker");
+  await pay.getByRole("button", { name: /Courier to your door.*R110/ }).click();
+  await check(pay.getByRole("button", { name: /PUDO locker.*R95/ }).isVisible(), "small parcels: R110 door, R95 locker");
   await pay.getByText("Pay with Instant EFT (Ozow) to earn a delivery stamp").waitFor();
   // Saved at sign up: one line, ready to pay. Change opens the form.
   await pay.getByRole("button", { name: /^Pay R/ }).waitFor();

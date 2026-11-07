@@ -109,6 +109,15 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-07: Flat delivery prices, parcel sizes match PUDO lockers
+
+- Decided with Ofentse: flat delivery prices, so buyers see the price up front. Quote pricing stays in the code but is switched off (CHARGE_QUOTES in packages/core fees.ts). Checkout still asks Bob Go whether the route works and blocks what it can't book.
+- Why the old prices lost money: couriers charge by box size (length x width x height / 5000) when that is more than the weight, and our boxes counted as about 2, 6 and 22 kg. Our boxes were also too tall for the lockers we priced (the small box needed a PUDO Medium).
+- New sizes match PUDO lockers (60 x 41 cm): Small 8 cm high, up to 5 kg (clothes, beauty); Medium 19 cm, up to 10 kg (shoe box, boots, bag); Large 41 cm, up to 15 kg. Every size now fits a locker.
+- New prices, VAT included, about 10% above the published 2024 Courier Guy and PUDO prices: courier Small R110, Medium R190, Large R250; locker Small R95, Medium R130, Large R185. Perks unchanged. [CONFIRM against Bob Go's live prices once the live key is in, and lower them if Bob Go is cheaper.]
+- Watch: shoes now belong in Medium. Live listings already set to Small that are shoes may not fit a courier bag [CONFIRM with sellers].
+- Deployed checkout, delivery and order-action.
+
 ### 2026-11-07: Delivery costs what Bob Go quotes; lockers fixed
 
 - Decided with Ofentse: buyers pay Bob Go's real price for courier and locker delivery, rounded up to the next R5 (R96.01 becomes R100). The flat fee is the fallback when Bob Go hasn't answered or the seller has no pickup address yet. Perks (half price, free locker, stamps) apply to the quoted price.

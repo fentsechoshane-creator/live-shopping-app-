@@ -107,7 +107,7 @@ Without Mux, seller videos upload to Supabase Storage and play as plain files. T
 
 ## 4. Bob Go (courier and locker delivery)
 
-myHaul books every courier and locker parcel through Bob Go when the seller marks an order shipped. The buyer's delivery fee (priced by parcel size: Small R90 door or R60 locker, Medium R120 or R80, Large R180 door only) stays with us to pay Bob Go.
+myHaul books every courier and locker parcel through Bob Go when the seller marks an order shipped. The buyer's delivery fee (priced by parcel size: Small R110 door or R95 locker, Medium R190 or R130, Large R250 or R185; sizes match PUDO lockers, decided 7 Nov 2026) stays with us to pay Bob Go.
 
 1. Test first in Bob Go's sandbox (free, with test credit): sign up at https://sandbox.bobgo.co.za, then Settings, API keys, create a key. Not tied to a sales channel.
 2. In Supabase, Edge Functions, Secrets, add: `BOBGO_MODE=sandbox` and `BOBGO_API_KEY` (the sandbox key). Never paste keys into chat.

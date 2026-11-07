@@ -29,13 +29,17 @@ export const WELCOME_CREDIT_MIN_ORDER: Cents = rand(200);
 export type DeliveryOption = "pudo_locker" | "courier" | "collect_cpt" | "baker_delivers" | "collect_baker";
 
 /** Parcel sizes the seller picks when listing. Delivery is priced by size (decided with Ofentse, 6 Nov 2026), so
- * big parcels can't sink us. Anything bigger than Large is collection only. */
+ * big parcels can't sink us. Anything bigger than Large is collection only.
+ * 7 Nov 2026: sizes now match PUDO's locker sizes (S, M, L: 60 x 41 cm, 8, 19 and 41 cm high) so every size fits a
+ * locker, and prices are flat, set about 10% above the published Courier Guy and PUDO prices, VAT included. Couriers
+ * charge by box size (length x width x height / 5000) when that is more than the weight, which is why Medium and
+ * Large cost more. [CONFIRM against Bob Go's live prices once the live key is in.] */
 export type ParcelSize = "small" | "medium" | "large";
 export const PARCEL_SIZES: Record<ParcelSize, { label: string; hint: string; maxKg: number; door: Cents; locker: Cents | null;
   /** What we book with the courier (centimetres). */ box: { length: number; width: number; height: number } }> = {
-  small: { label: "Small", hint: "Clothes, shoes, beauty. Fits a shoe box, up to 2 kg.", maxKg: 2, door: rand(90), locker: rand(60), box: { length: 35, width: 25, height: 12 } },
-  medium: { label: "Medium", hint: "Boots, a bag, a few items. Up to 5 kg.", maxKg: 5, door: rand(120), locker: rand(80), box: { length: 45, width: 35, height: 20 } },
-  large: { label: "Large", hint: "Small appliance or decor. Up to 15 kg. Too big for lockers.", maxKg: 15, door: rand(180), locker: null, box: { length: 60, width: 45, height: 40 } },
+  small: { label: "Small", hint: "Clothes and beauty. Fits a courier bag (60 x 41 x 8 cm), up to 5 kg.", maxKg: 5, door: rand(110), locker: rand(95), box: { length: 60, width: 41, height: 8 } },
+  medium: { label: "Medium", hint: "A shoe box, boots or a bag. Up to 60 x 41 x 19 cm and 10 kg.", maxKg: 10, door: rand(190), locker: rand(130), box: { length: 60, width: 41, height: 19 } },
+  large: { label: "Large", hint: "Small appliance or decor. Up to 60 x 41 x 41 cm and 15 kg.", maxKg: 15, door: rand(250), locker: rand(185), box: { length: 60, width: 41, height: 41 } },
 };
 export const PARCEL_SIZE_IDS = Object.keys(PARCEL_SIZES) as ParcelSize[];
 
@@ -60,8 +64,8 @@ export function deliveryFee(delivery: DeliveryOption, parcel: ParcelSize = "smal
 
 export const DELIVERY_OPTIONS: Record<DeliveryOption, { label: string; fee: Cents; days: string; foodOnly?: boolean }> = {
   // Courier and locker fees here are the Small prices; use deliveryFee() for the real price by size.
-  pudo_locker: { label: "PUDO locker", fee: rand(60), days: "2 to 4 days" },
-  courier: { label: "Courier to your door", fee: rand(90), days: "2 to 4 days" },
+  pudo_locker: { label: "PUDO locker", fee: rand(95), days: "2 to 4 days" },
+  courier: { label: "Courier to your door", fee: rand(110), days: "2 to 4 days" },
   collect_cpt: { label: "Free collection, Cape Town", fee: 0, days: "2 to 3 days" },
   collect_baker: { label: "Collect from the baker", fee: 0, days: "On your date", foodOnly: true },
   baker_delivers: { label: "Baker delivers", fee: rand(40), days: "On your date", foodOnly: true },
@@ -109,11 +113,14 @@ export interface OrderTotalsInput {
   foundingUntil?: Date | null;
   at?: Date;
   /** The courier or locker price Bob Go quoted for this exact route, in cents. When given, the buyer pays this
-   * (rounded up to the next R5, see quotedDeliveryFee) instead of the flat fee. Decided with Ofentse 7 Nov 2026. */
+   * (rounded up to the next R5, see quotedDeliveryFee) instead of the flat fee. Switched off for now (CHARGE_QUOTES):
+   * Ofentse chose flat prices on 7 Nov 2026 so buyers see the price up front. */
   quotedDeliveryCents?: Cents | null;
 }
 
 /** What the buyer pays for a quoted courier or locker price: rounded up to the next R5, so we never pay more than we took. */
+/** Charge Bob Go's quote instead of the flat price. Off: flat prices (decided with Ofentse 7 Nov 2026). */
+export const CHARGE_QUOTES = false;
 export const quotedDeliveryFee = (quoteCents: Cents): Cents => Math.ceil(Math.max(0, quoteCents) / 500) * 500;
 
 export interface OrderTotals {
@@ -143,7 +150,7 @@ export interface OrderTotals {
 export function orderTotals(input: OrderTotalsInput): OrderTotals {
   const flat = deliveryFee(input.delivery, input.parcelSize);
   if (flat === null) throw new Error("That delivery option can't take this parcel size.");
-  const fee0 = bookedByUs(input.delivery) && input.quotedDeliveryCents != null && input.quotedDeliveryCents > 0
+  const fee0 = CHARGE_QUOTES && bookedByUs(input.delivery) && input.quotedDeliveryCents != null && input.quotedDeliveryCents > 0
     ? quotedDeliveryFee(input.quotedDeliveryCents) : flat;
   const deliveryFeeCents = fee0;
   const deliveryKept = bookedByUs(input.delivery) ? deliveryFeeCents : 0;

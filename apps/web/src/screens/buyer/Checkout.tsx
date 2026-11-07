@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FEATURES } from "../../features";
-import { bookedByUs, DELIVERY_OPTIONS, DELIVERY_PERKS, deliveryFee, orderParcelSize, orderTotals, PARCEL_SIZES, quotedDeliveryFee, type DeliveryOption, type ParcelSize } from "@app/core";
+import { bookedByUs, DELIVERY_OPTIONS, DELIVERY_PERKS, deliveryFee, orderParcelSize, orderTotals, PARCEL_SIZES, quotedDeliveryFee, CHARGE_QUOTES, type DeliveryOption, type ParcelSize } from "@app/core";
 import { api, type FeedItem, type Offer, type PickupPoint, type SavedDelivery, type StreetAddress } from "../../api";
 import { AddressFields, addressLine, addressOk, EMPTY_ADDRESS, LockerPicker } from "../../components/Address";
 import { useSession } from "../../session";
@@ -105,8 +105,8 @@ export function CheckoutSheet({ item, onClose, offer, auctionPrice }: { item: Fe
   const earnsStamp = price >= DELIVERY_PERKS.stampMinOrder && !food;
   // A nudge when a bigger order would make delivery half price.
   const toHalf = DELIVERY_PERKS.halfPriceFrom - price;
-  // Couriers and lockers cost what Bob Go quotes for this route, rounded up to R5 (decided 7 Nov). Flat fee until it answers.
-  const quote = routeNow?.ok && routeNow.quoteCents ? routeNow.quoteCents : null;
+  // Flat delivery prices (decided 7 Nov). CHARGE_QUOTES switches to Bob Go's quote for this route, rounded up to R5.
+  const quote = CHARGE_QUOTES && routeNow?.ok && routeNow.quoteCents ? routeNow.quoteCents : null;
   const t = useMemo(() => feeFor(delivery) === null ? null : orderTotals({ itemPrice: price, delivery, parcelSize: parcel, welcomeCreditAvailable: credit, stampsReady: stamps >= DELIVERY_PERKS.stampsNeeded, quotedDeliveryCents: quote }),
     [price, delivery, credit, parcel, stamps, quote]); // eslint-disable-line react-hooks/exhaustive-deps
 
