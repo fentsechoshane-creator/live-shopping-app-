@@ -8,24 +8,21 @@ Shared memory for everyone working on this repo: Ofentse, Lehloma and any AI too
 
 ## How far we are
 
+Checked 7 Nov 2026 with the live health check. "Practical completion" here means real buyers and sellers can use the web app with real money; snags and extras can follow.
+
 | Area | Status |
 | --- | --- |
-| Business rules (fees, credit, returns, payouts, trust) | Done and tested |
-| Database, security rules, server functions | Done. Live database up to date (0001 to 0030) and every server function deployed (6 Nov) |
-| Seller side (sign up, checks, listings, orders, payouts) | Done in the web app |
-| Buyer side (feed, Explore, checkout, orders, returns) | Done in the web app |
-| Design (Liquid Glass, iPhone first, TikTok style profile) | Done, keeps improving |
-| Real payments (TradeSafe escrow) | Live in TradeSafe sandbox: sign in works, banks mapped. Next: one test payment |
-| Real video (Mux) | Built, waiting for keys [Lehloma] |
-| Sign in by code on the live project | Waiting for 2 Supabase settings [Ofentse] |
-| Mobile app (iPhone and Android) | Built with Capacitor. Android test build on GitHub; iPhone needs a Mac with Xcode |
-| Chat, offers, holds, comments | Done |
-| Timed auctions | Built (migration 0016), live database needs it; checkout and run-due functions to deploy [Lehloma] |
-| Live streams | Not started. Hidden for the first store upload (switch `VITE_LIVE`) |
-| Store readiness | Terms of Use, Privacy Policy, Contact us, phone notifications, reviewer notes, screenshots done. Company details [CONFIRM] |
-| Error reports, share previews, welcome, saved delivery | Done (previews need the web host) |
-| Security (docs/SECURITY.md) | Full review done (migration 0018 plus server and app fixes). Live database needs 0017 and 0018 [Ofentse to approve]. Next: two step sign in for the team, CAPTCHA at sign up |
-| Team dashboard (/team) | Built (migrations 0017 and 0021): feature switches per account, accounts, suspensions, checks, reports, returns, orders, listings, money, errors, activity log. Live database needs 0017 [Ofentse to approve] |
+| Business rules, database, security rules, server functions | Done and tested. Live database up to 0037 |
+| Buyer side (feed, Explore, checkout, orders, returns, cancelling, friends, sharing, Inbox) | Done and live |
+| Seller side (sign up, checks, Create with camera and editor, orders, shipping, payouts) | Done and live, except editing a listing after posting |
+| Payments (TradeSafe escrow) | Working in TradeSafe's developer sandbox (real test payments with Ozow). Needs the production account and keys |
+| Delivery (Bob Go) | Working in Bob Go's sandbox (courier bookings, tracking, locker checks). Needs the live key, a balance, and a price check |
+| Video (Mux) | Keys in and working |
+| Sign in emails | Supabase's built in email only sends to the team, a few an hour [CONFIRM if a sender was added]. Needs Resend or another sender before real people can join |
+| Team dashboard | Done and live |
+| Phone apps | Built (Capacitor). Store accounts, D-U-N-S, Mac for the iPhone build and push keys still to do |
+| Legal and company | Company registered. CIPC name fix, company details in Terms and Privacy, Information Officer registration, help@myhaul.co.za still open |
+| Live selling | Not started (not needed for launch) |
 
 ## Run the current version
 
