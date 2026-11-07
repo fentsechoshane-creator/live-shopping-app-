@@ -109,6 +109,12 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-07: First Bob Go delivery loop (sandbox)
+
+- Ofentse ran courier orders end to end on the live site: "Yesss" (MH 9126) and "Ferrari" (MH 7108) were booked with Bob Go's sandbox (Demo Couriers, tracking UASD8RS3 and UASDHM8L), shipped, Yesss marked delivered by the buyer, Ferrari tracked every 30 minutes (pending collection, as expected in a sandbox). No server errors.
+- Found: lockers were refused because we sent a declared value ("This service level does not support declared value", Bob Box lockers BOXL-M and BOXL-L). The checkout check correctly blocked them. Fix: declared value only for door delivery. Not deployed yet (needs OK).
+- Found: Bob Go charged R96.01 for a small courier parcel; buyers pay R90, so we lose R6.01 each. The team alert fired as designed. Live rates may differ from the sandbox [CONFIRM]. Decision needed on pricing.
+
 ### 2026-11-07: Camera zoom
 
 - Pinch on the camera preview, or tap 1×, 2×, 3× above the length buttons; the lit button shows the exact zoom while pinching (1.6×). Uses the camera's own zoom where the phone offers it (sharper), otherwise zooms digitally (up to 5×) by cropping; what you see is what's recorded and photographed, and you can zoom while recording. Zoom resets when you flip the camera. [CONFIRM on iPhone whether Safari offers the camera's own zoom; digital works either way]

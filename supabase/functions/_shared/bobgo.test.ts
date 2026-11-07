@@ -86,6 +86,7 @@ Deno.test("booking quotes first and refuses with the verdict; it sends what the 
     assertEquals(calls.length, 1); // never tried to book
     assertEquals(calls[0].body.delivery_pickup_point_location_id, 371);
     assertEquals(calls[0].body.pickup_point_provider_slug, "demo");
+    assertEquals(calls[0].body.declared_value, undefined); // lockers refuse a declared value
     assert(calls[0].body.timeout >= 6000, "always sends a timeout");
     rates = { id: 12, provider_rate_requests: [{ ...pr("success", "", [{ service_level_code: "LKR", status: "success", rate_amount: 60 }]), provider_slug: "demo" }] };
     const b = await dl.book(input);

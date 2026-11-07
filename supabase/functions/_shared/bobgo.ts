@@ -132,7 +132,9 @@ class BobGo implements Delivery {
   private common(b: QuoteInput) {
     return {
       parcels: parcels(b.parcel, b.description),
-      declared_value: Math.round(b.declaredValueCents / 100),
+      // Lockers refuse a declared value ("This service level does not support declared value", seen in the sandbox
+      // 7 Nov 2026), so it's only sent for door delivery, where it covers the parcel.
+      ...(b.toPoint ? {} : { declared_value: Math.round(b.declaredValueCents / 100) }),
       collection_address: toAddress(b.from),
       ...(b.toPoint ? { delivery_pickup_point_location_id: b.toPoint.id } : { delivery_address: toAddress(b.to!) }),
     };
