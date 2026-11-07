@@ -1356,3 +1356,11 @@ button.g3 { border: 0; padding: 0; display: block; width: 100%; }
 .post-btn.busy { opacity: 1; background: rgba(34, 197, 94, 0.35); color: #0b3d1e; }
 .post-btn.busy::before { content: ""; position: absolute; inset: 0; width: var(--p, 4%); background: var(--green); transition: width 0.3s ease; }
 .post-btn > span { position: relative; }
+
+/* Camera zoom: pinch on the preview, or tap 1×, 2×, 3×. */
+.cam-feed { transform-origin: 50% 50%; }
+.cam-pinch { position: absolute; inset: 0; z-index: 1; touch-action: none; }
+.cam-bottom, .cam-timer, .cam-msg { z-index: 2; }
+.cam-zoom { display: flex; gap: 6px; padding: 4px; border-radius: 999px; background: rgba(0, 0, 0, 0.3); margin-bottom: 8px; }
+.cam-zoom button { min-width: 34px; height: 34px; padding: 0 8px; border-radius: 999px; border: 0; background: rgba(255, 255, 255, 0.14); color: #fff; font-size: 12.5px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.cam-zoom button[aria-pressed="true"] { background: rgba(255, 255, 255, 0.92); color: #111; min-width: 44px; }

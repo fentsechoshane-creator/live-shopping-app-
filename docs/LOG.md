@@ -109,6 +109,10 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-07: Camera zoom
+
+- Pinch on the camera preview, or tap 1×, 2×, 3× above the length buttons; the lit button shows the exact zoom while pinching (1.6×). Uses the camera's own zoom where the phone offers it (sharper), otherwise zooms digitally (up to 5×) by cropping; what you see is what's recorded and photographed, and you can zoom while recording. Zoom resets when you flip the camera. [CONFIRM on iPhone whether Safari offers the camera's own zoom; digital works either way]
+
 ### 2026-11-07: Camera records upright; Ready to post redesigned
 
 - Camera: iPhones hand the browser landscape frames even when held upright, so recordings came out landscape. Photos and videos are now drawn upright at 9:16 from what the preview shows (cropped to fill), with the microphone kept. The app test records with the test camera and checks the video and the photo are 9:16.

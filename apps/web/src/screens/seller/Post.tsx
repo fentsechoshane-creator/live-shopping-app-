@@ -114,10 +114,10 @@ const HOLD_MS = 250;
  * Draws a camera frame upright at 9:16, cropped to fill like the preview. Phones (iPhones especially) hand the browser
  * landscape frames even when you hold the phone upright, so photos and videos are made from this, never the raw camera.
  */
-function drawPortrait(ctx: CanvasRenderingContext2D, v: HTMLVideoElement, w: number, h: number, mirror: boolean) {
+function drawPortrait(ctx: CanvasRenderingContext2D, v: HTMLVideoElement, w: number, h: number, mirror: boolean, zoom = 1) {
   const vw = v.videoWidth, vh = v.videoHeight;
   if (!vw || !vh) return;
-  const k = Math.max(w / vw, h / vh); // cover, like object-fit: cover on the preview
+  const k = Math.max(w / vw, h / vh) * zoom; // cover, like object-fit: cover on the preview, then the digital zoom
   const dw = vw * k, dh = vh * k;
   ctx.save();
   if (mirror) { ctx.translate(w, 0); ctx.scale(-1, 1); } // match the mirrored selfie preview
@@ -139,6 +139,33 @@ function Camera({ onDone, onEdit, onReview }: { onDone: (file: File, inApp: bool
   const [elapsed, setElapsed] = useState(0);
   const [shot, setShot] = useState<File | null>(null);
   const fromGallery = useRef(false);
+  // Zoom: the camera's own zoom where the phone allows it (sharper), otherwise digital (crops into the picture).
+  // What you see is what's recorded, and you can zoom while recording.
+  const [zoom, setZoomState] = useState(1);
+  const zoomRef = useRef(1);
+  const nativeZoom = useRef<{ min: number; max: number } | null>(null);
+  const maxZoom = nativeZoom.current ? Math.min(8, nativeZoom.current.max) : 5;
+  const setZoom = (z: number) => {
+    const next = Math.round(Math.min(maxZoom, Math.max(1, z)) * 10) / 10;
+    zoomRef.current = next;
+    setZoomState(next);
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (nativeZoom.current && track) track.applyConstraints({ advanced: [{ zoom: Math.max(nativeZoom.current.min, next) } as MediaTrackConstraintSet] }).catch(() => {});
+  };
+  const digital = nativeZoom.current ? 1 : zoom; // how much the picture itself is scaled
+  const pinch = useRef<{ d0: number; z0: number } | null>(null);
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const onFeedDown = (e: React.PointerEvent) => { pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY }); };
+  const onFeedMove = (e: React.PointerEvent) => {
+    if (!pointers.current.has(e.pointerId)) return;
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const [a, b] = [...pointers.current.values()];
+    if (!a || !b) return;
+    const d = Math.hypot(a.x - b.x, a.y - b.y);
+    if (!pinch.current) pinch.current = { d0: d || 1, z0: zoomRef.current };
+    setZoom(pinch.current.z0 * (d / pinch.current.d0));
+  };
+  const onFeedUp = (e: React.PointerEvent) => { pointers.current.delete(e.pointerId); if (pointers.current.size < 2) pinch.current = null; };
 
   // Start (or restart after a flip) the camera.
   useEffect(() => {
@@ -157,6 +184,9 @@ function Camera({ onDone, onEdit, onReview }: { onDone: (file: File, inApp: bool
         if (cancelled) return stream.getTracks().forEach((t) => t.stop());
         stop();
         streamRef.current = stream;
+        const caps = (stream.getVideoTracks()[0]?.getCapabilities?.() ?? {}) as { zoom?: { min: number; max: number } };
+        nativeZoom.current = caps.zoom && caps.zoom.max > 1 ? { min: caps.zoom.min, max: caps.zoom.max } : null;
+        zoomRef.current = 1; setZoomState(1);
         if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play().catch(() => {}); }
         setState("ready");
       } catch (e: any) {
@@ -191,7 +221,7 @@ function Camera({ onDone, onEdit, onReview }: { onDone: (file: File, inApp: bool
     // Upright 9:16, as sharp as the camera allows (up to 1080 by 1920).
     const short = Math.min(1080, Math.min(v.videoWidth, v.videoHeight));
     c.width = short; c.height = Math.round(short * 16 / 9);
-    drawPortrait(c.getContext("2d")!, v, c.width, c.height, facing === "user");
+    drawPortrait(c.getContext("2d")!, v, c.width, c.height, facing === "user", nativeZoom.current ? 1 : zoomRef.current);
     c.toBlob((b) => b && setShot(new File([b], `photo-${Date.now()}.jpg`, { type: "image/jpeg" })), "image/jpeg", 0.9);
   };
 
@@ -209,7 +239,7 @@ function Camera({ onDone, onEdit, onReview }: { onDone: (file: File, inApp: bool
       canvas.width = short; canvas.height = Math.round(short * 16 / 9);
       const ctx = canvas.getContext("2d")!;
       let raf = 0;
-      const draw = () => { drawPortrait(ctx, v, canvas.width, canvas.height, facing === "user"); raf = requestAnimationFrame(draw); };
+      const draw = () => { drawPortrait(ctx, v, canvas.width, canvas.height, facing === "user", nativeZoom.current ? 1 : zoomRef.current); raf = requestAnimationFrame(draw); };
       draw();
       stopDrawing = () => cancelAnimationFrame(raf);
       recordStream = new MediaStream([...canvas.captureStream(30).getVideoTracks(), ...stream.getAudioTracks()]);
@@ -251,7 +281,9 @@ function Camera({ onDone, onEdit, onReview }: { onDone: (file: File, inApp: bool
   const pct = Math.min(1, elapsed / limit);
   return (
     <div className="cam">
-      <video ref={videoRef} className={`cam-feed ${facing === "user" ? "mirror" : ""}`} muted playsInline autoPlay />
+      <video ref={videoRef} className={`cam-feed ${facing === "user" ? "mirror" : ""}`} muted playsInline autoPlay
+        style={digital > 1 ? { transform: `scale(${digital})${facing === "user" ? " scaleX(-1)" : ""}` } : undefined} />
+      <div className="cam-pinch" onPointerDown={onFeedDown} onPointerMove={onFeedMove} onPointerUp={onFeedUp} onPointerCancel={onFeedUp} aria-hidden="true" />
       {state === "starting" && <div className="cam-msg">Opening camera…</div>}
       {state === "unavailable" && (
         <div className="cam-msg">
@@ -263,6 +295,19 @@ function Camera({ onDone, onEdit, onReview }: { onDone: (file: File, inApp: bool
       {state === "recording" && <div className="cam-timer"><span className="dot-live" />{Math.floor(elapsed)}s of {limit}s</div>}
 
       <div className="cam-bottom">
+        {(state === "ready" || state === "recording") && (
+          <div className="cam-zoom" role="group" aria-label="Zoom">
+            {[1, 2, 3].filter((z) => z <= maxZoom).map((z) => {
+              // The button for the range you're in lights up and shows the exact zoom while pinching (1.6×).
+              const on = z === Math.min(3, Math.max(1, Math.floor(zoom + 0.05)));
+              return (
+                <button key={z} aria-pressed={on} onClick={() => setZoom(z)} aria-label={`Zoom ${z} times`}>
+                  {on && Math.abs(zoom - z) >= 0.05 ? `${zoom.toFixed(1)}×` : `${z}×`}
+                </button>
+              );
+            })}
+          </div>
+        )}
         {state !== "recording" && (
           <div className="cam-limits" role="group" aria-label="Video length limit">
             {LIMITS.map((l) => (

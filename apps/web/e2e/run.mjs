@@ -539,6 +539,12 @@ try {
   // The test camera sends landscape frames, like iPhones do; what we record and photograph must still be upright 9:16.
   const source = await page.evaluate(() => { const v = document.querySelector(".cam-feed"); return [v.videoWidth, v.videoHeight]; });
   console.log(`  test camera sends ${source.join("x")}`);
+  // Zoom: tap 2×; the preview zooms (digitally on the test camera) and 2× lights up. Then back to 1×.
+  await page.getByRole("button", { name: "Zoom 2 times" }).click();
+  await check(page.getByRole("button", { name: "Zoom 2 times" }).getAttribute("aria-pressed").then((v) => v === "true"), "2× is on");
+  await check(page.evaluate(() => getComputedStyle(document.querySelector(".cam-feed")).transform !== "none"), "the preview zoomed in");
+  await shot("camera-zoom");
+  await page.getByRole("button", { name: "Zoom 1 times" }).click();
   const sb = await shutter.boundingBox();
   await page.mouse.move(sb.x + sb.width / 2, sb.y + sb.height / 2);
   await page.mouse.down();
