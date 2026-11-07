@@ -4,15 +4,18 @@ import type { PlayEdit, VideoSource } from "../api";
 import { useSession } from "../session";
 import { Icon } from "./Icon";
 
-export interface ClipPlayerApi { seek: (t: number) => void }
+export interface ClipPlayerApi { seek: (t: number) => void; play: () => void; pause: () => void }
 
 /**
  * Plays an edit from the video editor: the clips one after another, each from its start to its end, with sound on
  * or off per clip. Photos show for their length. Loops at the end. Nothing was re-rendered: this is the "edit list"
  * idea in docs/VIDEO_EDITING.md. Tap to pause; the thin bar at the bottom shows where you are in the whole video.
  */
-export function ClipPlayer({ edit, label, onTime, apiRef }: {
+export function ClipPlayer({ edit, label, onTime, apiRef, noTap, onPlayState }: {
   edit: PlayEdit; label: string;
+  /** The editor drives play and pause itself (taps on the video select text instead). */
+  noTap?: boolean;
+  onPlayState?: (playing: boolean) => void;
   /** Called a few times a second with the moment on the whole timeline and the clip that's playing. */
   onTime?: (t: number, index: number) => void;
   apiRef?: (api: ClipPlayerApi) => void;
@@ -32,6 +35,8 @@ export function ClipPlayer({ edit, label, onTime, apiRef }: {
   const clip = edit.clips[Math.min(index, edit.clips.length - 1)];
   // The editor changes trims while playing, so the clock reads the latest edit, not the one it started with.
   const live = useRef({ edit, clip });
+  const onTimeRef = useRef(onTime);
+  onTimeRef.current = onTime;
   live.current = { edit, clip };
   const isImage = clip?.video.kind === "image";
   const total = editLength(edit);
@@ -127,7 +132,7 @@ export function ClipPlayer({ edit, label, onTime, apiRef }: {
       }
       const t = Math.max(0, startsAt + local);
       if (fillRef.current && total) fillRef.current.style.transform = `scaleX(${Math.min(1, t / total)})`;
-      if (now - lastReport > 200) { lastReport = now; onTime?.(t, index); }
+      if (now - lastReport > 200) { lastReport = now; onTimeRef.current?.(t, index); }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -141,7 +146,10 @@ export function ClipPlayer({ edit, label, onTime, apiRef }: {
       else if (ref.current) ref.current.currentTime = at.sourceTime;
     } else { pendingSeek.current = at.sourceTime; setIndex(at.index); }
   };
-  useEffect(() => { apiRef?.({ seek }); });
+  const playNow = () => { soundUnlocked.current = true; userPaused.current = false; setPaused(false); const v = ref.current; if (v && !isImage) { v.muted = clip.muted; v.play().catch(() => {}); } };
+  const pauseNow = () => { userPaused.current = true; setPaused(true); ref.current?.pause(); };
+  useEffect(() => { apiRef?.({ seek, play: playNow, pause: pauseNow }); });
+  useEffect(() => { onPlayState?.(!paused); }, [paused]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggle = () => {
     soundUnlocked.current = true;
@@ -156,9 +164,11 @@ export function ClipPlayer({ edit, label, onTime, apiRef }: {
         ? <img className="clip-photo" src={sourceOf(clip.video).url ?? ""} alt={label} />
         : <video ref={ref} playsInline aria-label={label} preload="auto"
             poster={clip?.video.muxPlaybackId ? `https://image.mux.com/${clip.video.muxPlaybackId}/thumbnail.jpg?width=480&time=${clip.start}` : undefined} />}
-      <button ref={tapRef} className="tap-layer" onClick={toggle} aria-label={paused ? "Play" : "Pause"}>
-        {paused && <span className="big-play vglass"><Icon name="play" size={30} /></span>}
-      </button>
+      {noTap ? <span ref={tapRef as any} hidden /> : (
+        <button ref={tapRef} className="tap-layer" onClick={toggle} aria-label={paused ? "Play" : "Pause"}>
+          {paused && <span className="big-play vglass"><Icon name="play" size={30} /></span>}
+        </button>
+      )}
       <div className="vbar" aria-hidden="true">
         <div className="vtrack clips">
           {edit.clips.map((c, i) => <i key={i} style={{ flexGrow: clipLength(c) }} />)}

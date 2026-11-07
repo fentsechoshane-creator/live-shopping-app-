@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { PlacedText } from "../../components/PlacedText";
 import { Link, useNavigate } from "react-router-dom";
 import { FEATURES } from "../../features";
 import { LISTING_LABELS, activeMarks } from "@app/core";
@@ -280,9 +281,7 @@ function VideoCard({ item, auction, avatar, counts, comments, onBrowse, onBuy, o
         ? <ClipPlayer edit={edit} label={`Video: ${item.caption}`} onTime={(time, i) => { setT(time); setClipIndex(i); }} apiRef={(a) => { player.current = a; }} />
         : <Video src={item.video} label={`Video: ${item.caption}`} productId={item.product.id} />}
       <div className="shade" />
-      {marks.filter((m) => m.kind === "text").map((m, i) => (
-        <div key={`${m.at}-${i}`} className={`overlay-text ${m.pos ?? "middle"}`}><span>{m.text}</span></div>
-      ))}
+      <div className="text-layer">{marks.filter((m) => m.kind === "text").map((m, i) => <PlacedText key={`${m.at}-${i}`} m={m} />)}</div>
       {marks.some((m) => m.kind === "flaw") && (
         <div className="flaw-flash" role="status"><Icon name="flag" size={14} />{marks.find((m) => m.kind === "flaw")?.text || "Flaw shown here"}</div>
       )}

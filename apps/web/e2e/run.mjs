@@ -587,7 +587,7 @@ try {
   await page.mouse.click(box.x + box.width * 0.2, box.y + box.height * 0.35);
   await clipCard.locator(".seek-flash.back").waitFor();
 
-  // ===== The video editor: join a gallery clip, trim, text, tag the item, mark a flaw, pick the cover =====
+  // ===== The video editor, CapCut style: timeline, trim handles, placeable text, tags, flaws, cover =====
   await page.goto(`${BASE}/post?mode=create`);
   if (await startOver.count()) await startOver.click();
   await page.getByLabel("Photo or video", { exact: true }).setInputFiles(here + "fixtures/clip.webm");
@@ -596,34 +596,57 @@ try {
   await editor.getByRole("listitem", { name: /^Clip 1, 8 seconds/ }).waitFor();
   await editor.getByLabel("Add clips", { exact: true }).setInputFiles([here + "fixtures/clip2.webm", here + "fixtures/denim.jpg"]);
   await editor.getByRole("listitem", { name: /^Clip 3, 3 seconds/ }).waitFor(); // a photo shows for 3 seconds
-  // Trim the first clip to start at 2 seconds, and turn the second clip's sound off.
+  // Trim clip 1 with its start handle (arrow keys move it a tenth of a second; shift a whole second).
   await editor.getByRole("listitem", { name: /^Clip 1/ }).click();
-  await editor.getByLabel("Clip starts at").fill("2");
+  await editor.getByRole("toolbar", { name: "Clip tools" }).waitFor();
+  const startHandle = editor.getByRole("slider", { name: "Clip starts at" });
+  await startHandle.focus();
+  await page.keyboard.press("Shift+ArrowRight");
+  await page.keyboard.press("Shift+ArrowRight");
   await editor.getByRole("listitem", { name: /^Clip 1, 6 seconds/ }).waitFor();
+  // Sound off on clip 2, then move the photo earlier and back.
   await editor.getByRole("listitem", { name: /^Clip 2/ }).click();
   await editor.getByRole("button", { name: "Sound on" }).click();
   await editor.getByRole("listitem", { name: /^Clip 2, 4 seconds, sound off/ }).waitFor();
-  // Move the photo earlier, then back.
   await editor.getByRole("listitem", { name: /^Clip 3/ }).click();
-  await editor.getByRole("button", { name: "Move clip earlier" }).click();
+  await editor.getByRole("button", { name: "Earlier" }).click();
   await editor.getByRole("listitem", { name: /^Clip 2, 3 seconds, selected/ }).waitFor();
-  await editor.getByRole("button", { name: "Move clip later" }).click();
-  // Text, a tag for this item and a flaw.
+  await editor.getByRole("button", { name: "Later" }).click();
+  await editor.getByRole("button", { name: "Done with this" }).click(); // done with the clip (tool bar)
+  await editor.getByRole("toolbar", { name: "Add" }).waitFor();
+  // Text: type it full screen, pick a style and colour, then drag it on the video.
   await editor.getByRole("button", { name: "Text" }).click();
-  await page.getByLabel("Text", { exact: true }).fill("Size M, fits true");
-  await page.getByRole("button", { name: "Top", exact: true }).click();
-  await page.getByRole("button", { name: "Add text" }).click();
+  const typer = page.getByRole("dialog", { name: "Text" });
+  await typer.getByLabel("Text").fill("Size M, fits true");
+  await typer.getByRole("button", { name: /Box/ }).click();
+  await typer.getByRole("button", { name: "Colour #22c55e" }).click();
+  await shot("editor-text");
+  await typer.getByRole("button", { name: "Done" }).click();
+  const placed = editor.getByRole("button", { name: "Text: Size M, fits true" });
+  await placed.waitFor();
+  const before = await placed.boundingBox();
+  await page.mouse.move(before.x + before.width / 2, before.y + before.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(before.x + before.width / 2, before.y + before.height / 2 - 80, { steps: 6 });
+  await page.mouse.up();
+  const after = await placed.boundingBox();
+  await check(Promise.resolve(after.y < before.y - 40), "text moved up by dragging");
+  await editor.getByRole("button", { name: /Text "Size M, fits true"/ }).waitFor(); // its bar on the timeline
+  await editor.getByRole("button", { name: "Done with this" }).click();
+  // A tag for this item and a flaw, then the cover.
   await editor.getByRole("button", { name: "Tag item" }).click();
   await page.getByRole("button", { name: /This item/ }).click();
+  await editor.getByRole("button", { name: "Done with this" }).click();
   await editor.getByRole("button", { name: "Flaw" }).click();
   await page.getByLabel("What the flaw is").fill("Small mark on the cuff");
   await page.getByRole("button", { name: "Mark this flaw" }).click();
+  await editor.getByRole("button", { name: /Flaw Small mark on the cuff/ }).waitFor();
+  await editor.getByRole("button", { name: "Done with this" }).click();
   await editor.getByRole("button", { name: "Cover", exact: true }).click();
   await editor.getByText(/Cover set at/).waitFor();
-  await check(editor.getByText(/Size M, fits true/).first().isVisible(), "text in the mark list");
-  await check((await editor.locator(".editor-len").textContent()) === "0:13", "6 + 4 + 3 seconds in total");
+  await check(editor.getByLabel("Time", { exact: true }).textContent().then((x) => x.endsWith("0:13")), "6 + 4 + 3 seconds in total");
   await shot("editor");
-  await editor.getByRole("button", { name: "Done" }).click();
+  await editor.getByRole("button", { name: "Done", exact: true }).click(); // the top Done: finish editing
   await page.getByRole("button", { name: /Edited · 3 clips/ }).waitFor();
   await page.getByRole("button", { name: "Next" }).click();
   const useThese = page.getByRole("button", { name: "Use these" });

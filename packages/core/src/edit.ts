@@ -11,7 +11,16 @@ export const EDIT_LIMITS = {
   maxText: 80,
   textSeconds: 3, // how long a text shows by default
   flawSeconds: 2.5,
+  // Placeable text, like CapCut (decided with Ofentse 7 Nov 2026): size is a multiple of the normal size, rot in degrees.
+  minTextSize: 0.5,
+  maxTextSize: 3,
 } as const;
+
+/** How text looks: plain with a shadow, on a solid box, or outlined. */
+export type TextStyle = "plain" | "box" | "outline";
+export const TEXT_STYLES: TextStyle[] = ["plain", "box", "outline"];
+/** The colours text can be. Few on purpose, so posts stay clean and readable. */
+export const TEXT_COLOURS = ["#ffffff", "#0b0b0f", "#22c55e", "#facc15", "#f97316", "#ef4444", "#ec4899", "#60a5fa"] as const;
 
 export type MarkKind = "text" | "tag" | "flaw";
 export type MarkPos = "top" | "middle" | "bottom";
@@ -33,7 +42,29 @@ export interface EditMark {
   until?: number;
   text?: string;
   productId?: string;
+  /** Older posts: a band (top, middle, bottom). Newer text has x and y instead. */
   pos?: MarkPos;
+  /** Placeable text: the centre as a share of the video's width and height (0 to 1). */
+  x?: number;
+  y?: number;
+  /** Text size as a multiple of the normal size, and rotation in degrees. */
+  size?: number;
+  rot?: number;
+  style?: TextStyle;
+  color?: string;
+}
+
+/** Keeps placed text on screen and within limits. */
+export function tidyMark(m: EditMark): EditMark {
+  const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
+  if (m.kind !== "text") return m;
+  return {
+    ...m,
+    ...(m.x != null ? { x: clamp(m.x, 0.05, 0.95) } : {}),
+    ...(m.y != null ? { y: clamp(m.y, 0.05, 0.95) } : {}),
+    ...(m.size != null ? { size: clamp(m.size, EDIT_LIMITS.minTextSize, EDIT_LIMITS.maxTextSize) } : {}),
+    ...(m.rot != null ? { rot: ((Math.round(m.rot) + 540) % 360) - 180 } : {}),
+  };
 }
 
 export interface EditList {
@@ -90,6 +121,11 @@ export function validateEdit(e: EditList): string[] {
     if (m.kind === "text" && !(m.text ?? "").trim()) out.push("A text is empty.");
     if ((m.text ?? "").length > EDIT_LIMITS.maxText) out.push(`Keep texts under ${EDIT_LIMITS.maxText} characters.`);
     if (m.kind === "tag" && !m.productId) out.push("A tag has no item.");
+    if (m.until != null && !(m.until > m.at)) out.push("A text ends before it starts.");
+    if (m.style && !TEXT_STYLES.includes(m.style)) out.push("Pick a text style.");
+    if (m.color && !(TEXT_COLOURS as readonly string[]).includes(m.color)) out.push("Pick a text colour.");
+    if (m.size != null && !(m.size >= EDIT_LIMITS.minTextSize && m.size <= EDIT_LIMITS.maxTextSize)) out.push("Text size is out of range.");
+    if ((m.x != null && !(m.x >= 0 && m.x <= 1)) || (m.y != null && !(m.y >= 0 && m.y <= 1))) out.push("A text is off the video.");
   }
   if (!(e.cover >= 0) || e.cover > total) out.push("Pick a cover from the video.");
   return [...new Set(out)];

@@ -109,6 +109,18 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-07: CapCut style editor
+
+- Asked by Ofentse: editing like CapCut, placeable text, everything cleaned up. The editor is rebuilt around:
+  - the video on top: text can be dragged anywhere (snaps to the centre line), resized and turned with the white corner handle, tapped to edit;
+  - a timeline you scroll to scrub (the white line is now): clips as a film strip with trim handles on the selected clip (drag, or arrow keys), and texts (purple), item tags (green) and flaws (orange) as bars on their own rows; the cover shows as a dot;
+  - one tool bar that changes with what's selected: nothing (Text, Tag item, Flaw, Cover, Split, Add clip), a clip (Split, Sound, Earlier, Later, Delete), or a text, tag or flaw (Edit, Longer, Shorter, Move here, Delete);
+  - typing text full screen with a live preview, three styles (plain, box, outline) and eight colours.
+- Text placement is saved with the post (x, y, size, angle, style, colour; migration 0037 and packages/core `tidyMark`, `TEXT_STYLES`, `TEXT_COLOURS`) and drawn the same way in the feed (`components/PlacedText.tsx`, sized against the video so it matches on any screen). Older posts with top, middle or bottom text still show as before.
+- Also: the flaw note on videos stays centred.
+- Tests: core (47), database (placeable text kept and checked), the app test trims with the handle, types styled text, drags it, adds a tag and flaw, sets the cover, posts and checks the feed.
+- Not yet: clip speed, transitions, music. [CONFIRM with Ofentse which of these matter]
+
 ### 2026-11-07: Live: Bob Go checks, cancelling, Inbox
 
 - Deployed with Ofentse's OK: migrations 0034 (booking safety net), 0035 (cancelling), 0036 (Inbox pictures); functions checkout, delivery, order-action and run-due (trimmed bundles, the repo is the source); the app pushed. Health check and a normal run-due pass after the deploy.

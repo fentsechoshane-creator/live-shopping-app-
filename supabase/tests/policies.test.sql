@@ -1183,3 +1183,19 @@ select pg_temp.act_as('00000000-0000-0000-0000-00000000000d');
 select pg_temp.expect_error($$update orders set cancelled_by = 'buyer' where id = '40000000-0000-0000-0000-000000000063'$$, 'permission denied');
 reset role;
 select 'cancel tests passed' as result;
+
+-- ===== Placeable text (migration 0037) =====
+select pg_temp.act_as((select s.owner_id from posts p join shops s on s.id = p.shop_id where p.edit is not null limit 1));
+select set_post_edit((select id from posts where edit is not null limit 1), jsonb_build_object(
+  'clips', (select edit->'clips' from posts where edit is not null limit 1),
+  'marks', jsonb_build_array(jsonb_build_object('kind', 'text', 'at', 0.5, 'until', 2, 'text', 'Size M', 'x', 0.4, 'y', 0.25, 'size', 1.6, 'rot', -12, 'style', 'box', 'color', '#22c55e')),
+  'cover', 0));
+do $$ declare m jsonb := (select edit->'marks'->0 from posts where edit is not null limit 1); begin
+  assert (m->>'x')::numeric = 0.4 and (m->>'size')::numeric = 1.6 and (m->>'rot')::numeric = -12 and m->>'style' = 'box' and m->>'color' = '#22c55e', 'placed text is kept';
+end $$;
+select pg_temp.expect_error($$select set_post_edit((select id from posts where edit is not null limit 1), jsonb_build_object('clips', (select edit->'clips' from posts where edit is not null limit 1),
+  'marks', jsonb_build_array(jsonb_build_object('kind', 'text', 'at', 0.5, 'text', 'Hi', 'style', 'neon')), 'cover', 0))$$, 'text style');
+select pg_temp.expect_error($$select set_post_edit((select id from posts where edit is not null limit 1), jsonb_build_object('clips', (select edit->'clips' from posts where edit is not null limit 1),
+  'marks', jsonb_build_array(jsonb_build_object('kind', 'text', 'at', 0.5, 'text', 'Hi', 'size', 9)), 'cover', 0))$$, 'wrong size');
+reset role;
+select 'placeable text tests passed' as result;

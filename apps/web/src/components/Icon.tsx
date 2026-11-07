@@ -23,6 +23,7 @@ const PATHS: Record<string, string> = {
   comment: "M4 5h16v11H9l-5 4z",
   send: "M4 12l16-8-6 16-2-7z",
   trash: "M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13",
+  pause: "M8 5v14M16 5v14",
   link: "M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1",
   whatsapp: "M4 20l1.3-4A8 8 0 1 1 8.5 19L4 20zM9 9c0 3 3 6 6 6l1.3-1.3-2-1-1 1c-1-.5-2-1.5-2.5-2.5l1-1-1-2L9 9z",
   addperson: "M15 19c0-3-2.7-5-6-5s-6 2-6 5M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM19 8v6M16 11h6",

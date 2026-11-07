@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { editLength, locate, clipStartsAt, activeMarks, validateEdit,
+import { editLength, locate, clipStartsAt, activeMarks, validateEdit, tidyMark, EDIT_LIMITS,
   deliveryFee, deliveryPerk, PARCEL_SIZE_IDS,
   rand, formatRand, protectionFee, orderTotals, sellerFee, releasableAt, payoutDate, nextFriday, addWorkingDays,
   reserveFor, scoreFrom, tierFor, canUse, canForceOn, packingVideoProblems, validateListing, canTransition, returnReasonsFor, shipBy,
@@ -317,5 +317,20 @@ describe("video edits", () => {
     expect(validateEdit({ ...e, clips: [{ start: 1, end: 1.5, muted: false, inApp: true }] })[0]).toMatch(/too short/);
     expect(validateEdit({ ...e, clips: [{ start: 0, end: 200, muted: false, inApp: true }], cover: 0 })[0]).toMatch(/3 minutes/);
     expect(validateEdit({ ...e, marks: [{ kind: "text", at: 1, text: "" }] })[0]).toMatch(/empty/);
+  });
+});
+
+describe("placeable text", () => {
+  it("keeps text on screen, sizes in range and angles between -180 and 180", () => {
+    const m = tidyMark({ kind: "text", at: 0, text: "Hi", x: 1.4, y: -0.2, size: 9, rot: 270 });
+    expect(m.x).toBe(0.95); expect(m.y).toBe(0.05); expect(m.size).toBe(EDIT_LIMITS.maxTextSize); expect(m.rot).toBe(-90);
+  });
+  it("refuses odd styles, colours and sizes", () => {
+    const base = { clips: [{ start: 0, end: 5, muted: false, inApp: true }], cover: 0 };
+    expect(validateEdit({ ...base, marks: [{ kind: "text", at: 1, text: "Hi", x: 0.5, y: 0.3, size: 1.5, rot: 10, style: "box", color: "#22c55e" }] })).toEqual([]);
+    expect(validateEdit({ ...base, marks: [{ kind: "text", at: 1, text: "Hi", style: "neon" as any }] })).toContain("Pick a text style.");
+    expect(validateEdit({ ...base, marks: [{ kind: "text", at: 1, text: "Hi", color: "#123456" }] })).toContain("Pick a text colour.");
+    expect(validateEdit({ ...base, marks: [{ kind: "text", at: 1, text: "Hi", size: 7 }] })).toContain("Text size is out of range.");
+    expect(validateEdit({ ...base, marks: [{ kind: "text", at: 2, until: 1, text: "Hi" }] })).toContain("A text ends before it starts.");
   });
 });
