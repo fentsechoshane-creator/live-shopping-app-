@@ -119,7 +119,8 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 - Text placement is saved with the post (x, y, size, angle, style, colour; migration 0037 and packages/core `tidyMark`, `TEXT_STYLES`, `TEXT_COLOURS`) and drawn the same way in the feed (`components/PlacedText.tsx`, sized against the video so it matches on any screen). Older posts with top, middle or bottom text still show as before.
 - Also: the flaw note on videos stays centred.
 - Tests: core (47), database (placeable text kept and checked), the app test trims with the handle, types styled text, drags it, adds a tag and flaw, sets the cover, posts and checks the feed.
-- Not yet: clip speed, transitions, music. [CONFIRM with Ofentse which of these matter]
+- Deployed with Ofentse's OK (7 Nov): migration 0037 live, app pushed.
+- Next for the editor (picked by Ofentse): clip speed, transitions between clips, filters (brightness and warmth). Music left out for now (licensing).
 
 ### 2026-11-07: Live: Bob Go checks, cancelling, Inbox
 
