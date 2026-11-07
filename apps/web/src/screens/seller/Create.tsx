@@ -365,24 +365,32 @@ export function CreateListing({ shop, media, onMedia, onCamera, onStep, startAtD
 
         {step === 4 && (
           <>
-            <h1>Check and post</h1>
-            <div className="wz-review">
-              <div className="wz-thumb">{cover && preview && (isImage ? <img src={preview} alt="" /> : <video src={preview} muted playsInline />)}
-                {media.length > 1 && <span className="wz-more">+{media.length - 1}</span>}</div>
-              <div className="group grow">
-                <ReviewRow t="Title" v={title} onEdit={() => setStep(1)} />
-                {!food && <ReviewRow t="Type" v={`${LISTING_LABELS[label].label}${condition && label === "pre_loved" ? `, ${CONDITIONS.find((c) => c.value === condition)?.label.toLowerCase()}` : ""}`} onEdit={() => setStep(1)} />}
-                {auction
-                ? <ReviewRow t="Auction" v={`Starts at ${R(priceCents)}${reserveCents ? `, reserve ${R(reserveCents)}` : ", no reserve"}, ${auctionDays} ${auctionDays === 1 ? "day" : "days"}`} onEdit={() => setStep(2)} />
-                : <ReviewRow t="Price" v={`${R(priceCents)} (you get ${R(priceCents - fee)})`} onEdit={() => setStep(2)} />}
-                {!food && <ReviewRow t="Stock" v={`${stock}${sizes.length ? ` · ${sizes.join(", ")}` : ""}`} onEdit={() => setStep(2)} />}
-                {!food && parcelSize && <ReviewRow t="Parcel" v={`${PARCEL_SIZES[parcelSize].label}, courier R${PARCEL_SIZES[parcelSize].door / 100}`} onEdit={() => setStep(2)} />}
-                {food && <ReviewRow t="Notice" v={`${leadDays} days${allergens ? ` · ${allergens}` : ""}`} onEdit={() => setStep(1)} />}
-                <ReviewRow t="Caption" v={caption || title} onEdit={() => setStep(3)} />
+            <h1>Ready to post?</h1>
+            <p className="wz-sub">This is how buyers will see it.</p>
+            {/* A preview like the post in the feed: the cover, with title and price over it. */}
+            <div className="post-preview">
+              {cover && preview && (isImage ? <img src={preview} alt="" /> : <video src={preview} muted playsInline autoPlay loop />)}
+              {media.length > 1 && <span className="pp-more">+{media.length - 1} {media.length === 2 ? "photo" : "photos"}</span>}
+              {edit && edit.files[0] === cover && <span className="pp-more left"><Icon name="cut" size={12} />Edited</span>}
+              <div className="pp-info">
+                {!food && <span className="pp-chip">{LISTING_LABELS[label].label}{condition && label === "pre_loved" ? ` · ${CONDITIONS.find((c) => c.value === condition)?.label}` : ""}</span>}
+                <b>{title}</b>
+                <span className="pp-price">{auction ? `Bids from ${R(priceCents)}` : R(priceCents)}</span>
               </div>
             </div>
-            <div className="note" style={{ marginTop: 12 }}>The buyer's money is held safely and paid to you after the return window closes.</div>
-            {busy && cover && <div className="note" style={{ marginTop: 10 }}>Uploading… {progress}%</div>}
+
+            <div className="sum-list" role="list">
+              <SumRow k="Title" v={title} onEdit={() => setStep(1)} />
+              {!food && <SumRow k="Condition" v={`${LISTING_LABELS[label].label}${condition && label === "pre_loved" ? `, ${CONDITIONS.find((c) => c.value === condition)?.label.toLowerCase()}` : ""}`} onEdit={() => setStep(1)} />}
+              {auction
+                ? <SumRow k="Auction" v={`From ${R(priceCents)}, ${reserveCents ? `reserve ${R(reserveCents)}` : "no reserve"}, ${auctionDays} ${auctionDays === 1 ? "day" : "days"}`} onEdit={() => setStep(2)} />
+                : <SumRow k="Price" v={R(priceCents)} sub={fee > 0 ? `You get ${R(priceCents - fee)} after the 6% fee` : `No fee for founding sellers. You get all of it.`} onEdit={() => setStep(2)} />}
+              {!food && <SumRow k="Stock" v={`${stock} ${stock === 1 ? "item" : "items"}${sizes.length ? ` · ${sizes.join(", ")}` : ""}`} onEdit={() => setStep(2)} />}
+              {!food && parcelSize && <SumRow k="Parcel" v={PARCEL_SIZES[parcelSize].label} sub={`Buyers pay R${PARCEL_SIZES[parcelSize].door / 100} for courier${PARCEL_SIZES[parcelSize].locker ? `, R${PARCEL_SIZES[parcelSize].locker / 100} to a locker` : ""}`} onEdit={() => setStep(2)} />}
+              {food && <SumRow k="Notice" v={`${leadDays} days`} sub={allergens || undefined} onEdit={() => setStep(1)} />}
+              <SumRow k="Caption" v={caption || title} onEdit={() => setStep(3)} />
+            </div>
+            <p className="wz-trust"><Icon name="lock" size={14} />The buyer's money is held safely and paid to you after the return window closes.</p>
           </>
         )}
       </div>
@@ -391,7 +399,13 @@ export function CreateListing({ shop, media, onMedia, onCamera, onStep, startAtD
         <div className="wz-foot">
           {step < 4
             ? <button className="btn green block big" onClick={next}>{step === 3 && !caption && !description ? "Skip" : "Next"}</button>
-            : <button className="btn green block big" onClick={post} disabled={busy}>{busy ? "Posting…" : "Post listing"}</button>}
+            : (
+              // The upload shows inside the button: it fills as the video goes up.
+              <button className={`btn green block big post-btn ${busy ? "busy" : ""}`} onClick={post} disabled={busy}
+                style={busy ? { ["--p" as string]: `${Math.max(4, progress)}%` } : undefined} aria-live="polite">
+                <span>{!busy ? "Post listing" : !cover || progress >= 100 ? "Posting…" : progress <= 0 ? "Getting your video ready…" : `Uploading ${progress}%`}</span>
+              </button>
+            )}
         </div>
       )}
       {step === 0 && media.length > 0 && (
@@ -401,11 +415,12 @@ export function CreateListing({ shop, media, onMedia, onCamera, onStep, startAtD
   );
 }
 
-function ReviewRow({ t, v, onEdit }: { t: string; v: string; onEdit: () => void }) {
+function SumRow({ k, v, sub, onEdit }: { k: string; v: string; sub?: string; onEdit: () => void }) {
   return (
-    <button className="cell" onClick={onEdit} aria-label={`Edit ${t.toLowerCase()}`}>
-      <span className="grow"><span className="s" style={{ display: "block" }}>{t}</span><span className="t" style={{ display: "block" }}>{v}</span></span>
-      <span className="link" style={{ fontSize: 13 }}>Edit</span>
+    <button className="sum-row" role="listitem" onClick={onEdit} aria-label={`${k}: ${v}. Change`}>
+      <span className="k">{k}</span>
+      <span className="v"><span className="main">{v}</span>{sub && <small>{sub}</small>}</span>
+      <Icon name="chevron" size={16} />
     </button>
   );
 }

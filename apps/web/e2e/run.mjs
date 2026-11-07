@@ -524,7 +524,7 @@ try {
   await check(page.getByLabel("Price (rand)").inputValue().then((v) => v === "450"), "price kept after going back");
   await page.getByRole("button", { name: "Next" }).click();
   await page.getByRole("button", { name: "Next" }).click();
-  await page.getByRole("heading", { name: "Check and post" }).waitFor();
+  await page.getByRole("heading", { name: "Ready to post?" }).waitFor();
   await shot("create-review");
   await page.getByRole("button", { name: "Post listing" }).click();
   await page.waitForURL((u) => u.pathname === "/me");
@@ -536,7 +536,23 @@ try {
   const shutter = page.getByRole("button", { name: /Tap for a photo/ });
   await page.waitForFunction(() => document.querySelector(".cam-feed")?.videoWidth > 0, null, { timeout: 15000 });
   await shot("camera");
+  // The test camera sends landscape frames, like iPhones do; what we record and photograph must still be upright 9:16.
+  const source = await page.evaluate(() => { const v = document.querySelector(".cam-feed"); return [v.videoWidth, v.videoHeight]; });
+  console.log(`  test camera sends ${source.join("x")}`);
+  const sb = await shutter.boundingBox();
+  await page.mouse.move(sb.x + sb.width / 2, sb.y + sb.height / 2);
+  await page.mouse.down();
+  await page.waitForTimeout(2500); // hold to record
+  await page.mouse.up();
+  await page.getByRole("button", { name: "Retake" }).waitFor({ timeout: 15000 });
+  await page.waitForFunction(() => { const v = document.querySelector("video.cam-feed"); return v && !v.srcObject && v.videoWidth > 0; }, null, { timeout: 15000 });
+  const recorded = await page.evaluate(() => { const v = document.querySelector("video.cam-feed"); return [v.videoWidth, v.videoHeight]; });
+  await check(Promise.resolve(recorded[0] < recorded[1] && Math.abs(recorded[1] / recorded[0] - 16 / 9) < 0.02), `recorded video is upright 9:16 (got ${recorded.join("x")})`);
+  await shot("camera-recorded-portrait");
+  await page.getByRole("button", { name: "Retake" }).click();
+  await page.waitForFunction(() => document.querySelector(".cam-feed")?.videoWidth > 0, null, { timeout: 15000 });
   await shutter.click();
+  await page.waitForFunction(() => { const i = document.querySelector('img[alt="Your photo"]'); return i && i.naturalWidth > 0 && Math.abs(i.naturalHeight / i.naturalWidth - 16 / 9) < 0.02; }, null, { timeout: 10000 }); // the photo is upright 9:16 too
   await page.getByRole("button", { name: "Next" }).click();
   await page.getByRole("heading", { name: "What are you selling?" }).waitFor(); // the photo is already in, so Create starts at step 1
   await page.getByRole("button", { name: "Back" }).click();

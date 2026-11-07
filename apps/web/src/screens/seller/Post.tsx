@@ -110,6 +110,21 @@ export function SellerGate({ open, onClose, onYes, unfinished }: { open: boolean
 const LIMITS = [15, 60, 180] as const;
 const HOLD_MS = 250;
 
+/**
+ * Draws a camera frame upright at 9:16, cropped to fill like the preview. Phones (iPhones especially) hand the browser
+ * landscape frames even when you hold the phone upright, so photos and videos are made from this, never the raw camera.
+ */
+function drawPortrait(ctx: CanvasRenderingContext2D, v: HTMLVideoElement, w: number, h: number, mirror: boolean) {
+  const vw = v.videoWidth, vh = v.videoHeight;
+  if (!vw || !vh) return;
+  const k = Math.max(w / vw, h / vh); // cover, like object-fit: cover on the preview
+  const dw = vw * k, dh = vh * k;
+  ctx.save();
+  if (mirror) { ctx.translate(w, 0); ctx.scale(-1, 1); } // match the mirrored selfie preview
+  ctx.drawImage(v, (w - dw) / 2, (h - dh) / 2, dw, dh);
+  ctx.restore();
+}
+
 /** Phone style camera: gallery on the left, shutter in the middle, flip on the right. Tap for a photo, hold to record. */
 function Camera({ onDone, onEdit, onReview }: { onDone: (file: File, inApp: boolean) => void; onEdit: (file: File, inApp: boolean) => void; onReview: (on: boolean) => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -134,7 +149,8 @@ function Camera({ onDone, onEdit, onReview }: { onDone: (file: File, inApp: bool
       try {
         let stream: MediaStream;
         try {
-          stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing, width: { ideal: 1080 }, height: { ideal: 1920 } }, audio: true });
+          // Ask for the most the camera has; drawPortrait crops it upright to 9:16 either way.
+          stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing, width: { ideal: 1920 }, height: { ideal: 1920 } }, audio: true });
         } catch {
           stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing } }); // no microphone: video without sound
         }
@@ -151,6 +167,11 @@ function Camera({ onDone, onEdit, onReview }: { onDone: (file: File, inApp: bool
     return () => { cancelled = true; };
   }, [facing]);
   useEffect(() => () => streamRef.current?.getTracks().forEach((t) => t.stop()), []);
+  // After Retake the preview is a new video element: plug the running camera back into it.
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!shot && v && streamRef.current && v.srcObject !== streamRef.current) { v.srcObject = streamRef.current; v.play().catch(() => {}); }
+  }, [shot]);
 
   // Recording clock, and stop at the limit.
   useEffect(() => {
@@ -167,10 +188,10 @@ function Camera({ onDone, onEdit, onReview }: { onDone: (file: File, inApp: bool
     const v = videoRef.current;
     if (!v || !v.videoWidth) return;
     const c = document.createElement("canvas");
-    c.width = v.videoWidth; c.height = v.videoHeight;
-    const ctx = c.getContext("2d")!;
-    if (facing === "user") { ctx.translate(c.width, 0); ctx.scale(-1, 1); } // match the mirrored preview
-    ctx.drawImage(v, 0, 0);
+    // Upright 9:16, as sharp as the camera allows (up to 1080 by 1920).
+    const short = Math.min(1080, Math.min(v.videoWidth, v.videoHeight));
+    c.width = short; c.height = Math.round(short * 16 / 9);
+    drawPortrait(c.getContext("2d")!, v, c.width, c.height, facing === "user");
     c.toBlob((b) => b && setShot(new File([b], `photo-${Date.now()}.jpg`, { type: "image/jpeg" })), "image/jpeg", 0.9);
   };
 
@@ -178,10 +199,27 @@ function Camera({ onDone, onEdit, onReview }: { onDone: (file: File, inApp: bool
     const stream = streamRef.current;
     if (!stream || typeof MediaRecorder === "undefined") return takePhoto();
     const type = ["video/mp4", "video/webm;codecs=vp9", "video/webm"].find((t) => MediaRecorder.isTypeSupported?.(t)) ?? "";
-    const rec = new MediaRecorder(stream, type ? { mimeType: type } : undefined);
+    // Record what the preview shows: frames drawn upright at 9:16 onto a canvas, plus the microphone.
+    const v = videoRef.current;
+    let recordStream = stream;
+    let stopDrawing = () => {};
+    const canvas = document.createElement("canvas");
+    if (v && v.videoWidth && typeof canvas.captureStream === "function") {
+      const short = Math.min(720, Math.min(v.videoWidth, v.videoHeight));
+      canvas.width = short; canvas.height = Math.round(short * 16 / 9);
+      const ctx = canvas.getContext("2d")!;
+      let raf = 0;
+      const draw = () => { drawPortrait(ctx, v, canvas.width, canvas.height, facing === "user"); raf = requestAnimationFrame(draw); };
+      draw();
+      stopDrawing = () => cancelAnimationFrame(raf);
+      recordStream = new MediaStream([...canvas.captureStream(30).getVideoTracks(), ...stream.getAudioTracks()]);
+    }
+    const rec = new MediaRecorder(recordStream, type ? { mimeType: type, videoBitsPerSecond: 4_000_000 } : { videoBitsPerSecond: 4_000_000 });
     const chunks: BlobPart[] = [];
     rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
     rec.onstop = () => {
+      stopDrawing();
+      if (recordStream !== stream) recordStream.getVideoTracks().forEach((t) => t.stop());
       setState("ready");
       setElapsed(0);
       const mime = rec.mimeType || type || "video/webm";

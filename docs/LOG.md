@@ -109,6 +109,12 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-07: Camera records upright; Ready to post redesigned
+
+- Camera: iPhones hand the browser landscape frames even when held upright, so recordings came out landscape. Photos and videos are now drawn upright at 9:16 from what the preview shows (cropped to fill), with the microphone kept. The app test records with the test camera and checks the video and the photo are 9:16.
+- Fixed: after Retake the camera preview stayed black (the new screen wasn't reconnected to the camera).
+- The last step of Create is now "Ready to post?": a big preview of the post as buyers see it (cover, condition, title, price), then tidy rows you tap to change (Title, Condition, Price with what you get, Stock, Parcel with what buyers pay, Caption), and a short note on how payment is held. The upload shows inside the Post button as it fills ("Getting your video ready…", "Uploading 34%"), instead of a separate box stuck at 0%.
+
 ### 2026-11-07: CapCut style editor
 
 - Asked by Ofentse: editing like CapCut, placeable text, everything cleaned up. The editor is rebuilt around:
