@@ -1,5 +1,5 @@
 import type {
-  AccountFeature, FeatureState, Cents, Condition, DeliveryOption, ListingLabel, OrderStatus, OrderTotals, ParcelSize, ReturnReason, SaleMode, SellerTier,
+  AccountFeature, FeatureState, Cents, Condition, DeliveryOption, ListingLabel, OrderStatus, OrderTotals, ParcelSize, PayoutSchedule, ReturnReason, SaleMode, SellerTier,
 } from "@app/core";
 
 export type Province = "EC" | "FS" | "GP" | "KZN" | "LP" | "MP" | "NC" | "NW" | "WC";
@@ -193,6 +193,8 @@ export interface CheckoutInput {
 export interface Order {
   id: string;
   status: OrderStatus;
+  /** How the buyer paid, as TradeSafe names it (like "OZOW"). */
+  paymentMethod?: string | null;
   mode: SaleMode;
   product: { id: string; title: string };
   shop: { id: string; name: string; handle: string };
@@ -202,7 +204,7 @@ export interface Order {
   deliveryDetails: Record<string, string>;
   foodDate: string | null;
   foodSlot: string | null;
-  totals: Pick<OrderTotals, "itemPrice" | "deliveryFee" | "protectionFee" | "creditUsed" | "total" | "sellerFee" | "sellerPayout" | "creditTopUp"> & { deliveryDiscount?: number };
+  totals: Pick<OrderTotals, "itemPrice" | "deliveryFee" | "protectionFee" | "creditUsed" | "total" | "sellerFee" | "sellerPayout" | "creditTopUp"> & { deliveryDiscount?: number; chargesTaken?: number };
   checkoutUrl: string | null;
   trackingRef: string | null;
   parcelSize?: ParcelSize | null;
@@ -245,6 +247,18 @@ export interface SellerChecks {
   bankLast4: string | null;
   certStatus: ReviewStatus;
   rulesAccepted: boolean;
+  /** How often TradeSafe pays the seller's bank (8 Nov 2026). */
+  payoutSchedule?: PayoutSchedule;
+}
+
+/** Something a seller owes us, taken from their next sale (migration 0038). */
+export interface SellerCharge {
+  id: string;
+  orderId: string | null;
+  kind: "refund_fee" | "courier_extra" | "chargeback" | "other";
+  amountCents: Cents;
+  note: string;
+  createdAt: string;
 }
 
 export interface MyShop {
@@ -403,7 +417,7 @@ export interface Api {
   /** Seller cancels a paid order before shipping (5 trust points unless it wasn't their fault). */
   sellerCancelOrder(id: string, reason: string): Promise<void>;
   /** Our team cancels and refunds any order, with a reason. */
-  teamCancelOrder(id: string, reason: string): Promise<void>;
+  teamCancelOrder(id: string, reason: string, sellerFault?: boolean): Promise<void>;
   confirmReceived(id: string): Promise<void>;
   requestReturn(id: string, reason: ReturnReason, details: string): Promise<void>;
   leaveReview(id: string, stars: number, body: string): Promise<void>;
@@ -545,6 +559,11 @@ export interface Api {
   returnReceived(id: string): Promise<void>;
   disputeReturn(id: string): Promise<void>;
   payouts(): Promise<Payout[]>;
+  /** What this seller owes us now, and every charge so far. */
+  sellerCharges(shopId?: string): Promise<{ owedCents: Cents; charges: SellerCharge[] }>;
+  setPayoutSchedule(schedule: PayoutSchedule): Promise<void>;
+  teamAddCharge(shopId: string, kind: "chargeback" | "other", amountCents: Cents, note: string, orderId?: string | null): Promise<void>;
+  teamRemoveCharge(id: string): Promise<void>;
   // Admin
   // Team dashboard
   teamOverview(): Promise<TeamOverview>;

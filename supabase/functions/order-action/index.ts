@@ -27,10 +27,11 @@ Deno.serve(handler(async (req, body) => {
     return t || null;
   };
   // Refund in full and close the order. A courier already booked is cancelled with Bob Go first.
-  const refundNow = async (by: "buyer" | "seller" | "team" | "auto", reason: string | null) => {
+  // sellerFault (team only): the seller pays TradeSafe's refund fee (migration 0038).
+  const refundNow = async (by: "buyer" | "seller" | "team" | "auto", reason: string | null, sellerFault = false) => {
     if (order.shipment_id && order.status === "paid") await requireDelivery().cancel(order.shipment_id).catch((e) => console.error("cancel booking", orderId, e));
     if (order.escrow_transaction_id) await es.refund(order.escrow_transaction_id);
-    await setStatus("refunded", { cancelled_by: by, cancel_reason: reason });
+    await setStatus("refunded", { cancelled_by: by, cancel_reason: reason, ...(by === "team" ? { seller_at_fault: sellerFault } : {}) });
   };
   const setStatus = async (status: string, extra: Record<string, unknown> = {}) =>
     must(await db.from("orders").update({ status, ...extra }).eq("id", orderId).eq("status", order.status), `set ${status}`);
@@ -96,8 +97,9 @@ Deno.serve(handler(async (req, body) => {
       if (!admin) throw new UserError("Only our team can do this.", 403);
       if (!["paid", "shipped", "delivered", "return_requested", "return_in_transit"].includes(order.status)) throw new UserError("This order can't be refunded now.");
       const reason = cleanReason(body.reason, true)!;
-      await refundNow("team", reason);
-      await db.rpc("log_admin", { p_action: "Cancelled and refunded order", p_kind: "order", p_target: orderId, p_note: reason, p_admin: uid });
+      const fault = body.sellerFault === true;
+      await refundNow("team", reason, fault);
+      await db.rpc("log_admin", { p_action: fault ? "Cancelled and refunded order (seller's fault, seller pays the refund fee)" : "Cancelled and refunded order", p_kind: "order", p_target: orderId, p_note: reason, p_admin: uid });
       break;
     }
     case "ship": {

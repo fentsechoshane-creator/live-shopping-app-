@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { formatRand, refundFee } from "@app/core";
 import { api, type Order } from "../api";
 import { useSession } from "../session";
 import { dateTimeText, ErrorNote, Sheet, useAction } from "./ui";
@@ -85,7 +86,7 @@ export function SellerCancel({ o, onDone, part }: { o: Order; onDone: () => void
       {part === "button" && <button className="btn line block danger-text" style={{ marginTop: 12 }} onClick={() => setOpen(true)}>Cancel this order</button>}
       {open && <ReasonSheet title="Cancel this order?"
         intro={noFault ? "The buyer gets a full refund. You don't lose trust points, because this wasn't your fault."
-          : "The buyer gets a full refund and you lose 5 trust points, the same as not shipping. Only cancel if you really can't send it."}
+          : `The buyer gets a full refund and you lose 5 trust points, the same as not shipping. TradeSafe's refund fee (about ${formatRand(refundFee(o.paymentMethod ?? null, o.totals.total))}) comes off your next sale. Only cancel if you really can't send it.`}
         reasons={SELLER_REASONS} confirm="Cancel and refund the buyer" danger
         onClose={() => setOpen(false)}
         onConfirm={async (reason) => { await api.sellerCancelOrder(o.id, reason!); setOpen(false); onDone(); return "Order cancelled. The buyer is refunded."; }} />}
@@ -96,6 +97,7 @@ export function SellerCancel({ o, onDone, part }: { o: Order; onDone: () => void
 /** Team: cancel and refund any order, with a reason that goes in the team log. */
 export function TeamCancel({ orderId, status, onDone }: { orderId: string; status: string; onDone: () => void }) {
   const [open, setOpen] = useState(false);
+  const [fault, setFault] = useState(false);
   if (!["paid", "shipped", "delivered", "return_requested", "return_in_transit"].includes(status)) return null;
   return (
     <>
@@ -105,13 +107,17 @@ export function TeamCancel({ orderId, status, onDone }: { orderId: string; statu
           : "It has already shipped. The buyer gets a full refund and any courier booking is left as is. Sort out getting the item back separately."}
         reasons={["Fraud or a fake account", "Dispute decided for the buyer", "Our mistake", "Seller asked us"]} confirm="Cancel and refund" danger
         onClose={() => setOpen(false)}
-        onConfirm={async (reason) => { await api.teamCancelOrder(orderId, reason!); setOpen(false); onDone(); return "Cancelled and refunded"; }} />}
+        extra={<label className="check-row" style={{ marginTop: 12 }}>
+          <input type="checkbox" checked={fault} onChange={(e) => setFault(e.target.checked)} />
+          <span>The seller's fault <span className="small muted" style={{ display: "block" }}>They pay TradeSafe's refund fee, taken from their next sale.</span></span>
+        </label>}
+        onConfirm={async (reason) => { await api.teamCancelOrder(orderId, reason!, fault); setOpen(false); onDone(); return "Cancelled and refunded"; }} />}
     </>
   );
 }
 
-function ReasonSheet({ title, intro, reasons, optional, confirm, danger, onClose, onConfirm }: {
-  title: string; intro: string; reasons: string[]; optional?: boolean; confirm: string; danger?: boolean;
+function ReasonSheet({ title, intro, reasons, optional, confirm, danger, extra, onClose, onConfirm }: {
+  title: string; intro: string; reasons: string[]; optional?: boolean; confirm: string; danger?: boolean; extra?: React.ReactNode;
   onClose: () => void; onConfirm: (reason: string | undefined) => Promise<string>;
 }) {
   const [pick, setPick] = useState<string | null>(null);
@@ -130,6 +136,7 @@ function ReasonSheet({ title, intro, reasons, optional, confirm, danger, onClose
       </div>
       {pick === "Other" && <input className="setup-input" style={{ marginTop: 10 }} value={other} onChange={(e) => setOther(e.target.value)} maxLength={300} placeholder="In a few words" aria-label="Reason" autoFocus />}
       {!optional && !pick && <p className="small muted">Pick a reason.</p>}
+      {extra}
     </Sheet>
   );
 }

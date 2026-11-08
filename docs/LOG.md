@@ -106,6 +106,19 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-08: Who pays TradeSafe's costs (seller charges, payout schedule)
+
+- From the signed TradeSafe merchant agreement (August 2026 version). Decided with Ofentse:
+  - **Payment fee** (1.5% Instant EFT, 2.5% card, 0.75% EFT, more for SnapScan and PayJustNow, plus VAT, on the whole amount including delivery): we pay it. That's what the buyer protection fee covers. No card surcharge [CONFIRM surcharge rules with the lawyer].
+  - **Refund fees** (R7.50 plus VAT for EFT, PayJustNow and wallet; the payment fee again for card and Ozow): the seller pays when the refund is their fault (not shipped in time, cancelled for no good reason, a return the seller pays postage for, or our team ticks "seller's fault"). We pay when the buyer changes their mind or cancels (ECTA section 44 allows only the return postage) [CONFIRM with the lawyer].
+  - **R5 bank fee per payout:** TradeSafe takes it from the seller's own payout (their plugin and agreement say so) [CONFIRM with TradeSafe]. Sellers now pick how often they're paid: each sale, once a week (new default) or once a month (no fee). Changed with TradeSafe's tokenUpdate, the same call their own plugins use. Our own agent payout should be set to monthly in the TradeSafe dashboard. [Ofentse]
+  - **Chargebacks:** our team adds them as a charge when the seller is at fault.
+- Migration 0038: `seller_charges` (refund_fee, courier_extra, chargeback, other), `orders.charges_taken_cents`, `orders.seller_at_fault`, `seller_checks.payout_schedule`, `refund_fee_cents()`, `seller_owed()`, team functions to add or remove a charge. What a seller owes is taken from their next sale inside escrow (added to our agent fee at checkout); if that sale is refunded it's owed again. Courier extras now really get collected this way (before they were only recorded).
+- App: Payouts shows how often you're paid, what you owe and why. Seller cancel says the refund fee. Team: "seller's fault" tick when cancelling, and a charges panel on each shop (add or remove).
+- Terms 7.2 updated; registered address is 73 Tinderwood Crescent.
+- Ofentse's real cost per R350 Instant EFT order (small courier): about R25 kept from a normal seller, about R4 from a founding seller, once the bank fee sits with sellers.
+- Not live yet: needs migration 0038 and checkout, order-action, seller-bank and run-due deployed.
+
 ### 2026-11-07: Flat delivery prices, parcel sizes match PUDO lockers
 
 - Decided with Ofentse: flat delivery prices, so buyers see the price up front. Quote pricing stays in the code but is switched off (CHARGE_QUOTES in packages/core fees.ts). Checkout still asks Bob Go whether the route works and blocks what it can't book.

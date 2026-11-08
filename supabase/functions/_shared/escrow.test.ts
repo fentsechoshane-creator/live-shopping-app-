@@ -21,14 +21,14 @@ const ENUMS: Record<string, { name: string; description: string }[]> = {
     { name: "BANK_250655", description: "First National Bank" }],
   BankAccountType: [{ name: "CHEQUE", description: "Cheque/Current Account" }, { name: "SAVINGS", description: "Savings Account" }],
   IdType: [{ name: "NATIONAL", description: "National ID" }],
-  PayoutInterval: [{ name: "IMMEDIATE", description: "Immediate" }, { name: "WEEKLY", description: "Weekly" }],
+  PayoutInterval: [{ name: "IMMEDIATE", description: "Immediate" }, { name: "WEEKLY", description: "Weekly" }, { name: "MONTHLY", description: "Monthly" }],
 };
 function setEnv() {
   Deno.env.set("TRADESAFE_MODE", "live"); Deno.env.set("TRADESAFE_CLIENT_ID", "id"); Deno.env.set("TRADESAFE_CLIENT_SECRET", "secret");
   Deno.env.set("TRADESAFE_AGENT_TOKEN", "agent"); Deno.env.set("APP_URL", "https://myhaul-app.netlify.app");
 }
 
-Deno.test("seller token: bank and account type use TradeSafe's own codes, payouts are immediate", async () => {
+Deno.test("seller token: bank and account type use TradeSafe's own codes, weekly payouts unless picked", async () => {
   setEnv();
   const ts = fakeTradeSafe((q, v) => q.includes("__type") ? { __type: { enumValues: ENUMS[v.n] ?? [] } } : { tokenCreate: { id: "T1" } });
   try {
@@ -38,9 +38,19 @@ Deno.test("seller token: bank and account type use TradeSafe's own codes, payout
     const input = ts.calls.find((c) => c.body.query.includes("tokenCreate"))!.body.variables.input;
     assert(input.bankAccount.bank === "BANK_051001", "Standard Bank mapped by name");
     assert(input.bankAccount.accountType === "CHEQUE");
-    assert(input.settings.payout.interval === "IMMEDIATE");
+    assert(input.settings.payout.interval === "WEEKLY", "weekly by default (8 Nov 2026)");
     assert(input.user.idType === "NATIONAL" && !("mobile" in input.user), "empty mobile left out");
     assert(ts.calls[0].url === "https://api.tradesafe.co.za/graphql", "default live GraphQL address");
+  } finally { ts.restore(); }
+});
+
+Deno.test("a seller's payout schedule is changed with tokenUpdate, like TradeSafe's own plugin", async () => {
+  setEnv();
+  const ts = fakeTradeSafe((q, v) => q.includes("__type") ? { __type: { enumValues: ENUMS[v.n] ?? [] } } : { tokenUpdate: { id: "T1" } });
+  try {
+    await escrow().setPayoutSchedule("T1", "MONTHLY");
+    const call = ts.calls.find((c) => c.body.query.includes("tokenUpdate"))!;
+    assert(call.body.variables.id === "T1" && call.body.variables.input.settings.payout.interval === "MONTHLY");
   } finally { ts.restore(); }
 });
 

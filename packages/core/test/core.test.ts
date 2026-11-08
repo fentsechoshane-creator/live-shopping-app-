@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { quotedDeliveryFee, CHARGE_QUOTES, PARCEL_SIZES, editLength, locate, clipStartsAt, activeMarks, validateEdit, tidyMark, EDIT_LIMITS,
+import { quotedDeliveryFee, refundFee, paymentKind, PAYOUT_SCHEDULES, CHARGE_QUOTES, PARCEL_SIZES, editLength, locate, clipStartsAt, activeMarks, validateEdit, tidyMark, EDIT_LIMITS,
   deliveryFee, deliveryPerk, PARCEL_SIZE_IDS,
   rand, formatRand, protectionFee, orderTotals, sellerFee, releasableAt, payoutDate, nextFriday, addWorkingDays,
   reserveFor, scoreFrom, tierFor, canUse, canForceOn, packingVideoProblems, validateListing, canTransition, returnReasonsFor, shipBy,
@@ -348,5 +348,37 @@ describe("quoted delivery prices", () => {
     const t = orderTotals({ itemPrice: rand(300), delivery: "courier", parcelSize: "small", quotedDeliveryCents: 9601 });
     expect(t.deliveryFee).toBe(rand(110));
     expect(t.deliveryKept).toBe(rand(110));
+  });
+});
+
+describe("what sellers owe and refund fees (8 Nov 2026)", () => {
+  it("takes what the seller owes from the payout, inside escrow, never more than the payout", () => {
+    const base = orderTotals({ itemPrice: rand(350), delivery: "courier", parcelSize: "small" });
+    const t = orderTotals({ itemPrice: rand(350), delivery: "courier", parcelSize: "small", sellerOwedCents: 863 });
+    expect(t.chargesTaken).toBe(863);
+    expect(t.sellerPayout).toBe(base.sellerPayout - 863);
+    expect(t.total).toBe(base.total); // the buyer pays the same
+    expect(t.total - t.escrowAgentFee).toBe(t.sellerPayout);
+    const big = orderTotals({ itemPrice: rand(100), delivery: "collect_cpt", sellerOwedCents: rand(500) });
+    expect(big.sellerPayout).toBe(0);
+    expect(big.chargesTaken).toBe(rand(100) - big.sellerFee);
+    expect(big.total - big.escrowAgentFee).toBe(0);
+  });
+  it("still balances with a reward and a perk", () => {
+    const t = orderTotals({ itemPrice: rand(1600), delivery: "pudo_locker", welcomeCreditAvailable: true, sellerOwedCents: 2000 });
+    expect(t.total - t.escrowAgentFee + t.creditTopUp).toBe(t.sellerPayout);
+  });
+  it("works out TradeSafe's refund fee by how the buyer paid, with VAT", () => {
+    expect(paymentKind("OZOW")).toBe("ozow");
+    expect(paymentKind("INSTANT_EFT")).toBe("ozow");
+    expect(paymentKind("EFT")).toBe("eft");
+    expect(paymentKind("CARD")).toBe("card");
+    expect(paymentKind(null)).toBe("card");
+    expect(refundFee("EFT", rand(472))).toBe(863); // R7.50 + VAT
+    expect(refundFee("OZOW", rand(472))).toBe(815); // 1.5% of R472 + VAT = R8.142
+    expect(refundFee("CARD", rand(472))).toBe(1357); // 2.5% + VAT
+  });
+  it("offers three payout schedules", () => {
+    expect(Object.keys(PAYOUT_SCHEDULES)).toEqual(["IMMEDIATE", "WEEKLY", "MONTHLY"]);
   });
 });

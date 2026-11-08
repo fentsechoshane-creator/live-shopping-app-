@@ -2,13 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import { CancelledNote, SellerCancel } from "../../components/CancelOrder";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import {
+  PAYOUT_SCHEDULES, DEFAULT_PAYOUT_SCHEDULE, type PayoutSchedule,
   bookedByUs, canUse, DELIVERY_OPTIONS, PARCEL_SIZES, PACKING_KEEP_MONTHS, PACKING_STEPS, PACKING_VIDEO_MAX_S, PACKING_VIDEO_MIN_S, packingVideoProblems, LISTING_LABELS, rand, TIER_INFO, tierFor, TRUST_POINTS, validateListing,
   type Condition, type ListingLabel,
 } from "@app/core";
 import { api, type MyShop } from "../../api";
 import { useLoad, useSession } from "../../session";
 import { ProductArt } from "../../components/Scene";
-import { BackButton, Cell, ErrorNote, Field, Loading, R, TierPill, dateText, dateTimeText, swatch, useAction } from "../../components/ui";
+import { BackButton, Cell, Choice, ErrorNote, Field, Loading, R, TierPill, dateText, dateTimeText, swatch, useAction } from "../../components/ui";
 import { Icon } from "../../components/Icon";
 import { addressLine, PickupAddressForm } from "../../components/Address";
 import { CourierTracking, statusPill, Timeline } from "../buyer/Orders";
@@ -180,16 +181,45 @@ export function SellerOrderDetail() {
 
 export function Payouts() {
   const [items, error] = useLoad(() => api.payouts(), []);
-  const [shop] = useLoad<MyShop | null>(() => api.myShop(), []);
+  const [shop, , reloadShop] = useLoad<MyShop | null>(() => api.myShop(), []);
+  const [owed] = useLoad(() => api.sellerCharges(), []);
+  const { busy, error: saveError, run } = useAction();
+  const { toast } = useSession();
   const tier = shop ? tierFor(shop.trustScore) : "standard";
+  const schedule: PayoutSchedule = shop?.checks.payoutSchedule ?? DEFAULT_PAYOUT_SCHEDULE;
+  const pickSchedule = (next: PayoutSchedule) => next !== schedule && run(async () => {
+    await api.setPayoutSchedule(next); reloadShop(); toast(`Paid ${PAYOUT_SCHEDULES[next].label.toLowerCase()} from now on`);
+  });
   return (
     <div className="screen">
       <BackButton to="/me?tab=selling" label="Shop" />
       <h1 style={{ marginTop: 6 }}>Payouts</h1>
       <div className="note" style={{ marginBottom: 12 }}>
-        You are paid once the buyer's return window closes. As a <b>{TIER_INFO[tier].label}</b> seller: {tier === "top" ? "the next working day" : tier === "trusted" ? "within 2 working days" : tier === "restricted" ? "held for review" : "in the weekly Friday run"}.
-        {shop?.checks.bankLast4 && <> To {shop.checks.bankName} ending {shop.checks.bankLast4}.</>}
+        Your money is released once the buyer's return window closes. As a <b>{TIER_INFO[tier].label}</b> seller: {tier === "top" ? "the next working day" : tier === "trusted" ? "within 2 working days" : tier === "restricted" ? "held for review" : "in the weekly Friday run"}.
+        {" "}{schedule === "IMMEDIATE" ? "TradeSafe then pays it straight into your bank" : schedule === "WEEKLY" ? "TradeSafe then pays everything released that week into your bank in one payment" : "TradeSafe then pays everything released that month into your bank in one payment"}{shop?.checks.bankLast4 ? <>, {shop.checks.bankName} ending {shop.checks.bankLast4}</> : null}.
       </div>
+
+      <h3 className="section-title">How often you're paid</h3>
+      <p className="small muted" style={{ marginTop: 0 }}>Our payment partner TradeSafe charges R5.75 for each payment into your bank, and nothing if you're paid once a month.</p>
+      <ErrorNote error={saveError} />
+      {(Object.keys(PAYOUT_SCHEDULES) as PayoutSchedule[]).map((k) => (
+        <Choice key={k} on={schedule === k} onClick={() => !busy && pickSchedule(k)} title={PAYOUT_SCHEDULES[k].label} sub={PAYOUT_SCHEDULES[k].sub} />
+      ))}
+
+      {owed && (owed.owedCents > 0 || owed.charges.length > 0) && <>
+        <h3 className="section-title">Owed to myHaul</h3>
+        <div className="note" style={{ marginBottom: 8 }}>
+          {owed.owedCents > 0 ? <>You owe <b>{R(owed.owedCents)}</b>. It comes off the payout of your next sale, so you don't need to do anything.</> : "All paid up."}
+        </div>
+        {owed.charges.map((c) => (
+          <div key={c.id} className="list-item">
+            <div className="grow"><b>{R(c.amountCents)}</b><div className="small muted">{c.note}</div></div>
+            <span className="small muted">{dateText(c.createdAt)}</span>
+          </div>
+        ))}
+      </>}
+
+      <h3 className="section-title">Your payouts</h3>
       <ErrorNote error={error} />
       {!items && !error && <Loading />}
       {items?.length === 0 && <div className="empty">No payouts yet.</div>}

@@ -72,8 +72,10 @@ Deno.serve(async (req) => {
     const payOn = payoutDate(tier, releasable);
     // [CONFIRM] new seller reserve: needs a second escrow allocation per order. Not applied yet.
     const { error } = await db.from("payouts").insert({
-      order_id: o.id, shop_id: o.shop_id, // A seller who picked too small a parcel size pays the courier's extra charge from this payout (0028).
-      amount_cents: Math.max(0, o.seller_payout_cents - (o.courier_extra_cents ?? 0)), reserve_cents: 0,
+      order_id: o.id, shop_id: o.shop_id,
+      // What TradeSafe pays the seller. A courier extra (parcel bigger than the size picked) is now a seller charge,
+      // taken from their next sale (0038), so it isn't taken off here too.
+      amount_cents: o.seller_payout_cents, reserve_cents: 0,
       // Welcome credit top up: paid by us by EFT, listed for our team on the Admin page.
       topup_cents: o.credit_topup_cents ?? 0,
       releasable_at: releasable.toISOString(), pay_on: payOn ? payOn.toISOString().slice(0, 10) : null,

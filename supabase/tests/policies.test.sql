@@ -1199,3 +1199,53 @@ select pg_temp.expect_error($$select set_post_edit((select id from posts where e
   'marks', jsonb_build_array(jsonb_build_object('kind', 'text', 'at', 0.5, 'text', 'Hi', 'size', 9)), 'cover', 0))$$, 'wrong size');
 reset role;
 select 'placeable text tests passed' as result;
+
+-- ===== Seller charges (migration 0038) =====
+-- From the cancel tests above: the seller's own cancel (63) and not shipping (64) cost the seller TradeSafe's refund fee;
+-- the buyer's cancel (61) and the courier failing (62) don't.
+select pg_temp.act_as_service();
+do $$ begin
+  assert (select count(*) from seller_charges where order_id::text like '40000000-0000-0000-0000-00000000006_' and kind = 'refund_fee') = 2, 'two seller fault refunds charged';
+  assert not exists (select 1 from seller_charges where order_id in ('40000000-0000-0000-0000-000000000061', '40000000-0000-0000-0000-000000000062')), 'no fee when not the seller''s fault';
+  -- No payment method recorded: card rate, 2.5% of R312 plus VAT = R8.97.
+  assert (select amount_cents from seller_charges where order_id = '40000000-0000-0000-0000-000000000064') = 897, 'card refund fee';
+  assert refund_fee_cents('OZOW', 47200) = 815 and refund_fee_cents('EFT', 47200) = 863 and refund_fee_cents('CARD', 47200) = 1357, 'same as packages/core';
+  assert exists (select 1 from notifications where user_id = (select owner_id from shops where handle = 'other.shop') and title = 'A refund fee comes off your next sale'), 'seller told';
+end $$;
+reset role;
+-- The seller sees what they owe; others can't.
+select pg_temp.act_as((select owner_id from shops where handle = 'other.shop'));
+do $$ begin
+  assert seller_owed((select id from shops where handle = 'other.shop')) = 1794, 'owes both fees';
+  assert (select count(*) from seller_charges) = 2, 'sees own charges';
+end $$;
+select pg_temp.expect_error($$select team_add_seller_charge((select id from shops where handle = 'other.shop'), 'other', 100, 'nope')$$, 'Only our team');
+reset role;
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000d');
+select pg_temp.expect_error($$select seller_owed((select id from shops where handle = 'other.shop'))$$, 'Not your shop');
+do $$ begin assert (select count(*) from seller_charges) = 0, 'buyers see no charges'; end $$;
+reset role;
+-- Money taken from a sale lowers what's owed; if that sale is refunded, it's owed again.
+select pg_temp.act_as_service();
+insert into orders (id, buyer_id, shop_id, product_id, mode, item_price_cents, delivery, delivery_fee_cents, protection_fee_cents, total_cents, seller_fee_cents, seller_payout_cents, charges_taken_cents)
+  values ('40000000-0000-0000-0000-000000000071', '00000000-0000-0000-0000-00000000000d', (select id from shops where handle = 'other.shop'),
+    '40000000-0000-0000-0000-000000000001', 'buy_now', 30000, 'collect_cpt', 0, 1200, 31200, 1800, 26406, 1794);
+do $$ begin assert seller_owed((select id from shops where handle = 'other.shop')) = 0, 'taken from the next sale'; end $$;
+update orders set status = 'cancelled' where id = '40000000-0000-0000-0000-000000000071';
+do $$ begin assert seller_owed((select id from shops where handle = 'other.shop')) = 1794, 'owed again when that sale falls through'; end $$;
+-- A courier extra becomes a charge.
+update orders set courier_extra_cents = 4000 where id = '40000000-0000-0000-0000-000000000061';
+do $$ begin assert exists (select 1 from seller_charges where order_id = '40000000-0000-0000-0000-000000000061' and kind = 'courier_extra' and amount_cents = 4000), 'courier extra charged'; end $$;
+reset role;
+select 'seller charges tests passed' as result;
+-- Our team adds a chargeback and can take it away again while it hasn't been collected.
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000c');
+select team_add_seller_charge((select id from shops where handle = 'other.shop'), 'chargeback', 25000, 'Card payment reversed by the buyer''s bank, item never arrived');
+do $$ begin
+  assert seller_owed((select id from shops where handle = 'other.shop')) = 1794 + 4000 + 25000, 'chargeback owed';
+  assert exists (select 1 from admin_actions where action like 'Added a charge%'), 'logged';
+end $$;
+select team_remove_seller_charge((select id from seller_charges where kind = 'chargeback'));
+do $$ begin assert not exists (select 1 from seller_charges where kind = 'chargeback'), 'removed'; end $$;
+reset role;
+select 'team charges tests passed' as result;

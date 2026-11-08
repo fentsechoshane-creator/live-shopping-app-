@@ -4,7 +4,7 @@ import { validateListing } from "@app/core";
 import type {
   ListingSuggestion, Conversation, OpenReport, SharedPost,
   MyProfile, ShopPublic,
-  Api, BankInput, Category, CheckoutInput, FeedItem, ListingInput, MyShop, Notification, Order, Payout, PendingReview,
+  Api, BankInput, Category, CheckoutInput, FeedItem, ListingInput, MyShop, Notification, Order, Payout, PendingReview, SellerCharge,
   ProductPublic, User, TeamPerson, TeamPersonDetail, Reward,
 } from "./types";
 
@@ -52,13 +52,13 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
 
   const ORDER_SELECT = "*, products(id, title), shops(id, name, handle), returns(*), reviews(stars)";
   const toOrder = (o: any): Order => ({
-    id: o.id, status: o.status, mode: o.mode, buyerId: o.buyer_id,
+    id: o.id, status: o.status, mode: o.mode, buyerId: o.buyer_id, paymentMethod: o.payment_method ?? null,
     product: { id: o.products?.id, title: o.products?.title ?? "Item" },
     shop: { id: o.shops?.id, name: o.shops?.name ?? "", handle: o.shops?.handle ?? "" },
     size: o.size, delivery: o.delivery, deliveryDetails: o.delivery_details ?? {}, foodDate: o.food_date, foodSlot: o.food_slot,
     totals: {
       itemPrice: o.item_price_cents, deliveryFee: o.delivery_fee_cents, protectionFee: o.protection_fee_cents,
-      creditUsed: o.credit_cents, total: o.total_cents, sellerFee: o.seller_fee_cents, sellerPayout: o.seller_payout_cents,
+      creditUsed: o.credit_cents, total: o.total_cents, sellerFee: o.seller_fee_cents, sellerPayout: o.seller_payout_cents, chargesTaken: o.charges_taken_cents ?? 0,
       creditTopUp: o.credit_topup_cents ?? 0, deliveryDiscount: o.delivery_discount_cents ?? 0,
     },
     checkoutUrl: o.checkout_url, trackingRef: o.tracking_ref, parcelSize: o.parcel_size ?? null, courierName: o.courier_name ?? null,
@@ -187,8 +187,8 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
     async sellerCancelOrder(id, reason) {
       await call("order-action", { orderId: id, action: "seller_cancel", reason });
     },
-    async teamCancelOrder(id, reason) {
-      await call("order-action", { orderId: id, action: "team_cancel", reason });
+    async teamCancelOrder(id, reason, sellerFault) {
+      await call("order-action", { orderId: id, action: "team_cancel", reason, sellerFault: sellerFault === true });
     },
     async cancelUnpaid(id) {
       await call("order-action", { orderId: id, action: "cancel_unpaid" });
@@ -611,7 +611,7 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
         checks: {
           phone: c.phone ?? null, idStatus: c.id_status ?? "not_started", bankStatus: c.bank_status ?? "not_started",
           bankName: c.bank_name ?? null, bankLast4: c.bank_last4 ?? null, certStatus: c.cert_status ?? "not_started",
-          rulesAccepted: !!c.rules_accepted_at,
+          rulesAccepted: !!c.rules_accepted_at, payoutSchedule: c.payout_schedule ?? "WEEKLY",
         },
         products: (s.products ?? []).filter((p: any) => p.status !== "removed")
           .map((p: any) => ({ ...toProduct(p), proofStatus: p.proof_status, posted: posted.has(p.id) })),
@@ -749,6 +749,26 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
     async payouts() {
       const rows = check(await sb.from("payouts").select("*").order("created_at", { ascending: false })) as any[];
       return rows.map((p): Payout => ({ id: p.id, orderId: p.order_id, amountCents: p.amount_cents, payOn: p.pay_on, status: p.status, releasableAt: p.releasable_at }));
+    },
+    async sellerCharges(shopId) {
+      const id = shopId ?? (check(await sb.from("shops").select("id").eq("owner_id", await uid()).single()) as any).id;
+      const [owed, rows] = await Promise.all([
+        sb.rpc("seller_owed", { p_shop: id }),
+        sb.from("seller_charges").select("*").eq("shop_id", id).order("created_at", { ascending: false }).limit(100),
+      ]);
+      return {
+        owedCents: (check(owed) as number) ?? 0,
+        charges: ((check(rows) as any[]) ?? []).map((c): SellerCharge => ({ id: c.id, orderId: c.order_id, kind: c.kind, amountCents: c.amount_cents, note: c.note, createdAt: c.created_at })),
+      };
+    },
+    async setPayoutSchedule(schedule) {
+      await call("seller-bank", { schedule });
+    },
+    async teamAddCharge(shopId, kind, amountCents, note, orderId) {
+      check(await sb.rpc("team_add_seller_charge", { p_shop: shopId, p_kind: kind, p_amount: amountCents, p_note: note, p_order: orderId ?? null }));
+    },
+    async teamRemoveCharge(id) {
+      check(await sb.rpc("team_remove_seller_charge", { p_id: id }));
     },
 
     // ===== Team dashboard =====

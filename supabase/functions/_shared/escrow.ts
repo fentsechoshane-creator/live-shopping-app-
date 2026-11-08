@@ -5,6 +5,7 @@
 // ID type, payout interval) aren't published, so we look them up from TradeSafe's own schema, like their plugin does.
 // Still to confirm with TradeSafe: whether the AGENT (us) may accept delivery on the buyer's behalf (see release()).
 import { env, UserError } from "./http.ts";
+import type { PayoutSchedule } from "./core/index.ts";
 
 export interface PartyInput {
   givenName: string;
@@ -14,6 +15,8 @@ export interface PartyInput {
   idNumber?: string;
   /** Sellers only. bankName is what the seller picked (like "Standard Bank"); mapped to TradeSafe's code. */
   bank?: { bankName: string; accountNumber: string; accountType: "SAVINGS" | "CHEQUE" };
+  /** Sellers only: how often TradeSafe pays their bank. Weekly unless they pick otherwise (decided 8 Nov 2026). */
+  payoutSchedule?: PayoutSchedule;
 }
 
 export interface TransactionInput {
@@ -33,6 +36,8 @@ export interface TransactionInput {
 export interface Escrow {
   mode: "mock" | "live";
   createParty(p: PartyInput): Promise<string>;
+  /** Change how often TradeSafe pays this seller's bank: each sale (R5 fee each), weekly, or monthly (no fee). */
+  setPayoutSchedule(token: string, schedule: PayoutSchedule): Promise<void>;
   createTransaction(t: TransactionInput): Promise<{ transactionId: string; allocationId: string }>;
   checkoutUrl(transactionId: string, orderId: string): Promise<string>;
   /** Seller has shipped. */
@@ -54,6 +59,7 @@ class MockEscrow implements Escrow {
   async createParty(p: PartyInput) {
     return `mock_party_${crypto.randomUUID().slice(0, 8)}_${p.familyName.toLowerCase().replace(/\W/g, "")}`;
   }
+  async setPayoutSchedule() {}
   async createTransaction(_t: TransactionInput) {
     return { transactionId: `mock_tx_${crypto.randomUUID()}`, allocationId: `mock_alloc_${crypto.randomUUID()}` };
   }
@@ -164,13 +170,20 @@ class TradeSafe implements Escrow {
             ...(p.idNumber && idType ? { idNumber: p.idNumber, idType, idCountry: "ZAF" } : {}),
           },
           // Sellers: paid into their bank as soon as we release, not weekly.
-          ...(bankAccount ? { bankAccount, settings: { payout: { interval: (await this.pick("PayoutInterval", ["IMMEDIATE"])) ?? "IMMEDIATE" } } } : {}),
+          ...(bankAccount ? { bankAccount, settings: { payout: { interval: (await this.pick("PayoutInterval", [p.payoutSchedule ?? "WEEKLY"])) ?? p.payoutSchedule ?? "WEEKLY" } } } : {}),
         },
       },
     );
     return d.tokenCreate.id;
   }
 
+  async setPayoutSchedule(token: string, schedule: PayoutSchedule) {
+    // Same call as TradeSafe's own WooCommerce and Dokan plugins (tokenUpdate with settings.payout.interval).
+    // [CONFIRM] that TradeSafe accepts settings on their own, without resending the person's details.
+    const interval = (await this.pick("PayoutInterval", [schedule])) ?? schedule;
+    await this.gql("mutation u($id: ID!, $input: TokenInput!) { tokenUpdate(id: $id, input: $input) { id } }",
+      { id: token, input: { settings: { payout: { interval } } } });
+  }
   async createTransaction(t: TransactionInput) {
     const d = await this.gql<{ transactionCreate: { id: string; allocations: { id: string }[] } }>(
       `mutation transactionCreate($input: CreateTransactionInput!) {

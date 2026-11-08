@@ -413,6 +413,7 @@ function Person() {
                   onApprove={() => act(() => api.adminReview(sh.id, "cert", true), "Certificate approved")} onReject={() => act(() => api.adminReview(sh.id, "cert", false), "Certificate sent back")} />}
               </div>
               {p.files.length > 0 && <div className="team-files">{p.files.map((f) => <a key={f.label} href={f.url} target="_blank" rel="noreferrer" className="btn line">{f.label}</a>)}</div>}
+              <ShopCharges shopId={sh.id} />
             </>
           )}
         </section>
@@ -1042,6 +1043,44 @@ function GlobalSearch() {
               <b>{o.title}</b><span className="small muted">{o.shopName} · @{o.buyer} · {R(o.totalCents)} · {orderStatus(o.status)}</span>
             </Link>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** What a seller owes us (refund fees they caused, courier extras, chargebacks). Comes off their next sale (0038). */
+function ShopCharges({ shopId }: { shopId: string }) {
+  const [data, error, reload] = useLoad(() => api.sellerCharges(shopId), [shopId]);
+  const [adding, setAdding] = useState(false);
+  const [kind, setKind] = useState<"chargeback" | "other">("chargeback");
+  const [amount, setAmount] = useState("");
+  const [note, setNote] = useState("");
+  const { busy, error: actError, run } = useAction();
+  const { toast } = useSession();
+  const cents = Math.round(Number(amount.replace(",", ".")) * 100);
+  return (
+    <div style={{ marginTop: 14 }}>
+      <div className="row between"><b>Owed to us</b><span>{data ? R(data.owedCents) : "…"}</span></div>
+      <ErrorNote error={error ?? actError} />
+      {data?.charges.length ? <ul className="team-list">{data.charges.map((c) => (
+        <li key={c.id}><span className="grow">{R(c.amountCents)} <span className="small muted">{c.note} · {dateText(c.createdAt)}</span></span>
+          {(c.kind === "chargeback" || c.kind === "other") && <button className="link small" disabled={busy}
+            onClick={() => run(async () => { await api.teamRemoveCharge(c.id); reload(); toast("Charge removed"); })}>Remove</button>}</li>
+      ))}</ul> : <p className="small muted">No charges.</p>}
+      {!adding ? <button className="btn small line" onClick={() => setAdding(true)}>Add a charge</button> : (
+        <div className="card inset" style={{ marginTop: 8 }}>
+          <div className="reason-chips" role="group" aria-label="Kind">
+            <button type="button" aria-pressed={kind === "chargeback"} onClick={() => setKind("chargeback")}>Chargeback</button>
+            <button type="button" aria-pressed={kind === "other"} onClick={() => setKind("other")}>Other</button>
+          </div>
+          <input className="setup-input" style={{ marginTop: 8 }} inputMode="decimal" placeholder="Amount in rand" aria-label="Amount in rand" value={amount} onChange={(e) => setAmount(e.target.value)} />
+          <input className="setup-input" style={{ marginTop: 8 }} maxLength={300} placeholder="What it's for (the seller sees this)" aria-label="What it's for" value={note} onChange={(e) => setNote(e.target.value)} />
+          <div className="row" style={{ gap: 8, marginTop: 8 }}>
+            <button className="btn small green" disabled={busy || !(cents > 0) || note.trim().length < 3}
+              onClick={() => run(async () => { await api.teamAddCharge(shopId, kind, cents, note.trim()); setAdding(false); setAmount(""); setNote(""); reload(); toast("Charge added. The seller is told."); })}>Add charge</button>
+            <button className="btn small line" onClick={() => setAdding(false)}>Cancel</button>
+          </div>
         </div>
       )}
     </div>

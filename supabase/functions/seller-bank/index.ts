@@ -1,8 +1,10 @@
 // Seller adds their bank account. We create their escrow token with TradeSafe, which holds the bank details.
 // We only keep the bank name and last 4 digits, to show the seller which account is linked.
+// { schedule: "IMMEDIATE" | "WEEKLY" | "MONTHLY" } alone changes how often TradeSafe pays them (decided 8 Nov 2026).
 import { handler, json, UserError } from "../_shared/http.ts";
 import { adminClient, requireUser, must } from "../_shared/supabase.ts";
 import { escrow } from "../_shared/escrow.ts";
+import { PAYOUT_SCHEDULES, type PayoutSchedule } from "../_shared/core/index.ts";
 
 // Banks sellers can pick. TradeSafe's own bank codes are looked up from their schema in escrow.ts.
 const BANKS: Record<string, true> = {
@@ -13,6 +15,17 @@ const BANKS: Record<string, true> = {
 Deno.serve(handler(async (req, body) => {
   const db = adminClient();
   const uid = await requireUser(req, db);
+  if (body?.schedule !== undefined) {
+    const schedule = String(body.schedule) as PayoutSchedule;
+    if (!(schedule in PAYOUT_SCHEDULES)) throw new UserError("Pick how often you want to be paid.");
+    const shop = must(await db.from("shops").select("id, seller_checks(escrow_token)").eq("owner_id", uid).single(), "load shop") as any;
+    const { data: allowed } = await db.rpc("take_usage", { p_user: uid, p_kind: "payout_schedule", p_max: 5, p_window: "1 day" });
+    if (allowed !== true) throw new UserError("You've changed this a few times today. Try again tomorrow.", 429);
+    // No bank yet: saved now and used when they add one.
+    if (shop.seller_checks?.escrow_token) await escrow().setPayoutSchedule(shop.seller_checks.escrow_token, schedule);
+    must(await db.from("seller_checks").update({ payout_schedule: schedule }).eq("shop_id", shop.id), "save schedule");
+    return json({ ok: true, schedule });
+  }
   const { bankName, accountNumber, accountType, givenName, familyName, idNumber } = body ?? {};
   if (!BANKS[bankName]) throw new UserError("Pick your bank.");
   const digits = String(accountNumber ?? "").replace(/\D/g, "");
@@ -20,7 +33,7 @@ Deno.serve(handler(async (req, body) => {
   if (!givenName || !familyName) throw new UserError("Add the name on the account.");
   if (idNumber && !/^\d{13}$/.test(String(idNumber))) throw new UserError("A South African ID number has 13 digits.");
 
-  const shop = must(await db.from("shops").select("id, status, seller_checks(phone, escrow_token)").eq("owner_id", uid).single(), "load shop") as any;
+  const shop = must(await db.from("shops").select("id, status, seller_checks(phone, escrow_token, payout_schedule)").eq("owner_id", uid).single(), "load shop") as any;
   if (shop.status === "banned") throw new UserError("This shop is closed.", 403);
   const { data: allowed } = await db.rpc("take_usage", { p_user: uid, p_kind: "seller_bank", p_max: 3, p_window: "1 day" });
   if (allowed !== true) throw new UserError("You've changed bank details too often today. Email help@myhaul.co.za.", 429);
@@ -30,6 +43,7 @@ Deno.serve(handler(async (req, body) => {
     givenName, familyName, email: u.user?.email ?? "", mobile: shop.seller_checks?.phone ?? u.user?.phone ?? "",
     idNumber: idNumber || undefined,
     bank: { bankName, accountNumber: digits, accountType: accountType === "CHEQUE" ? "CHEQUE" : "SAVINGS" },
+    payoutSchedule: (shop.seller_checks?.payout_schedule ?? "WEEKLY") as PayoutSchedule,
   });
   must(await db.from("seller_checks").update({
     escrow_token: token, bank_name: bankName, bank_last4: digits.slice(-4), bank_status: "approved",

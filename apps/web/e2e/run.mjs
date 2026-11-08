@@ -1041,6 +1041,27 @@ try {
   await ask.getByRole("button", { name: "Accept and refund" }).click();
   await page.getByText("The buyer cancelled this order.").waitFor();
 
+  // ===== Seller fault refunds cost the seller TradeSafe's fee; sellers pick how often they're paid (8 Nov 2026) =====
+  await signOut();
+  await signIn("nandi@test.co.za");
+  await buyTee();
+  const faultOrder = page.url().split("/orders/")[1];
+  await signOut();
+  await signIn("lebo@shop.demo");
+  await page.goto(`${BASE}/sell/orders/${faultOrder}`);
+  await page.getByRole("button", { name: "Cancel this order" }).click();
+  const sellerSheet = page.getByRole("dialog", { name: "Cancel this order?" });
+  await sellerSheet.getByText(/refund fee .* comes off your next sale/).waitFor();
+  await sellerSheet.getByRole("button", { name: "It's no longer available" }).click();
+  await sellerSheet.getByRole("button", { name: "Cancel and refund the buyer" }).click();
+  await page.goto(`${BASE}/sell/payouts`);
+  await page.getByText("Owed to myHaul").waitFor();
+  await page.getByText(/You owe R/).waitFor();
+  await page.getByText(/TradeSafe's fee for refunding order/).waitFor();
+  await page.getByRole("button", { name: /Once a month/ }).click();
+  await page.getByText("Paid once a month from now on").waitFor();
+  await shot("payouts-owed");
+
   if (errors.length) throw new Error("Page errors: " + errors.join(" | "));
   if (consoleIssues.size) console.log("Console issues:\n  " + [...consoleIssues].join("\n  "));
   console.log(`E2E passed. Screenshots in ${shots}`);

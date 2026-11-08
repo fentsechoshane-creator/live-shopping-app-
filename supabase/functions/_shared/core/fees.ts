@@ -117,6 +117,9 @@ export interface OrderTotalsInput {
    * (rounded up to the next R5, see quotedDeliveryFee) instead of the flat fee. Switched off for now (CHARGE_QUOTES):
    * Ofentse chose flat prices on 7 Nov 2026 so buyers see the price up front. */
   quotedDeliveryCents?: Cents | null;
+  /** What this seller owes us (refund fees they caused, courier extras, chargebacks), taken from this sale's payout
+   * inside escrow. At most the payout itself; the rest waits for their next sale. Decided with Ofentse 8 Nov 2026. */
+  sellerOwedCents?: Cents;
 }
 
 /** What the buyer pays for a quoted courier or locker price: rounded up to the next R5, so we never pay more than we took. */
@@ -146,6 +149,8 @@ export interface OrderTotals {
   escrowAgentFee: Cents;
   /** When the welcome credit is bigger than our cut, we pay the seller this difference ourselves, from the credit budget. */
   creditTopUp: Cents;
+  /** What we took from this payout towards what the seller owes us (already left out of sellerPayout). */
+  chargesTaken: Cents;
 }
 
 export function orderTotals(input: OrderTotalsInput): OrderTotals {
@@ -164,7 +169,9 @@ export function orderTotals(input: OrderTotalsInput): OrderTotals {
   const total = input.itemPrice + deliveryFeeCents - perk.cents + protect - creditUsed;
   // Inside escrow our share is our fees plus the courier money, less what we fund (reward, delivery perk);
   // if that goes below zero we top the seller up ourselves.
-  const ours = fee + protect + deliveryKept;
+  const payout = input.itemPrice + deliveryFeeCents - deliveryKept - fee;
+  const chargesTaken = Math.max(0, Math.min(Math.round(input.sellerOwedCents ?? 0), payout));
+  const ours = fee + protect + deliveryKept + chargesTaken;
   const funded = creditUsed + perk.cents;
   return {
     itemPrice: input.itemPrice,
@@ -173,12 +180,55 @@ export function orderTotals(input: OrderTotalsInput): OrderTotals {
     creditUsed,
     total,
     sellerFee: fee,
-    sellerPayout: input.itemPrice + deliveryFeeCents - deliveryKept - fee,
+    sellerPayout: payout - chargesTaken,
     deliveryKept,
     deliveryDiscount: perk.cents,
     deliveryPerk: perk.perk,
     platformRevenue: fee + protect - creditUsed - perk.cents,
     escrowAgentFee: Math.max(0, ours - funded),
     creditTopUp: Math.max(0, funded - ours),
+    chargesTaken,
   };
 }
+
+// ===== What TradeSafe charges (merchant agreement, August 2026 version; all plus VAT) =====
+// Decided with Ofentse 8 Nov 2026: we pay the payment fee (that's what the buyer protection fee is for). Refund fees are
+// paid by the seller when the refund is their fault, and by us otherwise (the law lets buyers cancel within 7 days).
+
+export const VAT_RATE = 0.15;
+/** TradeSafe's fee on money paid into escrow, by how the buyer paid. */
+export const PAYMENT_FEE_RATES = { card: 0.025, snapscan: 0.035, ozow: 0.015, rcs: 0.0275, payjustnow: 0.0525, eft: 0.0075 } as const;
+export type PaymentKind = keyof typeof PAYMENT_FEE_RATES | "wallet";
+/** Refunds of EFT, PayJustNow and wallet payments cost a flat R7.50; other refunds cost the payment fee again. */
+export const REFUND_FLAT_FEE: Cents = 750;
+/** Each payment into a bank account costs R5, unless the person is paid monthly. TradeSafe takes it from that payout. */
+export const PAYOUT_BANK_FEE: Cents = 500;
+
+/** Which TradeSafe payment method a stored method name is (TradeSafe's own names, like "OZOW" or "INSTANT_EFT"). */
+export function paymentKind(method: string | null | undefined): PaymentKind {
+  const m = (method ?? "").toLowerCase();
+  if (/ozow|instant/.test(m)) return "ozow";
+  if (/snap/.test(m)) return "snapscan";
+  if (/pjn|payjustnow/.test(m)) return "payjustnow";
+  if (/rcs/.test(m)) return "rcs";
+  if (/wallet/.test(m)) return "wallet";
+  if (/eft/.test(m)) return "eft";
+  return "card"; // card, Diners, Ecentric and anything unknown: the usual case
+}
+
+/** What TradeSafe charges us to refund an order, VAT included, rounded up to the cent. */
+export function refundFee(method: string | null | undefined, totalCents: Cents): Cents {
+  const k = paymentKind(method);
+  const before = k === "eft" || k === "payjustnow" || k === "wallet" ? REFUND_FLAT_FEE : totalCents * PAYMENT_FEE_RATES[k];
+  return Math.ceil(Math.round(before * (1 + VAT_RATE) * 100) / 100);
+}
+
+/** How often TradeSafe pays a seller's bank (their names). Monthly has no bank fee. */
+export type PayoutSchedule = "IMMEDIATE" | "WEEKLY" | "MONTHLY";
+export const PAYOUT_SCHEDULES: Record<PayoutSchedule, { label: string; sub: string }> = {
+  IMMEDIATE: { label: "Each sale", sub: "Paid as each order is released. R5.75 bank fee each time." },
+  WEEKLY: { label: "Once a week", sub: "All your released sales in one payment. One R5.75 bank fee a week." },
+  MONTHLY: { label: "Once a month", sub: "One payment a month, no bank fee." },
+};
+/** New sellers start on weekly: one fee a week instead of one per sale. */
+export const DEFAULT_PAYOUT_SCHEDULE: PayoutSchedule = "WEEKLY";

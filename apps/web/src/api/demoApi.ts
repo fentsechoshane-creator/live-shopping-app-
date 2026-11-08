@@ -2,11 +2,11 @@
 // Used when no Supabase keys are set. Sign in with any email or phone and the code 123456.
 import {
   bidStep, maskHandle, canTransition, isRude, orderTotals, payoutDate, releasableAt, returnReasonsFor, shipBy, tierFor, TRUST_POINTS, validateListing,
-  RETURN_POSTAGE_PAYER, ACCOUNT_FEATURE_KEYS, canForceOn, featureOffMessage, type AccountFeature, type OrderStatus, type TrustEventKind, bookedByUs, deliveryFee, PARCEL_SIZES, orderParcelSize, DELIVERY_PERKS, validateEdit } from "@app/core";
+  RETURN_POSTAGE_PAYER, ACCOUNT_FEATURE_KEYS, canForceOn, featureOffMessage, type AccountFeature, type OrderStatus, type TrustEventKind, bookedByUs, deliveryFee, PARCEL_SIZES, orderParcelSize, DELIVERY_PERKS, validateEdit, refundFee, formatRand, type PayoutSchedule } from "@app/core";
 import { handleProblem } from "../lib/handle";
 import type {
   Api, Person, SharedPost, Category, ReportReason, ReportTarget, CheckoutInput, FeedItem, ListingInput, MyShop, Notification, Order, Payout, PendingReview, ProductPublic, ReviewStatus,
-  ShopPublic, User, SavedDelivery, AppError, PickupPoint, ShopPickup, ShipmentEvent, AuctionInfo, TeamAlert, TeamOverview, TeamPerson, TeamPersonDetail, TeamOrder, TeamListing, TeamLogEntry, TeamFeature, Reward,
+  ShopPublic, User, SavedDelivery, AppError, PickupPoint, ShopPickup, ShipmentEvent, AuctionInfo, TeamAlert, TeamOverview, TeamPerson, TeamPersonDetail, TeamOrder, TeamListing, TeamLogEntry, TeamFeature, Reward, SellerCharge,
 } from "./types";
 
 interface DShop {
@@ -54,6 +54,9 @@ interface State {
   peopleFollows?: { followerId: string; followeeId: string; at: string }[];
   friendChats?: { id: string; a: string; b: string; lastAt: string }[];
   friendMessages?: { id: string; chatId: string; senderId: string; body: string; postId: string | null; shared: boolean; readAt: string | null; createdAt: string }[];
+  /** What sellers owe us (0038). */
+  sellerCharges?: (SellerCharge & { shopId: string })[];
+  payoutSchedules?: Record<string, PayoutSchedule>;
 }
 
 // Sample lockers for testing (the real list comes from Bob Go).
@@ -322,6 +325,15 @@ export function createDemoApi(): Api {
       });
     }
     if (to === "refunded") {
+      // Same as migration 0038: the seller pays TradeSafe's refund fee when the refund is their fault.
+      const fault = (o.status === "paid" && (!o.cancelledBy || (o.cancelledBy === "seller" && !o.bookingFailedAt && !o.cancelRequestedAt)))
+        || (o.cancelledBy === "team" && !!(o as any).sellerAtFault) || (o.status === "return_in_transit" && !o.cancelledBy && o.ret?.postagePayer === "seller");
+      if (fault && !(s.sellerCharges ?? []).some((c) => c.orderId === o.id && c.kind === "refund_fee")) {
+        const fee = refundFee(o.paymentMethod, o.totals.total);
+        (s.sellerCharges ??= []).unshift({ id: id(), shopId: o.shop.id, orderId: o.id, kind: "refund_fee", amountCents: fee,
+          note: `TradeSafe's fee for refunding order ${o.id.slice(0, 4).toUpperCase()}`, createdAt: t.toISOString() });
+        notify(o.shopOwnerId, "A refund fee comes off your next sale", `TradeSafe charged ${formatRand(fee)} to refund this order. It comes off the payout of your next sale.`, "/sell/payouts");
+      }
       if (o.status === "paid") {
         // Same as migration 0035: points only when it's the seller's doing.
         if (!o.cancelledBy || (o.cancelledBy === "seller" && !o.bookingFailedAt && !o.cancelRequestedAt)) trust(o.shopOwnerId, "not_shipped");
@@ -560,7 +572,10 @@ export function createDemoApi(): Api {
       const point = input.delivery === "pudo_locker" ? DEMO_POINTS.find((x) => x.id === input.pickupPoint?.id) ?? null : null;
       if (point) dd.locker = point.name;
       const myStamps = (s.stamps ?? []).filter((x) => x.userId === u.id && !x.usedOrderId);
-      const totals = orderTotals({ itemPrice, delivery: input.delivery, parcelSize, welcomeCreditAvailable: !!reward, stampsReady: myStamps.length >= 5,
+      // What this seller owes comes off their payout (0038).
+      const owed = Math.max(0, (s.sellerCharges ?? []).filter((c) => c.shopId === sh.id).reduce((n, c) => n + c.amountCents, 0)
+        - s.orders.filter((x) => x.shop.id === sh.id && !["cancelled", "refunded"].includes(x.status)).reduce((n, x) => n + (x.totals.chargesTaken ?? 0), 0));
+      const totals = orderTotals({ itemPrice, delivery: input.delivery, parcelSize, welcomeCreditAvailable: !!reward, stampsReady: myStamps.length >= 5, sellerOwedCents: owed,
         foundingUntil: sh.foundingUntil ? new Date(sh.foundingUntil) : null, at: now() });
       const oid = id();
       const o: DOrder = {
@@ -631,12 +646,12 @@ export function createDemoApi(): Api {
       if (reason.trim().length < 3) throw new Error("Say why, in a few words.");
       o.cancelledBy = "seller"; o.cancelReason = reason.trim().slice(0, 300); setStatus(o, "refunded"); save();
     },
-    async teamCancelOrder(oid, reason) {
+    async teamCancelOrder(oid, reason, sellerFault) {
       teamOnly();
       const o = s.orders.find((x) => x.id === oid);
       if (!o || !["paid", "shipped", "delivered", "return_requested", "return_in_transit"].includes(o.status)) throw new Error("This order can't be refunded now.");
       if (reason.trim().length < 3) throw new Error("Say why, in a few words.");
-      o.cancelledBy = "team"; o.cancelReason = reason.trim().slice(0, 300); setStatus(o, "refunded");
+      o.cancelledBy = "team"; o.cancelReason = reason.trim().slice(0, 300); (o as any).sellerAtFault = sellerFault === true; setStatus(o, "refunded");
       logTeam("Cancelled and refunded order", "order", o.id, o.cancelReason);
       save();
     },
@@ -1246,7 +1261,7 @@ export function createDemoApi(): Api {
       if (!sh) return null;
       return {
         id: sh.id, name: sh.name, handle: sh.handle, category: sh.category, status: sh.status, foundingUntil: sh.foundingUntil,
-        trustScore: me().trust, goodOrders: goodOrders(sh.id), checks: sh.checks,
+        trustScore: me().trust, goodOrders: goodOrders(sh.id), checks: { ...sh.checks, payoutSchedule: s.payoutSchedules?.[sh.id] ?? "WEEKLY" },
         products: s.products.filter((p) => p.shopId === sh.id && p.status !== "removed").map((p) => ({ ...p, posted: s.posts.some((po) => po.productId === p.id) })),
       };
     },
@@ -1415,6 +1430,34 @@ export function createDemoApi(): Api {
       runDue();
       const sh = myShopRow();
       return sh ? s.payouts.filter((p) => p.shopId === sh.id) : [];
+    },
+    async sellerCharges(shopId) {
+      const sid = shopId ?? myShopRow()?.id;
+      const charges = (s.sellerCharges ?? []).filter((c) => c.shopId === sid);
+      const taken = s.orders.filter((o) => o.shop.id === sid && !["cancelled", "refunded"].includes(o.status)).reduce((n, o) => n + (o.totals.chargesTaken ?? 0), 0);
+      return { owedCents: Math.max(0, charges.reduce((n, c) => n + c.amountCents, 0) - taken), charges: charges.map(({ shopId: _s, ...c }) => c) };
+    },
+    async setPayoutSchedule(schedule) {
+      await wait(300);
+      const sh = myShopRow();
+      if (!sh) throw new Error("Start your shop first");
+      (s.payoutSchedules ??= {})[sh.id] = schedule; save();
+    },
+    async teamAddCharge(shopId, kind, amountCents, note, orderId) {
+      teamOnly();
+      if (note.trim().length < 3) throw new Error("Say what it's for.");
+      if (!(amountCents > 0)) throw new Error("Add an amount.");
+      (s.sellerCharges ??= []).unshift({ id: id(), shopId, orderId: orderId ?? null, kind, amountCents, note: note.trim(), createdAt: now().toISOString() });
+      const sh = s.shops.find((x) => x.id === shopId);
+      if (sh) notify(sh.ownerId, "A charge comes off your next sale", `${note.trim()} (${formatRand(amountCents)}). It comes off the payout of your next sale.`, "/sell/payouts");
+      logTeam(`Added a charge of ${formatRand(amountCents)}`, "shop", shopId, note.trim()); save();
+    },
+    async teamRemoveCharge(cid) {
+      teamOnly();
+      const c = (s.sellerCharges ?? []).find((x) => x.id === cid);
+      if (!c) throw new Error("That charge is gone");
+      s.sellerCharges = s.sellerCharges!.filter((x) => x.id !== cid);
+      logTeam(`Removed a charge of ${formatRand(c.amountCents)}`, "shop", c.shopId, c.note); save();
     },
 
     // ===== Team dashboard (demo) =====
