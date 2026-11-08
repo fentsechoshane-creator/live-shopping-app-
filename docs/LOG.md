@@ -21,7 +21,7 @@ Checked 7 Nov 2026 with the live health check. "Practical completion" here means
 | Sign in emails | Supabase's built in email only sends to the team, a few an hour [CONFIRM if a sender was added]. Needs Resend or another sender before real people can join |
 | Team dashboard | Done and live |
 | Phone apps | Built (Capacitor). Store accounts, D-U-N-S, Mac for the iPhone build and push keys still to do |
-| Legal and company | Company registered. CIPC name fix, company details in Terms and Privacy, Information Officer registration, help@myhaul.co.za still open |
+| Legal and company | Company registered. Company details in Terms and Privacy, Information Officer registration, help@myhaul.co.za still open |
 | Live selling | Not started (not needed for launch) |
 
 ## Run the current version
@@ -451,7 +451,7 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 - myHaul (Pty) Ltd registered with CIPC on 3 November 2026, registration number 2026/885697/07. Private company, financial year end October. Directors: Shupulu Ofentse Choshane and Lehloma Moloi. Registered office in Kempton Park, Gauteng.
 - Terms of Use and Privacy Policy now carry the registration number, registered office and directors. Disputes go to the Magistrates' Court for the district of our registered office (was Cape Town).
-- Open: the certificate spells Ofentse's name "OFENTSO"; ask CIPC to correct it before opening the bank, TradeSafe and Apple accounts. [Ofentse]
+- Ofentse's legal name is Shupulu Ofentso Choshane (as on the CIPC certificate); he goes by Ofentse. Use the legal name on all legal and company documents (decided 8 Nov 2026). No CIPC fix needed.
 
 ### 2026-11-04: Ready for the first store upload
 
