@@ -30,7 +30,7 @@ await new Promise((r) => setTimeout(r, 2500));
 // A fake camera and microphone so the camera screen can be tested.
 const browser = await chromium.launch({ args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"] });
 // iPhone 15 in Safari with its toolbars showing: about 393 x 720 usable, touch, 3x screen.
-const page = await browser.newPage({ viewport: { width: 393, height: 720 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, permissions: ["camera", "microphone"] });
+const page = await browser.newPage({ viewport: { width: 393, height: 720 }, deviceScaleFactor: Number(process.env.SHOT_SCALE ?? 3), isMobile: true, hasTouch: true, permissions: ["camera", "microphone"] });
 page.setDefaultTimeout(15000);
 // Fonts are not needed for the checks, and some test environments block them.
 await page.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.abort());
@@ -1062,6 +1062,8 @@ try {
   await page.getByText("Paid once a month from now on").waitFor();
   await shot("payouts-owed");
 
+  // For the screen audit (e2e/audit.mjs): keep the demo state this run built up.
+  if (process.env.DUMP_STATE) writeFileSync(process.env.DUMP_STATE, await page.evaluate(() => JSON.stringify(Object.fromEntries(Object.entries(localStorage)))));
   if (errors.length) throw new Error("Page errors: " + errors.join(" | "));
   if (consoleIssues.size) console.log("Console issues:\n  " + [...consoleIssues].join("\n  "));
   console.log(`E2E passed. Screenshots in ${shots}`);

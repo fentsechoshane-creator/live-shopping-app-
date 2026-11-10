@@ -1,209 +1,194 @@
-// Styling audit: opens every screen and sheet at four phone widths and reports layout problems:
-// things running off the screen, text cut off, buttons too small to tap, text too small to read.
-// Run: npm run build && node apps/web/e2e/audit.mjs   (screenshots in apps/web/e2e/audit/)
+// Screen audit: a picture of every screen the main test doesn't stop on (lists, settings, legal pages, empty states,
+// every order status, the team dashboard, dark mode). Uses the demo state the main test leaves behind.
+// Run from the repo root, after a build:
+//   DUMP_STATE=/tmp/state.json npm run test:e2e && node apps/web/e2e/audit.mjs /tmp/state.json
 import { spawn } from "node:child_process";
-import { mkdirSync, rmSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 
-const require = createRequire(import.meta.url);
-const { chromium } = require("playwright");
+const { chromium } = createRequire(import.meta.url)("playwright");
 const here = fileURLToPath(new URL(".", import.meta.url));
 const out = here + "audit/";
-rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
-const PORT = 4174, BASE = `http://localhost:${PORT}`;
+const PORT = 4174, BASE = `http://localhost:${PORT}`, KEY = "lsa-demo-v4";
+const saved = JSON.parse(readFileSync(process.argv[2], "utf8"));
+const state = JSON.parse(saved[KEY]);
+
+// The main test doesn't leave an order in every status, so copy one into the missing ones.
+{
+  const base = state.orders.find((o) => o.status === "shipped") ?? state.orders[0];
+  const hoursAgo = (h) => new Date(Date.now() + (state.clockOffsetMs ?? 0) - h * 3600e3).toISOString();
+  const copy = (status, extra) => state.orders.push({ ...structuredClone(base), id: crypto.randomUUID(), status, ...extra });
+  if (!state.orders.some((o) => o.status === "pending_payment")) copy("pending_payment", { paidAt: null, shippedAt: null, trackingRef: null, createdAt: hoursAgo(0.2) });
+  if (!state.orders.some((o) => o.status === "delivered")) copy("delivered", { deliveredAt: hoursAgo(20), releasableAt: new Date(Date.now() + 6 * 864e5).toISOString() });
+  if (!state.orders.some((o) => o.status === "completed" && !o.review)) copy("completed", { deliveredAt: hoursAgo(300), review: null });
+  saved[KEY] = JSON.stringify(state);
+}
+
 const server = spawn("npx", ["vite", "preview", "--port", String(PORT), "--strictPort"], { cwd: here + "..", stdio: "pipe" });
 await new Promise((r) => setTimeout(r, 2500));
-const browser = await chromium.launch();
-const WIDTHS = [[320, 568, "se"], [375, 667, "375"], [393, 720, "393"], [430, 860, "430"]];
-const problems = new Map(); // "screen: issue" -> widths
+const browser = await chromium.launch({ args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"] });
+const problems = [];
+let n = 0;
 
-function inspect() {
-  const W = document.documentElement.clientWidth;
-  const found = [];
-  const name = (el) => {
-    const label = el.getAttribute("aria-label") || el.textContent?.trim().replace(/\s+/g, " ").slice(0, 40) || "";
-    return `<${el.tagName.toLowerCase()}${el.className && typeof el.className === "string" ? "." + el.className.trim().split(/\s+/).slice(0, 2).join(".") : ""}> "${label}"`;
-  };
-  const inScroller = (el) => {
-    for (let p = el.parentElement; p; p = p.parentElement) {
-      const ps = getComputedStyle(p);
-      if (/(auto|scroll)/.test(ps.overflowX) && p.scrollWidth > p.clientWidth + 1) return true;
-    }
-    return false;
-  };
-  const hidden = (el) => {
-    for (let p = el; p; p = p.parentElement) {
-      const s = getComputedStyle(p);
-      if (s.display === "none" || s.visibility === "hidden" || s.opacity === "0") return true;
-    }
-    return false;
-  };
-  const top = [...document.querySelectorAll(".sheet, .drawer, .setup, .welcome, .chat, .post, .viewer")].filter((x) => !hidden(x)).pop();
-  const root = top ?? document.querySelector(".content") ?? document.body;
-  if (document.documentElement.scrollWidth > W + 1) found.push(`page scrolls sideways (${document.documentElement.scrollWidth}px wide)`);
-  for (const el of root.querySelectorAll("*")) {
-    if (hidden(el) || el.closest("svg") || el.closest("[aria-hidden='true']")) continue;
-    const r = el.getBoundingClientRect();
-    if (r.width < 1 || r.height < 1) continue;
-    const s = getComputedStyle(el);
-    if ((r.right > W + 1 || r.left < -1) && !inScroller(el) && s.position !== "fixed") found.push(`off screen by ${Math.round(Math.max(r.right - W, -r.left))}px: ${name(el)}`);
-    const own = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
-    if (own && el.scrollWidth > el.clientWidth + 2 && s.overflowX !== "visible" && s.textOverflow !== "ellipsis" && !/(auto|scroll)/.test(s.overflowX))
-      found.push(`text cut off: ${name(el)}`);
-    if (own && parseFloat(s.fontSize) < 11) found.push(`text under 11px (${s.fontSize}): ${name(el)}`);
-    if (el.matches("button, a[href], [role=tab], input[type=checkbox], select") && !el.closest(".dots, .welcome-dots, .slide-dots") && (r.height < 28 || r.width < 28))
-      found.push(`small tap target ${Math.round(r.width)}x${Math.round(r.height)}: ${name(el)}`);
-    if (el.matches("input, textarea") && parseFloat(s.fontSize) < 16 && el.type !== "checkbox" && el.type !== "file") found.push(`input under 16px (iPhone zooms in): ${name(el)}`);
-  }
-  return [...new Set(found)];
-}
-
-async function run([w, h, tag]) {
-  const page = await browser.newPage({ viewport: { width: w, height: h }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+async function session({ user, dark = false, wide = false, fresh = false }) {
+  const ctx = await browser.newContext(wide
+    ? { viewport: { width: 1280, height: 800 }, colorScheme: dark ? "dark" : "light" }
+    : { viewport: { width: 393, height: 720 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true, colorScheme: dark ? "dark" : "light", permissions: ["camera", "microphone"] });
+  const page = await ctx.newPage();
+  page.setDefaultTimeout(8000);
   await page.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.abort());
-  const look = async (screen) => {
-    await page.waitForTimeout(450);
-    await page.screenshot({ path: `${out}${tag}-${screen}.png` });
-    for (const p of await page.evaluate(inspect)) {
-      const k = `${screen}: ${p}`;
-      problems.set(k, [...(problems.get(k) ?? []), w]);
-    }
+  page.on("pageerror", (e) => problems.push(`page error (${user ?? "signed out"}): ${e.message}`));
+  await page.goto(BASE + "/terms.html");
+  await page.evaluate(({ saved, KEY, user, fresh }) => {
+    if (fresh) return;
+    for (const [k, v] of Object.entries(saved)) localStorage.setItem(k, v);
+    const st = JSON.parse(saved[KEY]); st.currentUserId = user; localStorage.setItem(KEY, JSON.stringify(st));
+  }, { saved, KEY, user: user ?? null, fresh });
+  const shot = async (name, path, { full = false, wait = 700, act } = {}) => {
+    try {
+      if (path) await page.goto(BASE + path);
+      await page.waitForTimeout(wait);
+      if (act) { await act(page); await page.waitForTimeout(500); }
+      await page.screenshot({ path: `${out}${String(++n).padStart(3, "0")}-${name}.png`, fullPage: full });
+      // Anything wider than the phone is a layout bug.
+      const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+      if (over > 1) problems.push(`${name}: page is ${over}px wider than the screen`);
+    } catch (e) { problems.push(`${name}: ${String(e.message).split("\n")[0]}`); }
   };
-  const esc = () => page.keyboard.press("Escape");
-  const signIn = async (email) => {
-    await page.goto(`${BASE}/signin`);
-    await page.getByLabel("Email").fill(email);
-    await page.getByRole("button", { name: "Send code" }).click();
-    await page.getByLabel("Code").fill("123456");
-    await page.waitForURL((u) => !u.pathname.startsWith("/signin"));
-  };
-  const step = async (label, fn) => { try { await fn(); } catch (e) { problems.set(`${label}: audit could not open (${e.message.split("\n")[0].slice(0, 80)})`, [w]); } };
-
-  await page.goto(BASE);
-  await page.evaluate(() => localStorage.clear());
-  await page.goto(BASE);
-  await step("welcome", async () => { await page.getByText("Shop from short videos").waitFor(); await look("welcome"); });
-  await step("welcome interests", async () => { await page.getByRole("button", { name: "Skip" }).click(); await look("welcome-interests"); await page.getByRole("button", { name: /Show me everything|Next/ }).click(); await page.keyboard.press("ArrowDown"); });
-  await step("feed", async () => { await page.locator(".video-card").first().waitFor(); await look("feed"); });
-  await step("item sheet", async () => { await page.getByRole("button", { name: /See details/ }).first().click(); await look("item-sheet"); await esc(); });
-  await step("comments", async () => { await page.getByRole("button", { name: /^Comments/ }).first().click(); await look("comments"); await esc(); });
-  await step("more sheet", async () => { await page.getByRole("button", { name: "More options" }).first().click(); await look("more-sheet"); await esc(); });
-  await step("sign in sheet", async () => { await page.getByRole("button", { name: /^Like/ }).first().click(); await look("signin-sheet"); await esc(); });
-  await step("explore", async () => { await page.goto(`${BASE}/explore`); await look("explore"); });
-  await step("signin page", async () => { await page.goto(`${BASE}/signin`); await look("signin"); });
-  await step("create account", async () => {
-    await page.getByLabel("Email").fill(`audit${w}@test.co.za`);
-    await page.getByRole("button", { name: "Send code" }).click();
-    await page.getByLabel("Code").fill("123456");
-    const setup = page.getByRole("dialog", { name: "Create your account" });
-    await setup.waitFor();
-    await look("setup-birthday");
-    await setup.getByLabel("Birthday").fill("2010-01-01");
-    await look("setup-birthday-young");
-    await setup.getByLabel("Birthday").fill("1998-06-15");
-    await setup.getByRole("button", { name: "Next" }).click();
-    await setup.getByLabel("Name", { exact: true }).fill("Nomvula Dlamini-Khumalo");
-    await setup.getByLabel("Username", { exact: true }).fill("lebo.m");
-    await setup.getByText("is taken").waitFor();
-    await look("setup-username-taken");
-    await setup.getByLabel("Username", { exact: true }).fill(`nomvula.${w}`);
-    await setup.getByText("is available").waitFor();
-    await look("setup-username");
-    await setup.getByRole("button", { name: "Create account" }).click();
-    await setup.getByText("Add a profile photo").waitFor();
-    await look("setup-photo");
-    await setup.getByRole("button", { name: "Skip for now" }).click();
-    await setup.waitFor({ state: "detached" });
-  });
-  await step("checkout", async () => {
-    await page.goto(BASE);
-    await page.getByRole("region", { name: /Oversized tee/ }).getByRole("button", { name: "Buy now" }).click();
-    const sheet = page.getByRole("dialog", { name: "Checkout" });
-    await sheet.waitFor();
-    await look("checkout");
-    await sheet.getByRole("button", { name: /Courier Guy/ }).click();
-    await sheet.getByRole("button", { name: "M", exact: true }).click();
-    await look("checkout-address");
-    await sheet.getByRole("button", { name: /PUDO/ }).click();
-    await look("checkout-locker");
-    await sheet.getByRole("button", { name: /Free collection/ }).click();
-    await sheet.getByRole("button", { name: /^Pay/ }).click();
-    await page.waitForURL(/mock-pay/);
-    await look("mock-pay");
-    await page.getByRole("button", { name: "Pay now" }).click();
-    await page.waitForURL(/\/orders\//);
-    await look("order-paid");
-    await page.getByRole("button", { name: "Ship and deliver" }).click();
-    await page.getByText("Something wrong?").waitFor();
-    await look("order-delivered");
-  });
-  await step("cake checkout", async () => {
-    await page.goto(BASE);
-    const cake = page.getByRole("region", { name: /cake/i }).first();
-    await cake.scrollIntoViewIfNeeded();
-    await cake.getByRole("button", { name: /Order now/ }).click();
-    await page.getByRole("dialog", { name: "Order" }).waitFor();
-    await look("checkout-cake");
-    await esc();
-  });
-  await step("wallet", async () => { await page.getByRole("button", { name: /^Wallet/ }).first().click(); await look("wallet"); await esc(); });
-  await step("activity", async () => {
-    await page.goto(`${BASE}/activity`); await look("activity");
-    await page.getByRole("button", { name: "Messages", exact: true }).click(); await look("activity-messages");
-    await page.getByRole("button", { name: "Orders", exact: true }).click(); await look("activity-orders");
-  });
-  await step("profile", async () => {
-    await page.goto(`${BASE}/me`); await look("profile");
-    await page.getByRole("tab", { name: "Likes" }).click(); await look("profile-likes");
-    await page.getByRole("button", { name: "Edit profile" }).click(); await look("edit-profile"); await esc();
-    await page.getByRole("button", { name: "Menu and settings" }).click(); await look("menu"); await esc();
-  });
-  for (const [path, nameShot] of [["/orders", "orders"], ["/help", "help"], ["/privacy", "privacy"], ["/settings/blocked", "blocked"], ["/s/thrift.with.lebo", "shop"], ["/s/thrift.with.lebo?item=p-tee", "shop-item"], ["/sell/start", "onboarding"]]) {
-    await step(nameShot, async () => { await page.goto(BASE + path); await look(nameShot); });
-  }
-  await step("chat", async () => {
-    await page.goto(BASE);
-    await page.getByRole("region", { name: /Oversized tee/ }).getByRole("button", { name: "More options" }).click();
-    await page.getByRole("button", { name: /^Message @/ }).click();
-    await page.waitForURL(/\/messages\//);
-    await look("chat");
-    await page.getByLabel("Message", { exact: true }).fill("Hi, is this still available in a size L please?");
-    await page.getByRole("button", { name: "Send" }).click();
-    await page.waitForTimeout(2500);
-    await look("chat-sent");
-  });
-  await step("post camera", async () => { await page.goto(`${BASE}/post`); await look("post"); });
-
-  // Seller side
-  await step("seller", async () => {
-    await signIn("lebo@shop.demo");
-    await page.goto(`${BASE}/me`); await look("seller-profile");
-    await page.goto(`${BASE}/sell/orders`); await look("seller-orders");
-    const first = page.locator("a.list-item").first();
-    if (await first.count()) { await first.click(); await look("seller-order"); }
-    await page.goto(`${BASE}/sell/payouts`); await look("seller-payouts");
-    await page.goto(`${BASE}/post?mode=create`); await look("create-1");
-    await page.goto(`${BASE}/post?mode=live`); await look("live");
-    await page.goto(`${BASE}/activity?tab=messages`);
-    const chat = page.locator(".group a.cell").first();
-    if (await chat.count()) {
-      await chat.click(); await page.waitForURL(/\/messages\//); await look("seller-chat");
-      await page.getByRole("button", { name: /More|Add/ }).last().click().catch(() => {});
-      await look("seller-chat-plus");
-    }
-  });
-  await step("admin", async () => { await signIn("admin@team.demo"); await page.goto(`${BASE}/admin`); await look("admin"); });
-  await page.close();
+  return { page, shot, close: () => ctx.close() };
 }
 
+const uid = (email) => state.users.find((u) => u.email === email)?.id;
+const byStatus = (list) => { const seen = new Map(); for (const o of list) if (!seen.has(o.status)) seen.set(o.status, o); return [...seen.values()]; };
+
+// ===== Signed out =====
+let s = await session({ fresh: true });
+await s.shot("out-first-open", "/");
+await s.close();
+s = await session({ user: null });
+await s.shot("out-feed", "/");
+await s.shot("out-explore", "/explore");
+await s.shot("out-signin", "/signin");
+await s.shot("out-me-needs-signin", "/me");
+await s.shot("out-shop-page", "/s/" + state.shops[0].handle);
+await s.shot("out-item-link", "/i/" + state.posts[0].productId);
+await s.shot("out-help", "/help");
+await s.shot("out-terms", "/terms");
+await s.shot("out-privacy", "/privacy");
+await s.shot("out-not-found", "/nothing-here");
+await s.shot("out-explore-search-none", "/explore", { act: async (p) => { await p.getByRole("searchbox").first().fill("zzzzqq"); } });
+await s.close();
+
+// ===== Buyer with history =====
+const buyers = state.users.filter((u) => state.orders.some((o) => o.buyerId === u.id)).sort((a, b) =>
+  state.orders.filter((o) => o.buyerId === b.id).length - state.orders.filter((o) => o.buyerId === a.id).length);
+const buyer = buyers[0];
+s = await session({ user: buyer.id });
+await s.shot("buyer-orders", "/orders", { full: true });
+for (const o of byStatus(state.orders.filter((x) => x.buyerId === buyer.id))) await s.shot(`buyer-order-${o.status}`, "/orders/" + o.id, { full: true });
+for (const b of buyers.slice(1)) for (const o of byStatus(state.orders.filter((x) => x.buyerId === b.id))) {
+  if (state.orders.some((x) => x.buyerId === buyer.id && x.status === o.status)) continue;
+  const t = await session({ user: b.id }); await t.shot(`buyer-order-${o.status}`, "/orders/" + o.id, { full: true }); await t.close();
+}
+await s.shot("buyer-inbox-messages", "/inbox?tab=messages");
+await s.shot("buyer-inbox-updates", "/inbox?tab=updates", { full: true });
+await s.shot("buyer-me", "/me");
+await s.shot("buyer-me-likes", "/me", { act: async (p) => { await p.getByRole("tab", { name: /Likes/ }).click(); } });
+await s.shot("buyer-menu", "/me", { act: async (p) => { await p.getByRole("button", { name: "Menu and settings" }).click(); } });
+await s.shot("buyer-trust-sheet", "/me", { act: async (p) => { await p.locator(".standing, [aria-label*='standing'], .pill").first().click(); } });
+await s.shot("buyer-settings-delivery", "/settings/delivery", { full: true });
+await s.shot("buyer-settings-blocked", "/settings/blocked");
+await s.shot("buyer-friends", "/friends");
+await s.shot("buyer-post-open-shop", "/post");
+await s.shot("buyer-sell-start", "/sell/start");
+await s.shot("buyer-explore", "/explore", { full: true });
+await s.shot("buyer-following", "/", { act: async (p) => { await p.getByRole("tab", { name: "Following" }).click(); } });
+await s.shot("buyer-live-tab", "/", { act: async (p) => { await p.getByRole("tab", { name: "Live" }).click(); } });
+await s.shot("buyer-browse-sheet", "/", { act: async (p) => { await p.locator(".video-card").first().getByRole("button", { name: /Buy now|Order now|Bid/ }).click(); } });
+await s.close();
+
+// A brand new buyer: every empty state.
+s = await session({ user: null });
+await s.page.goto(BASE + "/signin");
+await s.page.getByLabel("Email").fill("fresh.buyer@example.com");
+await s.page.getByRole("button", { name: "Send code" }).click();
+await s.shot("new-signin-code", null);
+await s.page.getByLabel("Code").fill("123456");
+await s.page.waitForTimeout(1500);
+await s.shot("new-setup-birthday", null);
+const setup = s.page.getByRole("dialog", { name: "Create your account" });
 try {
-  for (const w of WIDTHS) await run(w);
-} finally {
-  await browser.close();
-  server.kill();
-}
-const rows = [...problems.entries()].sort();
-console.log(rows.length ? rows.map(([k, ws]) => `${k}   [${ws.join(", ")}]`).join("\n") : "No layout problems found.");
-console.log(`\n${rows.length} problems. Screenshots in ${out}`);
+  await setup.getByLabel("Year", { exact: true }).selectOption("1999");
+  await setup.getByRole("button", { name: "Next" }).click();
+  await s.shot("new-setup-name", null);
+  await setup.getByLabel("Name", { exact: true }).fill("Fresh Buyer");
+  await setup.getByLabel("Username", { exact: true }).fill("fresh.buyer" + (Date.now() % 1000));
+  await s.page.waitForTimeout(900);
+  await setup.getByRole("button", { name: "Create account" }).click();
+  await s.shot("new-setup-photo", null);
+  await setup.getByRole("button", { name: "Skip for now" }).click();
+  await s.shot("new-setup-delivery", null, { full: true });
+  await setup.getByRole("button", { name: "Skip for now" }).click();
+} catch (e) { problems.push("new account setup: " + String(e.message).split("\n")[0]); }
+await s.shot("empty-orders", "/orders");
+await s.shot("empty-inbox-messages", "/inbox?tab=messages");
+await s.shot("empty-inbox-updates", "/inbox?tab=updates");
+await s.shot("empty-me", "/me");
+await s.shot("empty-friends", "/friends");
+await s.shot("empty-blocked", "/settings/blocked");
+await s.shot("empty-following", "/", { act: async (p) => { await p.getByRole("tab", { name: "Following" }).click(); } });
+await s.close();
+
+// ===== Seller =====
+const seller = state.users.find((u) => u.id === "u-lebo");
+const shop = state.shops.find((x) => x.ownerId === seller.id);
+s = await session({ user: seller.id });
+await s.shot("seller-me", "/me", { full: true });
+await s.shot("seller-selling-tab", "/me?tab=selling", { full: true });
+await s.shot("seller-orders", "/sell/orders", { full: true });
+for (const o of byStatus(state.orders.filter((x) => x.shop.id === shop.id))) await s.shot(`seller-order-${o.status}`, "/sell/orders/" + o.id, { full: true });
+await s.shot("seller-payouts", "/sell/payouts", { full: true });
+await s.shot("seller-post-camera", "/post", { wait: 1500 });
+await s.shot("seller-post-create", "/post?mode=create");
+await s.shot("seller-post-live", "/post?mode=live");
+await s.shot("seller-inbox", "/inbox?tab=messages");
+await s.shot("seller-menu", "/me", { act: async (p) => { await p.getByRole("button", { name: "Menu and settings" }).click(); } });
+await s.shot("seller-mock-label", "/mock-label/MOCK1234");
+await s.close();
+
+// ===== Team (phone and laptop) =====
+const admin = state.users.find((u) => u.admin);
+if (admin) for (const wide of [false, true]) {
+  s = await session({ user: admin.id, wide });
+  const tag = wide ? "team-wide" : "team";
+  for (const [name, path] of [["overview", "/team"], ["todo", "/team/todo"], ["accounts", "/team/accounts"], ["person", "/team/accounts/" + seller.id],
+    ["orders", "/team/orders"], ["listings", "/team/listings"], ["money", "/team/money"], ["errors", "/team/errors"], ["log", "/team/log"]]) {
+    await s.shot(`${tag}-${name}`, path, { full: !wide });
+  }
+  await s.close();
+} else problems.push("no team account in the saved state");
+s = await session({ user: buyer.id });
+await s.shot("team-not-allowed", "/team");
+await s.close();
+
+// ===== Dark mode, the screens people see most =====
+s = await session({ user: buyer.id, dark: true });
+for (const [name, path] of [["feed", "/"], ["explore", "/explore"], ["orders", "/orders"], ["inbox", "/inbox?tab=messages"], ["me", "/me"], ["help", "/help"], ["terms", "/terms"]]) await s.shot("dark-" + name, path);
+const anyOrder = state.orders.find((x) => x.buyerId === buyer.id);
+if (anyOrder) await s.shot("dark-order", "/orders/" + anyOrder.id);
+await s.shot("dark-menu", "/me", { act: async (p) => { await p.getByRole("button", { name: "Menu and settings" }).click(); } });
+await s.shot("dark-checkout", "/", { act: async (p) => { await p.locator(".video-card").first().getByRole("button", { name: /Buy now|Order now|Bid/ }).click(); } });
+await s.close();
+s = await session({ user: seller.id, dark: true });
+await s.shot("dark-seller-order", "/sell/orders/" + (state.orders.find((x) => x.shop.id === shop.id)?.id ?? ""));
+await s.shot("dark-payouts", "/sell/payouts");
+await s.shot("dark-create", "/post?mode=create");
+await s.close();
+
+console.log(`${n} screens saved to ${out}`);
+if (problems.length) console.log("Problems:\n  " + problems.join("\n  "));
+await browser.close();
+server.kill();
+process.exit(0);

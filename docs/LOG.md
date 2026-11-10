@@ -106,6 +106,14 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-10: Screen audit (usability and style), no app changes yet
+
+- New: `apps/web/e2e/audit.mjs` photographs every screen the main test doesn't stop on (signed out, every order status, settings, legal, empty states, seller, team on phone and laptop, dark mode), using the state the main test leaves behind. Run: `DUMP_STATE=/tmp/state.json npm run test:e2e && node apps/web/e2e/audit.mjs /tmp/state.json`. Pictures land in `apps/web/e2e/audit/`. It also reports any screen wider than the phone (none found).
+- About 175 screens checked at 393 x 720. Findings given to Ofentse in three groups; nothing fixed yet, waiting for his go ahead and a style direction.
+  - **Wrong or misleading:** a refunded order still shows the seller "You get R328.06, paid once the return window closes" and an unfinished timeline (buyer side too); the seller's money on courier orders doesn't add up on screen (item + delivery minus fee isn't "You get", because delivery goes to the courier); "[CONFIRM launch date]" shows in the Terms; in chat the Accept, Counter, Decline buttons of the newest offer sit behind the quick replies; a "not as described" return says a "change of mind" return is accepted after 3 days.
+  - **Not complete:** sellers can't edit or remove a listing; page not found and "no results" are bare lines; a seller's "Use the camera" card uses the Live icon; new shops show "0.0" stars; the quick buttons on a seller's Me page run off the screen with no hint.
+  - **Looks generic:** stock Tailwind green and amber, a soft green glow under every main button, glossy gradient chat bubbles, the same tinted circle icon + headline + grey paragraph on many screens, a helper paragraph under almost every title, four different empty state styles, three different back and header styles, pop up messages that cover the Back button, person pages centred while Me and shop pages are left aligned, no myHaul wordmark anywhere in the app.
+
 ### 2026-11-08: Who pays TradeSafe's costs (seller charges, payout schedule)
 
 - From the signed TradeSafe merchant agreement (August 2026 version). Decided with Ofentse:
