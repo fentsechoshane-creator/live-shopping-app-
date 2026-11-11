@@ -23,7 +23,8 @@
 | --- | --- |
 | Type | The phone's system font. Body 17px. Large title (`h1`) 34px bold on main screens, 28px (`h1.item`) for an item or order name. Section title (`h2`) 22px bold. Small print 13px. Form labels 13px grey capitals above the field. |
 | Colour | System colours only: green (tint and success), orange (`--amber`: attention, auctions, made to order), red (`--red`: errors, destructive actions, unread badges). Page `--bg` is the iOS grouped grey, cards are `--surface` white. Light and dark follow the phone. |
-| Buttons | Capsules, 50px high, 17px semibold, flat (no gradient, no glow). One green button per screen for the main action. Others are plain surface buttons. Disabled buttons go grey. Two buttons in a row use `.btn.grow` (16px) so labels stay on one line. |
+| Buttons | Slim, flat capsules: main action 48px (`.btn.big`), normal 44px, two in a row 40px (`.btn.grow`, 15px). No gradient, no glow. One green button per screen for the main action. Disabled buttons go grey. |
+| Hold to bid | One slim capsule that switches between the price and "Hold to bid", counts down while held inside an amber glass ring, and opens the bid sheet on a quick tap. Dark glass on videos, amber in the bid sheet. |
 | Lists | Grouped lists (`.group` with `.cell`) for settings, menus, orders and details, as in iOS Settings. Chevron on the right when a row opens something. |
 | Sheets | Solid (not see through), 30px top corners, a grab handle, a title and a close button. Main action pinned in the sheet foot. |
 | Glass | Only for bars that float over content: the tab bar, the top bar on the feed, controls over video (`.vglass`, always dark with white text). |
@@ -33,7 +34,7 @@
 | Notices | Short capsule that drops in from the top and leaves by itself. Never covers a Pay button or the message box. Errors that need action stay on the page as a red note. |
 | Shape | Cards 20px radius (`--r`), small parts 12px, sheets 30px. |
 | Motion | Short and soft: sheets rise, the menu slides in, buttons press in slightly. Off when the phone asks for reduced motion. |
-| Touch | Nothing you tap is smaller than 44px. |
+| Touch | Nothing you tap is smaller than 40px. |
 | Words | Plain South African English. No hyphens or em dashes in app text. Say what happens: "Pay R311", "Ask for a return". Helper text is one short line or it goes. |
 
 ## Screen map (prototype to real app)

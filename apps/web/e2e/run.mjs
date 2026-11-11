@@ -261,24 +261,25 @@ try {
   await jacket.getByText(/Auction · 1d/).waitFor();
   // Bid straight from the video: hold the button until the ring closes. Letting go early does nothing.
   const holdBtn = jacket.getByRole("button", { name: /^Hold to bid R720/ });
-  await jacket.getByRole("button", { name: "Custom" }).waitFor();
+  await holdBtn.waitFor();
   await hold(holdBtn, 1000);
   await page.waitForTimeout(400);
   await check(await page.getByText("You're the top bidder at R720").count() === 0, "letting go early doesn't bid");
   await page.mouse.move(0, 0); await hold(holdBtn, 1500, true);
+  await jacket.getByText(/Bid R720 in [12]/).waitFor();
   await shot("hold-to-bid");
   await page.mouse.up();
   await hold(holdBtn, 3400);
   await page.getByText("You're the top bidder at R720").waitFor();
   await jacket.getByRole("button", { name: "Bid placed" }).waitFor();
   check(true, "holding for 3 seconds places the bid without leaving the video");
-  // Custom: your own amount, in the bid sheet over the video.
-  await jacket.getByRole("button", { name: "Custom" }).click();
+  // A quick tap on the same button: pick your own amount, in the bid sheet over the video.
+  await jacket.getByRole("button", { name: /^Hold to bid R740/ }).click();
   const bidSheet = page.getByRole("dialog", { name: /Vintage 90s denim jacket/ });
   await bidSheet.getByText("Reserve not met yet").waitFor();
   await bidSheet.getByText("l***m").first().waitFor(); // other bidders are masked
   await page.waitForTimeout(600);
-  await check(await bidSheet.getByLabel(/Or your own amount/).evaluate((el) => el === document.activeElement), "Custom starts in the amount box");
+  await check(await bidSheet.getByLabel(/Or your own amount/).evaluate((el) => el === document.activeElement), "a tap starts in the amount box");
   await shot("auction-sheet");
   await bidSheet.getByLabel(/Or your own amount/).fill("725");
   await check(bidSheet.getByRole("button", { name: /^Hold to bid R725/ }).isDisabled(), "a bid under the step can't be placed");

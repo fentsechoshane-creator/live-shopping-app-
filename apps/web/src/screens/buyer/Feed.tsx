@@ -116,7 +116,7 @@ export function FeedList({ items, start = 0, onNearEnd }: { items: FeedItem[]; s
   const [index, setIndex] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
   const { withUser, user, toast } = useSession();
-  // Bidding straight from the video: hold for the next step up, or Custom for your own amount.
+  // Bidding straight from the video: hold for the next step up, or tap the same button for your own amount.
   const needUser = () => { if (user) return false; withUser(undefined, "Sign in to bid"); return true; };
   const quickBid = async (it: FeedItem, amount: number) => {
     try {
@@ -339,10 +339,8 @@ function VideoCard({ item, auction, avatar, counts, comments, onBrowse, onBuy, o
         </div>
         <div className="actions">
           {mine ? <OwnerBar item={shown} auction={tagged ? undefined : auction} /> : !tagged && p.mode === "auction" && auction && auctionButton(auction, now).kind === "bid" ? (
-            <div className="bid-actions">
-              <button className="btn vglass" onClick={onCustomBid}>Custom</button>
-              <HoldToBid label={`Hold to bid ${R(auction.minNextCents)}`} onConfirm={() => onQuickBid(auction.minNextCents)} onNeedUser={needUser} />
-            </div>
+            <HoldToBid glass label={`Hold to bid ${R(auction.minNextCents)}`} price={R(auction.minNextCents)} onConfirm={() => onQuickBid(auction.minNextCents)}
+              onTap={onCustomBid} onNeedUser={needUser} />
           ) : <BuyButton item={shown} auction={tagged ? undefined : auction} onClick={() => onBuy(shown)} />}
           {!mine && <button className="vround vglass" onClick={onMessage} aria-label={`Message @${item.shop.handle}`}><Icon name="chat" /></button>}
           <button className="vround vglass" onClick={share} aria-label="Share"><Icon name="share" /></button>

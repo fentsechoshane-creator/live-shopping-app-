@@ -99,7 +99,7 @@ export function AuctionSheet({ item, info, onInfo, onClose, onPay, focusCustom }
       ) : open ? (
         <>
           <ErrorNote error={error} />
-          <HoldToBid block label={`Hold to bid ${R(amount)}`} onConfirm={bid} disabled={amount < min} />
+          <HoldToBid block label={`Hold to bid ${R(amount)}`} price={R(amount)} onConfirm={bid} disabled={amount < min} />
           <p className="small muted" style={{ textAlign: "center", margin: "8px 0 0" }}>Hold until the ring closes. A bid is a promise to buy: if you win, pay within 2 hours.</p>
         </>
       ) : undefined}>

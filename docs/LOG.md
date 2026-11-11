@@ -107,6 +107,14 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-11: Slimmer buttons, hold to bid as a live sign
+
+Asked by Ofentse: the bid button was too fat with the price in it, and so were paired buttons like the refund ones. **Not live yet** (branch `flat-prices`, waiting for "okay deploy").
+
+- **Hold to bid on a video** is one slim dark glass capsule. At rest it switches between the price (with a pulsing amber dot) and "Hold to bid", like a live sign. Held, it counts down ("Bid R720 in 2") while the amber glass ring closes. A quick tap opens the bid sheet to pick your own amount, so the separate Custom button is gone. The bid sheet button works the same way.
+- **Slim buttons everywhere:** main buttons 48px, normal 44px, two in a row 40px, empty state buttons 40px, the round buttons on videos 44px. Nothing you tap is under 40px.
+- E2E passes (the auction test now taps the same button for a custom bid). Every screen is in one PDF for Ofentse.
+
 ### 2026-11-11: Finishing pass: Apple look with our own kick, listing editing, every screen checked
 
 Asked by Ofentse: fix everything from the screen audit, match Apple's design with a myHaul identity ("option 1": Apple's system green as the one tint), check every page for proportions, so an investor can use it alone and find nothing. **Not live yet**: it sits on branch `flat-prices` with the flat prices and seller charges work, waiting for "okay deploy".
