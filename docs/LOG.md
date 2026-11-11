@@ -12,7 +12,7 @@ Checked 7 Nov 2026 with the live health check. "Practical completion" here means
 
 | Area | Status |
 | --- | --- |
-| Business rules, database, security rules, server functions | Done and tested. Live database up to 0037 |
+| Business rules, database, security rules, server functions | Done and tested. Live database up to 0041 (11 Nov) |
 | Buyer side (feed, Explore, checkout, orders, returns, cancelling, friends, sharing, Inbox) | Done and live |
 | Seller side (sign up, checks, Create with camera and editor, orders, shipping, payouts) | Done. Editing or taking down a listing after posting is built, not live yet |
 | Payments (TradeSafe escrow) | Working in TradeSafe's developer sandbox (real test payments with Ozow). Needs the production account and keys |
@@ -63,7 +63,7 @@ Checked 7 Nov 2026 with the live health check. "Practical completion" here means
 
 ## Next up
 
-- **Deploy the finished app (needs Ofentse's "okay deploy"):** migrations 0038, 0039, 0040 and 0041, then functions checkout, delivery, order-action, seller-bank, run-due and live-token, then push main (branch `flat-prices` holds the work). The app on main must not go live before the server, or prices and payouts won't match. [Claude]
+- **Walk through the live site** with test accounts after the 11 Nov deploy: buy, auction with a max bid, ship, return, search filters, stats, invite, and a live show on two phones once the LiveKit keys are in. [Claude, then Ofentse]
 - **Bob Go sandbox:** key and sandbox mode are in and work. Ofentse adds the "Tracking updated" webhook in Bob Go (URL in docs/SETUP.md section 4: `.../functions/v1/bobgo-webhook`). Then test a full sandbox booking from a real order. Later: read "Shipment submission status" and "Shipment health status" to alert sellers when a booking fails or a parcel is stuck. [Ofentse, Claude]
 - **Mux Robots:** check videos when they're ready (hold flagged posts), suggest covers and listing details. [Claude]
 - **LiveKit for live video:** make a LiveKit Cloud project (livekit.io, free Build plan to test), then add `LIVEKIT_URL`, `LIVEKIT_API_KEY` and `LIVEKIT_API_SECRET` in Supabase > Edge Functions > Secrets (docs/SETUP.md section 5). Until then live shows open with a "Live video isn't set up yet" note. Then test a real show with two phones. [Ofentse, then Claude]
@@ -106,6 +106,14 @@ Debug as we go: anyone who finds or fixes a problem updates this list. Highest r
 Fixed in this round: Safari double back on the edge swipe (now only in the installed app), deleting an account now also deletes the person's photos and videos, React Router warnings.
 
 ## Log
+
+### 2026-11-11: Deployed everything (Ofentse: "okay deploy")
+
+- Live database: 0038 seller charges, 0039 max bids, 0040 live selling, 0041 extras (applied through the Supabase connector as 20261111175108, 175159, 175250, 175349; `scripts/push-live.mjs` maps them).
+- Server functions deployed as single bundled files: checkout, delivery, order-action, seller-bank, run-due, and the new live-token (no signed in user needed; it checks the seller itself).
+- Then main pushed, so the site and the server match.
+- Checked with Ofentse: nothing in the code or database came from the other chat; that chat set up the myhaul.co.za domain (Afrihost) and Resend for sign in emails.
+- Open: LiveKit keys are Ofentse's to add in Supabase secrets (if not done yet); a live walk through with test accounts.
 
 ### 2026-11-11: Extras: live chats, reviews, search filters, seller stats, invite a friend
 
