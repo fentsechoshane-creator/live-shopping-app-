@@ -109,10 +109,10 @@ begin
   select * into nt from bids where product_id = p.id and round = p.auction_round order by amount_cents desc, created_at limit 1;
 
   if nt.id is distinct from t.id then
-    -- No sniping: a bid in the last 2 minutes adds 2 minutes.
-    if p.auction_ends_at - now() < interval '2 minutes' then
+    -- No sniping (changed 11 Nov 2026 from 2 minutes, like eBay): a bid in the last 60 seconds resets the clock to 60 seconds.
+    if p.auction_ends_at - now() < interval '60 seconds' then
       perform set_config('app.auction_internal', '1', true);
-      update products set auction_ends_at = now() + interval '2 minutes' where id = p.id;
+      update products set auction_ends_at = now() + interval '60 seconds' where id = p.id;
     end if;
     -- Everyone who was on top or bid for by their max in this go, and isn't on top now, is told once.
     -- (You see the result straight away on screen, so you're not sent a notice.)

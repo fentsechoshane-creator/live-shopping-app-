@@ -5,8 +5,8 @@
 export const AUCTION_DAYS = [1, 3, 5, 7] as const;
 /** The winner has this long to pay. */
 export const AUCTION_PAY_HOURS = 2;
-/** A bid in the last 2 minutes adds 2 minutes, so nobody wins by sniping at the last second. */
-export const AUCTION_EXTEND_MINUTES = 2;
+/** A bid in the last 60 seconds resets the clock to 60 seconds (like eBay), so nobody wins by sniping. Decided 11 Nov 2026. */
+export const AUCTION_EXTEND_SECONDS = 60;
 
 /** The smallest raise over the current bid: R10 under R500, R20 under R2,000, then R50. */
 export function bidStep(currentCents: number): number {

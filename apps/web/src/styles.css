@@ -1472,3 +1472,15 @@ button.g3 { border: 0; padding: 0; display: block; width: 100%; }
 /* The + for your own amount sits beside the bid button on a video. */
 .bid-row { display: grid; grid-template-columns: auto 1fr; gap: 8px; min-width: 0; }
 .bid-stepper .step-amt button.amt { background: none; box-shadow: none; border-radius: 12px; min-height: 0; width: auto; }
+/* Recent bids folds away; tap to open. The height eases open (grid rows 0fr to 1fr). */
+.fold { border-radius: 16px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--hairline); margin-bottom: 12px; overflow: hidden; }
+.fold-head { width: 100%; min-height: 50px; display: flex; align-items: center; gap: 8px; padding: 0 16px; border: 0; background: none; color: var(--ink); font: inherit; font-size: 16px; font-weight: 600; text-align: left; }
+.fold-head > span:first-child { flex: 1; }
+.fold-head svg { color: var(--ink-3); transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1); }
+.fold.open .fold-head svg { transform: rotate(180deg); }
+.fold-body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.35s cubic-bezier(0.22, 1, 0.36, 1); }
+.fold.open .fold-body { grid-template-rows: 1fr; }
+.fold-body > * { min-height: 0; overflow: hidden; }
+.fold .bid-list { padding: 0 16px; }
+.fold.open .bid-list { padding-bottom: 8px; }
+@media (prefers-reduced-motion: reduce) { .fold-body, .fold-head svg { transition: none; } }

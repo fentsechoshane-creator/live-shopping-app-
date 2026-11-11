@@ -274,10 +274,15 @@ try {
   await jacket.getByRole("button", { name: "Bid placed" }).waitFor();
   check(true, "holding for 3 seconds places the bid without leaving the video");
   // The + beside it: pick your own amount, in the bid sheet over the video.
-  await jacket.getByRole("button", { name: "Pick your own amount" }).click();
+  await jacket.getByRole("button", { name: "Pick your own amount", exact: true }).click();
   const bidSheet = page.getByRole("dialog", { name: /Vintage 90s denim jacket/ });
   await bidSheet.getByText("Reserve not met yet").waitFor();
+  const recent = bidSheet.getByRole("button", { name: /^Recent bids/ });
+  await check(recent.getAttribute("aria-expanded").then((v) => v === "false"), "recent bids start folded away");
+  await recent.click();
   await bidSheet.getByText("l***m").first().waitFor(); // other bidders are masked
+  await recent.click();
+  await check(recent.getAttribute("aria-expanded").then((v) => v === "false"), "recent bids fold away again");
   await bidSheet.getByRole("button", { name: /^Your bid, R740/ }).waitFor();
   await check(bidSheet.getByRole("button", { name: /^Lower by/ }).isDisabled(), "can't go under the lowest bid");
   await bidSheet.getByRole("button", { name: "Raise by R20" }).click();

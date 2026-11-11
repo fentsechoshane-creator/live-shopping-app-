@@ -115,7 +115,8 @@ Asked by Ofentse, from a Whatnot screenshot and three mock ups (picked option A 
 - **Bid sheet:** big rounded amount with minus and plus (one bid step each: R10 under R500, R20 under R2,000, then R50), quick buttons (lowest, +R50, +R100), tap the amount to type it (too low snaps up to the lowest bid), and a Max bid switch. Hold to bid as before ("Max R1,200 in 3" when setting a max).
 - **Max bid (migration 0039, `maxBidReplies` in packages/core):** you set the most you'll pay; we bid for you only when you're outbid, at the lowest amount that puts you back on top. Fair with many maxes: the item is locked while a bid is handled, all maxes are weighed together, ranked by amount then by who set it first; the top max leads at one step over the next max; lower maxes show one bid at their max then drop out. Nobody sees another person's max (our team can). A max can only go up. Everyone outbid is told once.
 - Tests: 7 core tests, a database block (three maxes, secrecy, equal maxes, "only goes up", the helper is not callable), and e2e (stepper, typing, set a max while on top).
-- **Open:** the anti sniping rule (a bid in the last 2 minutes resets the clock to 2 minutes) is waiting on Ofentse; eBay uses 1 minute, Whatnot live shows use seconds.
+- **Anti sniping is now 60 seconds** (Ofentse, 11 Nov): a bid in the last minute resets the clock to 1 minute, like eBay (was 2 minutes). In migration 0039, core `AUCTION_EXTEND_SECONDS`, the demo, the sheet's help note and Terms 7 (which now also explains max bids). Whatnot style seconds long timers wait for live selling.
+- **Recent bids fold away** in the bid sheet: tap to open, eases open and shut, starts closed.
 
 ### 2026-11-11: Slimmer buttons, hold to bid as a live sign
 

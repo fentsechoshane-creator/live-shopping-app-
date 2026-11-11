@@ -1,7 +1,7 @@
 // Demo adapter: the whole app runs in the browser with sample data, using the same rules as the server.
 // Used when no Supabase keys are set. Sign in with any email or phone and the code 123456.
 import {
-  bidStep, maxBidReplies, maskHandle, canTransition, isRude, orderTotals, payoutDate, releasableAt, returnReasonsFor, shipBy, tierFor, TRUST_POINTS, validateListing,
+  bidStep, maxBidReplies, AUCTION_EXTEND_SECONDS, maskHandle, canTransition, isRude, orderTotals, payoutDate, releasableAt, returnReasonsFor, shipBy, tierFor, TRUST_POINTS, validateListing,
   RETURN_POSTAGE_PAYER, ACCOUNT_FEATURE_KEYS, canForceOn, featureOffMessage, type AccountFeature, type OrderStatus, type TrustEventKind, bookedByUs, deliveryFee, PARCEL_SIZES, orderParcelSize, DELIVERY_PERKS, validateEdit, refundFee, formatRand, type PayoutSchedule } from "@app/core";
 import { handleProblem } from "../lib/handle";
 import type {
@@ -869,7 +869,7 @@ export function createDemoApi(): Api {
       for (const r of replies) add(r.bidderId, r.amountCents);
       const now2 = roundBids(p)[0];
       if (now2.id !== top?.id) {
-        if (new Date(p.auctionEndsAt).getTime() - Date.now() < 2 * 60e3) p.auctionEndsAt = new Date(Date.now() + 2 * 60e3).toISOString();
+        if (new Date(p.auctionEndsAt).getTime() - Date.now() < AUCTION_EXTEND_SECONDS * 1000) p.auctionEndsAt = new Date(Date.now() + AUCTION_EXTEND_SECONDS * 1000).toISOString();
         const told = new Set([top?.bidderId, ...replies.map((r) => r.bidderId)].filter((x): x is string => !!x && x !== now2.bidderId && x !== u.id));
         for (const who of told) notify(who, "You've been outbid", `${p.title} is now at R${now2.amountCents / 100}. Bid again before it ends.`, `/i/${p.id}`);
         notify(sh.ownerId, `New bid: R${now2.amountCents / 100}`, p.title, `/i/${p.id}`);

@@ -55,6 +55,7 @@ export function AuctionSheet({ item, info, onInfo, onClose, onPay }: {
   const [picked, setPicked] = useState<number | null>(null);
   const [typing, setTyping] = useState<string | null>(null);
   const [maxOn, setMaxOn] = useState(false);
+  const [showBids, setShowBids] = useState(false);
   const ends = info?.endsAt ? new Date(info.endsAt).getTime() : 0;
   const left = ends - now;
   const open = info?.state === "open" && left > 0;
@@ -167,17 +168,23 @@ export function AuctionSheet({ item, info, onInfo, onClose, onPay }: {
           )}
 
           {info.recent.length > 0 && (
-            <>
-              <h3 style={{ fontSize: 15, margin: "10px 0 2px" }}>Recent bids</h3>
-              <div className="bid-list">
-                {info.recent.map((b, i) => (
-                  <div key={i} className="row between"><span><b>{b.who}</b> <span className="muted small">{timeAgo(b.at)}</span></span><b>{R(b.amountCents)}</b></div>
-                ))}
+            <div className={`fold ${showBids ? "open" : ""}`}>
+              <button className="fold-head" onClick={() => setShowBids(!showBids)} aria-expanded={showBids} aria-controls="recent-bids">
+                <span>Recent bids</span>
+                <span className="muted small">{info.bidCount}</span>
+                <Icon name="down" size={18} />
+              </button>
+              <div className="fold-body" id="recent-bids">
+                <div className="bid-list">
+                  {info.recent.map((b, i) => (
+                    <div key={i} className="row between"><span><b>{b.who}</b> <span className="muted small">{timeAgo(b.at)}</span></span><b>{R(b.amountCents)}</b></div>
+                  ))}
+                </div>
               </div>
-            </>
+            </div>
           )}
           <div className="note" style={{ marginTop: 12 }}>
-            <b>How auctions work.</b> Bids go up in fixed steps. A bid in the last 2 minutes adds 2 minutes, so nobody wins by sniping.
+            <b>How auctions work.</b> Bids go up in fixed steps. A bid in the last minute resets the clock to 1 minute, so nobody wins by sniping.
             The winner pays within 2 hours and the money is held safely. No change of mind returns, but you're covered if it's wrong or faulty.
           </div>
         </>

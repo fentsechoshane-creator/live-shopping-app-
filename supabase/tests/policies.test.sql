@@ -530,14 +530,14 @@ select pg_temp.act_as('00000000-0000-0000-0000-00000000000a');
 select pg_temp.expect_error($$select place_bid((select id from products where title = 'Vintage leather jacket'), 50000)$$, 'own item');
 select pg_temp.expect_error($$update products set reserve_cents = 25000 where title = 'Vintage leather jacket'$$, 'once people have bid');
 reset role;
--- No sniping: a bid in the last 2 minutes adds 2 minutes.
+-- No sniping: a bid in the last 60 seconds resets the clock to 60 seconds.
 select pg_temp.act_as_service();
-update products set auction_ends_at = now() + interval '30 seconds' where title = 'Vintage leather jacket';
+update products set auction_ends_at = now() + interval '20 seconds' where title = 'Vintage leather jacket';
 reset role;
 select pg_temp.act_as('00000000-0000-0000-0000-0000000000f1');
 select place_bid((select id from products where title = 'Vintage leather jacket'), 22000);
 reset role;
-do $$ begin assert (select auction_ends_at from products where title = 'Vintage leather jacket') > now() + interval '100 seconds', 'late bid extends the end'; end $$;
+do $$ begin assert (select auction_ends_at from products where title = 'Vintage leather jacket') > now() + interval '50 seconds', 'late bid resets the clock to 60 seconds'; end $$;
 -- Max bids: many maxes on one item, settled fairly in one go.
 reset role;
 insert into auth.users (id, email) values ('00000000-0000-0000-0000-0000000000f3', 'bidder3@test.co.za');
