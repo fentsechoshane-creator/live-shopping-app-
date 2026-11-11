@@ -5,7 +5,7 @@ import type {
   ListingSuggestion, Conversation, OpenReport, SharedPost,
   MyProfile, ShopPublic,
   Api, BankInput, Category, CheckoutInput, FeedItem, ListingInput, MyShop, Notification, Order, Payout, PendingReview, SellerCharge,
-  ProductPublic, User, TeamPerson, TeamPersonDetail, Reward,
+  ProductPublic, User, TeamPerson, TeamPersonDetail, Reward, LiveShow, LiveChatMessage, LiveSummary,
 } from "./types";
 
 export function createSupabaseApi(url: string, anonKey: string): Api {
@@ -108,6 +108,18 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
     product: toProduct({ ...r, id: r.product_id, status: "live" }),
     shop: { id: r.shop_id, name: r.shop_name, handle: r.shop_handle, category: r.category, trustScore: r.trust_score, tier: r.tier },
     video: { muxPlaybackId: r.playback_id, url: videoUrl(r.storage_path), kind: isImage(r.storage_path) ? "image" : "video" },
+  });
+
+  // ===== Live selling helpers =====
+  const liveShops = async (ids: string[]): Promise<Record<string, ShopPublic>> => {
+    const uniq = [...new Set(ids)];
+    if (!uniq.length) return {};
+    const rows = (check(await sb.from("shops").select("id, name, handle, category").in("id", uniq)) as any[]) ?? [];
+    return Object.fromEntries(rows.map((r) => [r.id, { id: r.id, name: r.name, handle: r.handle, category: r.category, trustScore: 50, tier: "standard" } as ShopPublic]));
+  };
+  const toShow = (r: any, shop: ShopPublic, pinned: FeedItem | null, auction: FeedItem | null): LiveShow => ({
+    id: r.id, title: r.title, status: r.status, startsAt: r.startsAt, startedAt: r.startedAt ?? null, endedAt: r.endedAt ?? null,
+    shop, pinned, auction, peakViewers: Number(r.peakViewers ?? 0), reminded: !!r.reminded, reminders: Number(r.reminders ?? 0), mine: !!r.mine,
   });
 
   const api: Api = {
@@ -537,6 +549,75 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
     async sendMessage(conversationId, body, productId, image) {
       const imagePath = image ? await upload("private", image, "chat") : null;
       check(await sb.from("messages").insert({ conversation_id: conversationId, sender_id: await uid(), body: body.trim(), product_id: productId ?? null, image_path: imagePath }));
+    },
+    // ===== Live selling (migration 0040, live-token function) =====
+    async liveShows() {
+      const rows = ((check(await sb.rpc("live_shows_list")) as any[]) ?? []).filter(Boolean);
+      const shops = await liveShops(rows.map((r) => r.shopId));
+      return rows.filter((r) => shops[r.shopId]).map((r) => toShow(r, shops[r.shopId], null, null));
+    },
+    async liveShow(showId) {
+      const r = check(await sb.rpc("live_show_info", { p_show: showId })) as any;
+      if (!r) return null;
+      const shops = await liveShops([r.shopId]);
+      if (!shops[r.shopId]) return null;
+      const pinned = r.pinnedProductId ? await api.productItem(r.pinnedProductId) : null;
+      let auction = r.auctionProductId ? await api.productItem(r.auctionProductId) : null;
+      if (auction && !auction.video.url && !auction.video.muxPlaybackId) {
+        // A live auction is a copy of a listing: show the original's video or photo.
+        const from = (await sb.from("products").select("from_product_id").eq("id", r.auctionProductId).maybeSingle()).data?.from_product_id;
+        const parent = from ? (from === pinned?.product.id ? pinned : await api.productItem(from)) : null;
+        if (parent) auction = { ...auction, video: parent.video, edit: undefined };
+      }
+      if (auction && r.auctionProductId) api.settleAuction(r.auctionProductId).catch(() => {});
+      return toShow(r, shops[r.shopId], pinned, auction);
+    },
+    async createShow(title, startsAt) {
+      return check(await sb.rpc("live_create", { p_title: title, p_starts_at: startsAt })) as string;
+    },
+    async goLive(showId) {
+      check(await sb.rpc("live_go", { p_show: showId }));
+    },
+    async endShow(showId) {
+      return check(await sb.rpc("live_end", { p_show: showId })) as LiveSummary;
+    },
+    async pinLiveItem(showId, productId) {
+      check(await sb.rpc("live_pin", { p_show: showId, p_product: productId }));
+    },
+    async startLiveAuction(showId, productId, startCents, seconds, suddenDeath) {
+      return check(await sb.rpc("live_start_auction", { p_show: showId, p_product: productId, p_start_cents: startCents, p_seconds: seconds, p_sudden_death: suddenDeath })) as string;
+    },
+    async reportLiveViewers(showId, count) {
+      await sb.rpc("live_viewers", { p_show: showId, p_count: count });
+    },
+    async liveChat(showId) {
+      const rows = (check(await sb.rpc("live_chat_since", { p_show: showId })) as any[]) ?? [];
+      return rows.reverse().map((m): LiveChatMessage => ({ id: m.id, who: m.who, isSeller: !!m.is_seller, body: m.body, at: m.at }));
+    },
+    async sayLive(showId, body) {
+      check(await sb.rpc("live_say", { p_show: showId, p_body: body }));
+    },
+    async hideLiveChat(messageId) {
+      check(await sb.rpc("live_hide_chat", { p_id: messageId }));
+    },
+    async setLiveReminder(showId, on) {
+      const me = await uid();
+      if (on) {
+        const { error } = await sb.from("live_reminders").insert({ show_id: showId, user_id: me });
+        if (error && error.code !== "23505") throw new Error(error.message.includes("row-level") ? "This show has ended." : error.message);
+      } else check(await sb.from("live_reminders").delete().eq("show_id", showId).eq("user_id", me));
+    },
+    async liveToken(showId, role) {
+      return await call<{ url: string; token: string }>("live-token", { showId, role });
+    },
+    watchLive(showId, onChange) {
+      // Changes arrive straight away through Supabase Realtime; a slow check every 8 seconds covers a dropped connection.
+      const ch = sb.channel(`live-${showId}`)
+        .on("postgres_changes", { event: "*", schema: "public", table: "live_shows", filter: `id=eq.${showId}` }, () => onChange())
+        .on("postgres_changes", { event: "INSERT", schema: "public", table: "live_chat", filter: `show_id=eq.${showId}` }, () => onChange())
+        .subscribe();
+      const t = window.setInterval(onChange, 8000);
+      return () => { window.clearInterval(t); sb.removeChannel(ch); };
     },
     async productItem(productId) {
       const p = (await sb.from("products").select(`${PRODUCT_COLS}, shops(id, name, handle, category)`).eq("id", productId).maybeSingle()).data as any;

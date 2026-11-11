@@ -32,3 +32,6 @@ verify_jwt = false
 
 [functions.push-notifications]
 verify_jwt = false
+
+[functions.live-token]
+verify_jwt = false

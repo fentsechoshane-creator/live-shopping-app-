@@ -615,6 +615,114 @@ do $$ begin
 end $$;
 select 'auction tests passed' as result;
 
+-- ===== Live selling =====
+reset role;
+select pg_temp.act_as_service();
+update seller_checks set id_status = 'approved', bank_status = 'approved', rules_accepted_at = coalesce(rules_accepted_at, now())
+  where shop_id = (select id from shops where handle = 'thrift.with.lebo');
+update profiles set trust_score = 60 where id = '00000000-0000-0000-0000-00000000000a';
+insert into products (shop_id, title, price_cents, sizes, status, stock, mode, label)
+  values ((select id from shops where handle = 'thrift.with.lebo'), 'Live drop tee', 15000, '{}', 'live', 6, 'buy_now', 'new');
+reset role;
+select pg_temp.act_as('00000000-0000-0000-0000-0000000000f1');
+select pg_temp.expect_error($$select live_create('My show')$$, 'Open your shop first');
+insert into follows (user_id, shop_id) values ('00000000-0000-0000-0000-0000000000f1', (select id from shops where handle = 'thrift.with.lebo'));
+reset role;
+-- Not unlocked yet: 5 good orders, unless our team switches Live on.
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000a');
+select pg_temp.expect_error($$select live_create('Friday thrift drop')$$, 'Unlocks after 5 delivered orders');
+reset role;
+insert into account_features (user_id, feature, state, reason) values ('00000000-0000-0000-0000-00000000000a', 'live', 'on', 'Test'), ('00000000-0000-0000-0000-00000000000a', 'auctions', 'on', 'Test')
+  on conflict (user_id, feature) do update set state = 'on';
+reset role;
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000a');
+select pg_temp.expect_error($$select live_create('x')$$, 'at least 3 letters');
+select live_create('Friday thrift drop', now() + interval '1 day');
+reset role;
+select pg_temp.act_as('00000000-0000-0000-0000-0000000000f2');
+insert into live_reminders (show_id, user_id) values ((select id from live_shows where title = 'Friday thrift drop'), '00000000-0000-0000-0000-0000000000f2');
+do $$ begin assert (live_show_info((select id from live_shows where title = 'Friday thrift drop'))->>'reminded')::boolean, 'reminder set'; end $$;
+select pg_temp.expect_error($$select live_go((select id from live_shows where title = 'Friday thrift drop'))$$, 'isn''t your show');
+reset role;
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000a');
+select live_go((select id from live_shows where title = 'Friday thrift drop'));
+select live_create('Second show');
+select pg_temp.expect_error($$select live_go((select id from live_shows where title = 'Second show'))$$, 'already live');
+select live_pin((select id from live_shows where title = 'Friday thrift drop'), (select id from products where title = 'Live drop tee' and mode = 'buy_now'));
+select pg_temp.expect_error($$select live_pin((select id from live_shows where title = 'Friday thrift drop'), (select id from products where title = 'Retro sunglasses'))$$, 'live items with stock');
+select live_viewers((select id from live_shows where title = 'Friday thrift drop'), 12);
+reset role;
+do $$ begin
+  assert (select status = 'live' and started_at is not null from live_shows where title = 'Friday thrift drop'), 'show is live';
+  assert exists (select 1 from notifications where user_id = '00000000-0000-0000-0000-0000000000f1' and kind = 'live'), 'followers hear when you go live';
+  assert exists (select 1 from notifications where user_id = '00000000-0000-0000-0000-0000000000f2' and kind = 'live'), 'reminders are sent';
+end $$;
+-- Chat
+select pg_temp.act_as('00000000-0000-0000-0000-0000000000f1');
+select live_say((select id from live_shows where title = 'Friday thrift drop'), 'Love this tee');
+select pg_temp.expect_error($$select live_say((select id from live_shows where title = 'Friday thrift drop'), '   ')$$, 'Type a message');
+select pg_temp.expect_error($$select live_hide_chat((select id from live_chat limit 1))$$, 'can''t hide');
+reset role;
+select pg_temp.act_as_anon();
+select pg_temp.expect_error($$select live_say((select id from live_shows where title = 'Friday thrift drop'), 'hi')$$, 'permission denied');
+do $$ begin assert (select count(*) from live_chat_since((select id from live_shows where title = 'Friday thrift drop'))) = 1, 'anyone can read the chat'; end $$;
+reset role;
+-- A live auction sells one unit, copied from the listing.
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000a');
+select pg_temp.expect_error($$select live_start_auction((select id from live_shows where title = 'Friday thrift drop'), (select id from products where title = 'Live drop tee' and mode = 'buy_now'), 5000, 5)$$, '10 to 120 seconds');
+select live_start_auction((select id from live_shows where title = 'Friday thrift drop'), (select id from products where title = 'Live drop tee' and mode = 'buy_now'), 5000, 30);
+select pg_temp.expect_error($$select live_start_auction((select id from live_shows where title = 'Friday thrift drop'), (select id from products where title = 'Live drop tee' and mode = 'buy_now'), 5000, 30)$$, 'Wait for this auction');
+reset role;
+do $$ begin
+  assert (select stock from products where title = 'Live drop tee' and mode = 'buy_now') = 5, 'one unit taken from the listing';
+  assert (select auction_state = 'open' and stock = 1 and auction_ends_at < now() + interval '31 seconds' from products where from_product_id is not null and mode = 'auction'), 'a 30 second auction';
+end $$;
+select pg_temp.act_as('00000000-0000-0000-0000-0000000000f1');
+select place_bid((select id from products where from_product_id is not null and auction_state = 'open'), 5000);
+reset role;
+select pg_temp.act_as_service();
+update products set auction_ends_at = now() + interval '3 seconds' where from_product_id is not null and auction_state = 'open';
+reset role;
+select pg_temp.act_as('00000000-0000-0000-0000-0000000000f2');
+select place_bid((select id from products where from_product_id is not null and auction_state = 'open'), 6000);
+reset role;
+do $$ begin assert (select auction_ends_at > now() + interval '8 seconds' and auction_ends_at < now() + interval '11 seconds' from products where from_product_id is not null and auction_state = 'open'), 'a late bid resets the live clock to 10 seconds'; end $$;
+-- Ends: the top bid wins. Not paid in time: the unit goes back to the listing.
+select pg_temp.act_as_service();
+update products set auction_ends_at = now() - interval '1 second' where from_product_id is not null and auction_state = 'open';
+select settle_due_auctions();
+update products set auction_pay_by = now() - interval '1 second' where from_product_id is not null and auction_state = 'won';
+select settle_due_auctions();
+reset role;
+do $$ begin
+  assert (select auction_state = 'unpaid' and status = 'removed' from products where from_product_id is not null), 'unpaid live auction is closed';
+  assert (select stock from products where title = 'Live drop tee' and mode = 'buy_now') = 6, 'the unit goes back to the listing';
+end $$;
+-- Sudden death: no reset.
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000a');
+select live_start_auction((select id from live_shows where title = 'Friday thrift drop'), (select id from products where title = 'Live drop tee' and mode = 'buy_now'), 5000, 20, true);
+reset role;
+select pg_temp.act_as_service();
+update products set auction_ends_at = now() + interval '3 seconds' where from_product_id is not null and auction_state = 'open';
+reset role;
+select pg_temp.act_as('00000000-0000-0000-0000-0000000000f1');
+select place_bid((select id from products where from_product_id is not null and auction_state = 'open'), 5000);
+reset role;
+do $$ begin assert (select auction_ends_at < now() + interval '4 seconds' from products where from_product_id is not null and auction_state = 'open'), 'sudden death never resets'; end $$;
+-- The seller hides a message and ends the show.
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000a');
+select live_hide_chat((select id from live_chat limit 1));
+do $$ declare r jsonb := live_end((select id from live_shows where title = 'Friday thrift drop')); begin
+  assert (r->>'peakViewers')::int = 12 and (r->>'auctions')::int = 2, 'end of show summary';
+end $$;
+do $$ begin assert (live_end((select id from live_shows where title = 'Second show'))->>'cancelled')::boolean, 'a planned show can be cancelled'; end $$;
+reset role;
+select pg_temp.act_as('00000000-0000-0000-0000-0000000000f1');
+select pg_temp.expect_error($$select live_say((select id from live_shows where title = 'Friday thrift drop'), 'still here?')$$, 'isn''t live');
+do $$ begin assert (select count(*) from live_chat_since((select id from live_shows where title = 'Friday thrift drop'))) = 0, 'hidden chat is gone'; end $$;
+reset role;
+select 'live selling tests passed' as result;
+
 -- ===== Team dashboard =====
 select pg_temp.act_as('00000000-0000-0000-0000-00000000000b');
 select pg_temp.expect_error($$select admin_overview()$$, 'team');

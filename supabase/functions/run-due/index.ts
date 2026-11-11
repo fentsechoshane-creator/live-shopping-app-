@@ -43,6 +43,9 @@ Deno.serve(async (req) => {
   // 0. Close auctions that ended, and cancel wins not paid within 2 hours.
   const { data: settled } = await db.rpc("settle_due_auctions");
   done.auctions_settled = (settled as number | null) ?? 0;
+  // Shows whose host disappeared: end them so they don't sit in the Live tab.
+  const { data: staleShows } = await db.rpc("end_stale_live_shows");
+  done.live_shows_ended = (staleShows as number | null) ?? 0;
 
   const due = must(await db.from("due_orders").select("*").limit(200), "load due orders") as any[];
   for (const o of due) {

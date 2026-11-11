@@ -61,6 +61,27 @@ export interface FeedItem {
 }
 
 export type Reaction = "like" | "repost";
+
+/** A live show: planned, live now, or over. Video runs on LiveKit; the rest is in the database (migration 0040). */
+export interface LiveShow {
+  id: string;
+  title: string;
+  status: "scheduled" | "live" | "ended" | "cancelled";
+  startsAt: string;
+  startedAt: string | null;
+  endedAt: string | null;
+  shop: ShopPublic;
+  /** The Buy now item on screen, if the seller pinned one. */
+  pinned: FeedItem | null;
+  /** The quick live auction running now (or just ended), shown with the pinned item's picture. */
+  auction: FeedItem | null;
+  peakViewers: number;
+  reminded: boolean;
+  reminders: number;
+  mine: boolean;
+}
+export interface LiveChatMessage { id: string; who: string; isSeller: boolean; body: string; at: string }
+export interface LiveSummary { minutes: number; peakViewers: number; orders: number; salesCents: Cents; auctions: number; auctionsWon: number; cancelled?: boolean }
 export type ReportReason = "counterfeit" | "not_as_shown" | "offensive" | "scam" | "spam" | "other";
 export type ReportTarget = "post" | "shop" | "comment" | "message" | "user";
 
@@ -529,6 +550,29 @@ export interface Api {
   sendMessage(conversationId: string, body: string, productId?: string | null, image?: File | null): Promise<void>;
   /** An item with its shop and video, for chat cards and buying from a chat. */
   productItem(productId: string): Promise<FeedItem | null>;
+
+  // ===== Live selling =====
+  /** Shows live now (newest first), then planned ones (soonest first). */
+  liveShows(): Promise<LiveShow[]>;
+  liveShow(showId: string): Promise<LiveShow | null>;
+  /** Plan a show (startsAt) or make one to start now (null). Returns its id. */
+  createShow(title: string, startsAt: string | null): Promise<string>;
+  goLive(showId: string): Promise<void>;
+  /** Ends a live show (or cancels a planned one) and returns how it went. */
+  endShow(showId: string): Promise<LiveSummary>;
+  pinLiveItem(showId: string, productId: string | null): Promise<void>;
+  /** A quick auction on one unit of a live Buy now item. Returns the auction listing's id. */
+  startLiveAuction(showId: string, productId: string, startCents: Cents, seconds: number, suddenDeath: boolean): Promise<string>;
+  reportLiveViewers(showId: string, count: number): Promise<void>;
+  /** Up to 50 latest messages, oldest first. */
+  liveChat(showId: string): Promise<LiveChatMessage[]>;
+  sayLive(showId: string, body: string): Promise<void>;
+  hideLiveChat(messageId: string): Promise<void>;
+  setLiveReminder(showId: string, on: boolean): Promise<void>;
+  /** Access to the show's video. Null in the demo, which has no video service. */
+  liveToken(showId: string, role: "host" | "viewer"): Promise<{ url: string; token: string } | null>;
+  /** Calls back whenever the show or its chat changes. Returns a function that stops watching. */
+  watchLive(showId: string, onChange: () => void): () => void;
   /** Seller: a special price for one item or a bundle, sent as a message. */
   makeOffer(conversationId: string, productIds: string[], priceCents: Cents, hours: number): Promise<void>;
   /** The buyer offers a price on one Buy now item; the seller accepts, counters or declines. */

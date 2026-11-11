@@ -29,11 +29,12 @@ import { useIsMine } from "../../lib/mine";
 import { useMyShopId } from "../../lib/mine";
 import { MakeOfferSheet } from "../../components/MakeOffer";
 import { ClipPlayer, type ClipPlayerApi } from "../../components/ClipPlayer";
+import { LiveTab } from "../live/LiveTab";
 
 type Tab = "for_you" | "following" | "live";
 
 export function Feed() {
-  const [tab, setTab] = useState<Tab>("for_you");
+  const [tab, setTab] = useState<Tab>(() => (FEATURES.live && new URLSearchParams(window.location.search).get("tab") === "live" ? "live" : "for_you"));
   const [items, error, reloadFeed] = useLoad(() => api.feed(), []);
   // A seller changed or took down their own listing: show the feed as it is now.
   useEffect(() => { window.addEventListener("listing-changed", reloadFeed); return () => window.removeEventListener("listing-changed", reloadFeed); }, [reloadFeed]);
@@ -64,9 +65,7 @@ export function Feed() {
     <div className="fill">
       {error && <div className="feed-empty" style={{ background: "#0b0b0d" }}><div className="error">{error}</div></div>}
       {!items && !error && <div className="feed-empty" style={{ background: "#0b0b0d" }}><Loading /></div>}
-      {items && tab === "live" && (
-        <FeedEmpty icon="live" title="No one is live" body="Follow sellers to hear when they go live." />
-      )}
+      {tab === "live" && <LiveTab />}
       {items && tab === "following" && visibleItems.length === 0 && (
         <FeedEmpty icon="addperson" title="Nothing here yet" body="Videos from sellers you follow show here."
           action={<button className="btn vglass" onClick={() => nav("/explore")}>Find sellers</button>} />

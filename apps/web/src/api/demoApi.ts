@@ -1,11 +1,11 @@
 // Demo adapter: the whole app runs in the browser with sample data, using the same rules as the server.
 // Used when no Supabase keys are set. Sign in with any email or phone and the code 123456.
 import {
-  bidStep, maxBidReplies, AUCTION_EXTEND_SECONDS, maskHandle, canTransition, isRude, orderTotals, payoutDate, releasableAt, returnReasonsFor, shipBy, tierFor, TRUST_POINTS, validateListing,
+  bidStep, maxBidReplies, AUCTION_EXTEND_SECONDS, liveStock, MIN_LIVE_STOCK, GOOD_ORDERS_FOR_AUCTIONS, LIVE_AUCTION_EXTEND_SECONDS, maskHandle, canTransition, isRude, orderTotals, payoutDate, releasableAt, returnReasonsFor, shipBy, tierFor, TRUST_POINTS, validateListing,
   RETURN_POSTAGE_PAYER, ACCOUNT_FEATURE_KEYS, canForceOn, featureOffMessage, type AccountFeature, type OrderStatus, type TrustEventKind, bookedByUs, deliveryFee, PARCEL_SIZES, orderParcelSize, DELIVERY_PERKS, validateEdit, refundFee, formatRand, type PayoutSchedule } from "@app/core";
 import { handleProblem } from "../lib/handle";
 import type {
-  Api, Person, SharedPost, Category, ReportReason, ReportTarget, CheckoutInput, FeedItem, ListingInput, MyShop, Notification, Order, Payout, PendingReview, ProductPublic, ReviewStatus,
+  Api, LiveShow, LiveChatMessage, LiveSummary, Person, SharedPost, Category, ReportReason, ReportTarget, CheckoutInput, FeedItem, ListingInput, MyShop, Notification, Order, Payout, PendingReview, ProductPublic, ReviewStatus,
   ShopPublic, User, SavedDelivery, AppError, PickupPoint, ShopPickup, ShipmentEvent, AuctionInfo, TeamAlert, TeamOverview, TeamPerson, TeamPersonDetail, TeamOrder, TeamListing, TeamLogEntry, TeamFeature, Reward, SellerCharge,
 } from "./types";
 
@@ -16,7 +16,11 @@ interface DShop {
 }
 interface DProduct extends ProductPublic { shopId: string; proofStatus: ReviewStatus;
   auctionEndsAt?: string | null; reserveCents?: number | null; auctionState?: AuctionInfo["state"]; auctionRound?: number;
-  auctionWinner?: string | null; auctionPriceCents?: number | null; auctionPayBy?: string | null }
+  auctionWinner?: string | null; auctionPriceCents?: number | null; auctionPayBy?: string | null;
+  /** Live auctions (0040): the show, the listing a unit was taken from, and no clock resets. */
+  liveShowId?: string | null; fromProductId?: string | null; suddenDeath?: boolean }
+interface DShow { id: string; shopId: string; title: string; status: LiveShow["status"]; startsAt: string; startedAt: string | null; endedAt: string | null;
+  pinnedProductId: string | null; auctionProductId: string | null; peakViewers: number }
 interface DPost { id: string; shopId: string; productId: string; caption: string; video: FeedItem["video"]; createdAt: string; photos?: string[]; edit?: FeedItem["edit"] }
 interface DOrder extends Order { shopOwnerId: string; bundleIds?: string[]; offerId?: string | null; paymentMethod?: string | null;
   packingVideo?: string; packingPhoto?: string; packingReview?: "ok" | "strike"; packingReviewedAt?: string }
@@ -58,6 +62,10 @@ interface State {
   /** What sellers owe us (0038). */
   sellerCharges?: (SellerCharge & { shopId: string })[];
   payoutSchedules?: Record<string, PayoutSchedule>;
+  /** Live selling (0040). */
+  liveShows?: DShow[];
+  liveChat?: { id: string; showId: string; userId: string; body: string; at: string; hidden?: boolean }[];
+  liveReminders?: { showId: string; userId: string }[];
 }
 
 // Sample lockers for testing (the real list comes from Bob Go).
@@ -130,7 +138,22 @@ function seed(): State {
     { id: "b-2", productId: "p-auction", round: 0, bidderId: "u-sweet", amountCents: 64000, at: ago(55) },
     { id: "b-3", productId: "p-auction", round: 0, bidderId: "u-lebo", amountCents: 70000, at: ago(20) },
   ];
-  return { bids, users: bots, currentUserId: null, shops, products, posts, orders: [], notifications: [], payouts: [], clockOffsetMs: 0, follows: [],
+  // One show live now and one planned for tomorrow evening, so the Live tab has something in it.
+  const tomorrow = new Date(now + 86400e3); tomorrow.setHours(18, 0, 0, 0);
+  const liveShows: DShow[] = [
+    { id: "ls-1", shopId: "s-lebo", title: "Friday thrift drop: tees and denim", status: "live", startsAt: ago(18), startedAt: ago(18), endedAt: null,
+      pinnedProductId: "p-tee", auctionProductId: null, peakViewers: 46 },
+    { id: "ls-2", shopId: "s-luxe", title: "Designer Sunday: silk and bags", status: "scheduled", startsAt: tomorrow.toISOString(), startedAt: null, endedAt: null,
+      pinnedProductId: null, auctionProductId: null, peakViewers: 0 },
+  ];
+  const liveChat = [
+    { id: "lc-1", showId: "ls-1", userId: "u-sweet", body: "Is the tee true to size?", at: ago(3) },
+    { id: "lc-2", showId: "ls-1", userId: "u-lebo", body: "Yes, a boxy fit. Size down for a closer fit.", at: ago(2) },
+    { id: "lc-3", showId: "ls-1", userId: "u-luxe", body: "That sand colour is so good", at: ago(1) },
+  ];
+  // The sample shop has earned live selling and auctions, so the demo can show both.
+  const on = { state: "on" as const, reason: "Sample shop", at: ago(60 * 24), by: "team" };
+  return { liveShows, liveChat, liveReminders: [], features: { "u-lebo": { live: on, auctions: on } }, bids, users: bots, currentUserId: null, shops, products, posts, orders: [], notifications: [], payouts: [], clockOffsetMs: 0, follows: [],
     // Sample activity: Lebo reposted the cake and liked the silk shirt, so the Following feed shows a repost.
     comments: [
       { id: "c-1", postId: "po-1", userId: "u-sweet", body: "The sand colour is so nice. Does it shrink?", createdAt: new Date(now - 3000e3).toISOString() },
@@ -361,6 +384,13 @@ export function createDemoApi(): Api {
   // ===== Auctions (same rules as migration 0016). Auctions use the real clock, not the demo day skip. =====
   const roundBids = (p: DProduct) => (s.bids ?? []).filter((b) => b.productId === p.id && b.round === (p.auctionRound ?? 0)).sort((a, b) => b.amountCents - a.amountCents || a.at.localeCompare(b.at));
   const handleOf = (uid: string) => s.users.find((x) => x.id === uid)?.handle ?? null;
+  /** A live auction nobody won (or didn't pay for): the unit goes back to the listing it came from. */
+  function liveReturnStock(p: DProduct) {
+    if (!p.fromProductId) return;
+    const from = s.products.find((x) => x.id === p.fromProductId);
+    if (from) { from.stock += 1; if (from.status === "sold_out" && from.mode === "buy_now") from.status = "live"; }
+    p.status = "removed";
+  }
   function settleAuction(p: DProduct) {
     if (p.mode !== "auction") return;
     const owner = shopOf(p.shopId).ownerId;
@@ -372,12 +402,14 @@ export function createDemoApi(): Api {
         notify(owner, `Sold at auction: ${p.title}`, `R${top.amountCents / 100}. The winner has 2 hours to pay.`, `/i/${p.id}`);
       } else {
         Object.assign(p, { auctionState: "unsold", status: "draft" });
+        liveReturnStock(p);
         notify(owner, `Auction ended: ${p.title}`, top ? "The reserve wasn't met. You can list it again." : "No bids this time. You can list it again.");
       }
       save();
     } else if (p.auctionState === "won" && p.auctionPayBy && Date.now() > new Date(p.auctionPayBy).getTime()
                && !s.orders.some((o) => o.product.id === p.id && o.buyerId === p.auctionWinner && !["pending_payment", "cancelled"].includes(o.status))) {
       Object.assign(p, { auctionState: "unpaid", status: "draft" });
+      liveReturnStock(p);
       if (p.auctionWinner) { trust(p.auctionWinner, "unpaid_auction_win"); notify(p.auctionWinner, "Auction win cancelled", `${p.title} wasn't paid within 2 hours, so you lost trust points.`); }
       notify(owner, `Winner didn't pay: ${p.title}`, "You can list it again.");
       save();
@@ -476,6 +508,41 @@ export function createDemoApi(): Api {
     const sh = shopOf(po.shopId);
     return p?.status === "live" && sh.status === "open" && ownerOf(sh.id).trust >= 40;
   };
+
+  // ===== Live selling helpers =====
+  const liveBlocker = (shopId: string): string | null => {
+    const sh = shopOf(shopId);
+    const owner = s.users.find((x) => x.id === sh.ownerId);
+    if (sh.status !== "open" || sh.checks.idStatus !== "approved" || sh.checks.bankStatus !== "approved") return "Your shop goes live once your ID and bank account are checked.";
+    if (!owner || owner.trust < 40 || s.suspensions?.[owner.id]) return "Your account is under review.";
+    if (featureState(owner.id, "live") === "off" || featureState(owner.id, "sell") === "off") return "Going live is switched off for your account. Contact us if you think that's a mistake.";
+    const stock = liveStock(s.products.filter((p) => p.shopId === shopId));
+    if (stock < MIN_LIVE_STOCK) return `You can't go live without stock. Have at least ${MIN_LIVE_STOCK} items in stock, or ${MIN_LIVE_STOCK} of one item (you have ${stock}).`;
+    if (featureState(owner.id, "live") !== "on" && goodOrders(shopId) < GOOD_ORDERS_FOR_AUCTIONS) return `Unlocks after ${GOOD_ORDERS_FOR_AUCTIONS} delivered orders with good ratings (${goodOrders(shopId)} so far).`;
+    return null;
+  };
+  const myShow = (showId: string, uid: string) => {
+    const x = (s.liveShows ?? []).find((y) => y.id === showId);
+    if (!x || shopOf(x.shopId).ownerId !== uid) throw new Error("That isn't your show.");
+    return x;
+  };
+  const itemOf = (productId: string): FeedItem | null => {
+    const p = s.products.find((x) => x.id === productId);
+    if (!p) return null;
+    const post = s.posts.find((x) => x.productId === (p.fromProductId ?? p.id));
+    const base = post ? toFeed(post) : { postId: p.id, caption: p.title, product: p, shop: publicShop(shopOf(p.shopId)), video: {} };
+    return p.fromProductId ? { ...base, postId: p.id, product: p, edit: undefined } : base;
+  };
+  const showOut = (x: DShow, full: boolean): LiveShow => ({
+    id: x.id, title: x.title, status: x.status, startsAt: x.startsAt, startedAt: x.startedAt, endedAt: x.endedAt,
+    shop: publicShop(shopOf(x.shopId)),
+    pinned: full && x.pinnedProductId ? itemOf(x.pinnedProductId) : null,
+    auction: full && x.auctionProductId ? itemOf(x.auctionProductId) : null,
+    peakViewers: x.peakViewers,
+    reminded: !!s.currentUserId && (s.liveReminders ?? []).some((r) => r.showId === x.id && r.userId === s.currentUserId),
+    reminders: (s.liveReminders ?? []).filter((r) => r.showId === x.id).length,
+    mine: shopOf(x.shopId).ownerId === s.currentUserId,
+  });
 
   const api: Api = {
     mode: "demo",
@@ -869,7 +936,9 @@ export function createDemoApi(): Api {
       for (const r of replies) add(r.bidderId, r.amountCents);
       const now2 = roundBids(p)[0];
       if (now2.id !== top?.id) {
-        if (new Date(p.auctionEndsAt).getTime() - Date.now() < AUCTION_EXTEND_SECONDS * 1000) p.auctionEndsAt = new Date(Date.now() + AUCTION_EXTEND_SECONDS * 1000).toISOString();
+        // Live auctions: the last 10 seconds reset to 10, unless sudden death. Others: 60 seconds (0039, 0040).
+        const win = (p.liveShowId ? LIVE_AUCTION_EXTEND_SECONDS : AUCTION_EXTEND_SECONDS) * 1000;
+        if (!(p.liveShowId && p.suddenDeath) && new Date(p.auctionEndsAt).getTime() - Date.now() < win) p.auctionEndsAt = new Date(Date.now() + win).toISOString();
         const told = new Set([top?.bidderId, ...replies.map((r) => r.bidderId)].filter((x): x is string => !!x && x !== now2.bidderId && x !== u.id));
         for (const who of told) notify(who, "You've been outbid", `${p.title} is now at R${now2.amountCents / 100}. Bid again before it ends.`, `/i/${p.id}`);
         notify(sh.ownerId, `New bid: R${now2.amountCents / 100}`, p.title, `/i/${p.id}`);
@@ -1145,6 +1214,166 @@ export function createDemoApi(): Api {
       return { conversation: toConv(c, u.id), messages: s.messages.filter((m) => m.conversationId === cid)
         .map((m) => ({ id: m.id, body: m.body, createdAt: m.createdAt, mine: m.senderId === u.id, readAt: m.readAt, productId: m.productId ?? null,
           imageUrl: mediaUrl(m.image ?? null), offer: offerOf(m.offerId) })), typing: typingIn.has(cid) };
+    },
+    // ===== Live selling: same rules as migration 0040. The demo has no video service, so liveToken is null. =====
+    async liveShows() {
+      await mediaReady;
+      const t = Date.now();
+      return (s.liveShows ?? [])
+        .filter((x) => (x.status === "live" && x.startedAt && t - new Date(x.startedAt).getTime() < 8 * 3600e3)
+          || (x.status === "scheduled" && new Date(x.startsAt).getTime() > t - 3600e3))
+        .filter((x) => !s.currentUserId || !blockedBetween(s.currentUserId, shopOf(x.shopId).ownerId))
+        .sort((a, b) => (a.status === "live" ? 0 : 1) - (b.status === "live" ? 0 : 1)
+          || (a.status === "live" ? (b.startedAt ?? "").localeCompare(a.startedAt ?? "") : a.startsAt.localeCompare(b.startsAt)))
+        .map((x) => showOut(x, false));
+    },
+    async liveShow(showId) {
+      await mediaReady;
+      const x = (s.liveShows ?? []).find((y) => y.id === showId);
+      if (!x || (s.currentUserId && blockedBetween(s.currentUserId, shopOf(x.shopId).ownerId))) return null;
+      const a = x.auctionProductId ? s.products.find((p) => p.id === x.auctionProductId) : undefined;
+      if (a) settleAuction(a);
+      return showOut(x, true);
+    },
+    async createShow(title, startsAt) {
+      notSuspended();
+      const u = me();
+      const sh = s.shops.find((x) => x.ownerId === u.id);
+      if (!sh) throw new Error("Open your shop first.");
+      const why = liveBlocker(sh.id);
+      if (why) throw new Error(why);
+      const t = title.trim();
+      if (t.length < 3) throw new Error("Give your show a title of at least 3 letters.");
+      if (t.length > 80) throw new Error("Keep the title under 80 letters.");
+      if (isRude(t)) throw new Error("Please keep it friendly. That title has words we don't allow.");
+      if (startsAt && (new Date(startsAt).getTime() < Date.now() - 5 * 60e3 || new Date(startsAt).getTime() > Date.now() + 30 * 86400e3)) throw new Error("Pick a time in the next 30 days.");
+      if ((s.liveShows ?? []).filter((x) => x.shopId === sh.id && x.status === "scheduled" && new Date(x.startsAt).getTime() > Date.now()).length >= 5)
+        throw new Error("You already have 5 shows planned. Start or cancel one first.");
+      const show: DShow = { id: id(), shopId: sh.id, title: t, status: "scheduled", startsAt: startsAt ?? new Date().toISOString(), startedAt: null, endedAt: null,
+        pinnedProductId: null, auctionProductId: null, peakViewers: 0 };
+      s.liveShows = [...(s.liveShows ?? []), show];
+      save();
+      return show.id;
+    },
+    async goLive(showId) {
+      const u = me();
+      const x = myShow(showId, u.id);
+      if (x.status === "live") return;
+      if (x.status !== "scheduled") throw new Error("This show has ended. Start a new one.");
+      const why = liveBlocker(x.shopId);
+      if (why) throw new Error(why);
+      if ((s.liveShows ?? []).some((y) => y.shopId === x.shopId && y.status === "live")) throw new Error("You're already live in another show. End it first.");
+      Object.assign(x, { status: "live", startedAt: new Date().toISOString() });
+      const sh = shopOf(x.shopId);
+      const who = new Set([...s.follows.filter((f) => f.shopId === sh.id).map((f) => f.userId), ...(s.liveReminders ?? []).filter((r) => r.showId === x.id).map((r) => r.userId)]);
+      for (const w of who) if (w !== u.id && !blockedBetween(w, u.id)) notify(w, `@${sh.handle} is live`, x.title, `/live/${x.id}`);
+      save();
+    },
+    async endShow(showId) {
+      const u = me();
+      const x = myShow(showId, u.id);
+      if (x.status === "scheduled") { Object.assign(x, { status: "cancelled", endedAt: new Date().toISOString() }); save(); return { minutes: 0, peakViewers: 0, orders: 0, salesCents: 0, auctions: 0, auctionsWon: 0, cancelled: true }; }
+      if (x.status === "live") Object.assign(x, { status: "ended", endedAt: new Date().toISOString(), pinnedProductId: null });
+      const from = new Date(x.startedAt ?? x.startsAt).getTime(), to = new Date(x.endedAt ?? Date.now()).getTime();
+      const mine = s.orders.filter((o) => o.shop.id === x.shopId && !["pending_payment", "cancelled"].includes(o.status)
+        && ((new Date((o as any).createdAt).getTime() >= from && new Date((o as any).createdAt).getTime() <= to) || s.products.find((p) => p.id === o.product.id)?.liveShowId === x.id));
+      const auctions = s.products.filter((p) => p.liveShowId === x.id);
+      save();
+      return { minutes: Math.max(1, Math.ceil((to - from) / 60e3)), peakViewers: x.peakViewers, orders: mine.length,
+        salesCents: mine.reduce((n, o) => n + o.totals.itemPrice, 0), auctions: auctions.length,
+        auctionsWon: auctions.filter((p) => p.auctionState === "won" || p.auctionState === "paid").length } as LiveSummary;
+    },
+    async pinLiveItem(showId, productId) {
+      const x = myShow(showId, me().id);
+      if (x.status !== "live") throw new Error("Go live first.");
+      if (productId && !s.products.some((p) => p.id === productId && p.shopId === x.shopId && p.status === "live" && p.mode === "buy_now" && p.stock > 0))
+        throw new Error("Pick one of your live items with stock.");
+      x.pinnedProductId = productId;
+      save();
+    },
+    async startLiveAuction(showId, productId, startCents, seconds, suddenDeath) {
+      const u = me();
+      const x = myShow(showId, u.id);
+      if (x.status !== "live") throw new Error("Go live first.");
+      if (featureState(u.id, "auctions") === "off") throw new Error("Auctions are switched off for your account.");
+      const open = x.auctionProductId ? s.products.find((p) => p.id === x.auctionProductId) : undefined;
+      if (open) settleAuction(open);
+      if (open?.auctionState === "open") throw new Error("Wait for this auction to end first.");
+      const from = s.products.find((p) => p.id === productId && p.shopId === x.shopId);
+      if (!from || from.status !== "live" || from.mode !== "buy_now" || from.stock < 1) throw new Error("Pick one of your live items with stock.");
+      if (from.label === "authentic_designer") throw new Error("Designer items can't be auctioned live yet. Sell them with Buy now.");
+      if (seconds < 10 || seconds > 120) throw new Error("Live auctions run 10 to 120 seconds.");
+      if (startCents < 2000 || startCents > 5000000) throw new Error("Start between R20 and R50,000.");
+      if (featureState(u.id, "auctions") !== "on" && goodOrders(x.shopId) < GOOD_ORDERS_FOR_AUCTIONS && featureState(u.id, "live") !== "on")
+        throw new Error(`Auctions unlock after ${GOOD_ORDERS_FOR_AUCTIONS} delivered orders with good ratings.`);
+      const copy: DProduct = { ...from, id: id(), mode: "auction", stock: 1, priceCents: startCents, status: "live", reserveCents: null,
+        auctionEndsAt: new Date(Date.now() + seconds * 1000).toISOString(), auctionState: "open", auctionRound: 0, auctionWinner: null,
+        auctionPriceCents: null, auctionPayBy: null, liveShowId: x.id, fromProductId: from.id, suddenDeath, createdAt: new Date().toISOString() } as DProduct;
+      s.products = [...s.products, copy];
+      from.stock -= 1;
+      if (from.stock === 0) from.status = "sold_out";
+      Object.assign(x, { auctionProductId: copy.id, pinnedProductId: from.id });
+      save();
+      return copy.id;
+    },
+    async reportLiveViewers(showId, count) {
+      const x = (s.liveShows ?? []).find((y) => y.id === showId);
+      if (x && x.status === "live" && shopOf(x.shopId).ownerId === s.currentUserId) { x.peakViewers = Math.max(x.peakViewers, count); save(); }
+    },
+    async liveChat(showId) {
+      const x = (s.liveShows ?? []).find((y) => y.id === showId);
+      if (!x) return [];
+      const owner = shopOf(x.shopId).ownerId, viewer = s.currentUserId;
+      return (s.liveChat ?? []).filter((m) => m.showId === showId && !m.hidden && (!viewer || !blockedBetween(viewer, m.userId)))
+        .sort((a, b) => a.at.localeCompare(b.at)).slice(-50)
+        .map((m): LiveChatMessage => ({ id: m.id, who: handleOf(m.userId) ?? "someone", isSeller: m.userId === owner, body: m.body, at: m.at }));
+    },
+    async sayLive(showId, body) {
+      notSuspended(); notOff("comment");
+      const u = me();
+      if (!u.handle) throw new Error("Pick a username first.");
+      const x = (s.liveShows ?? []).find((y) => y.id === showId);
+      if (!x || x.status !== "live") throw new Error("This show isn't live.");
+      if (blockedBetween(u.id, shopOf(x.shopId).ownerId)) throw new Error("You can't chat in this show.");
+      const b = body.trim();
+      if (!b) throw new Error("Type a message.");
+      if (b.length > 200) throw new Error("Keep it under 200 letters.");
+      if (isRude(b)) throw new Error("Please keep it friendly. That message has words we don't allow.");
+      s.liveChat = [...(s.liveChat ?? []), { id: id(), showId, userId: u.id, body: b, at: new Date().toISOString() }];
+      save();
+    },
+    async hideLiveChat(messageId) {
+      const m = (s.liveChat ?? []).find((y) => y.id === messageId);
+      const x = m && (s.liveShows ?? []).find((y) => y.id === m.showId);
+      if (!m || !x || shopOf(x.shopId).ownerId !== s.currentUserId) throw new Error("You can't hide that message.");
+      m.hidden = true;
+      save();
+    },
+    async setLiveReminder(showId, on) {
+      const u = me();
+      const x = (s.liveShows ?? []).find((y) => y.id === showId);
+      if (!x || !["scheduled", "live"].includes(x.status)) throw new Error("This show has ended.");
+      s.liveReminders = (s.liveReminders ?? []).filter((r) => !(r.showId === showId && r.userId === u.id));
+      if (on) s.liveReminders.push({ showId, userId: u.id });
+      save();
+    },
+    async liveToken() { return null; },
+    watchLive(showId, onChange) {
+      // The demo's bot shows feel alive: now and then a bot says something and a viewer drops in.
+      const lines = ["Is this still available?", "What size is that?", "Love it", "Can you show the back?", "How much for two?", "Just joined, hi!", "Fire", "Does it shrink in the wash?"];
+      const t = window.setInterval(() => {
+        const x = (s.liveShows ?? []).find((y) => y.id === showId);
+        const owner = x ? shopOf(x.shopId).ownerId : null;
+        if (x && x.status === "live" && owner !== s.currentUserId && Math.random() < 0.3) {
+          const bots = s.users.filter((u) => u.id.startsWith("u-") && u.id !== owner && u.handle);
+          const who = bots[Math.floor(Math.random() * bots.length)];
+          const recent = new Set((s.liveChat ?? []).filter((m) => m.showId === showId).slice(-6).map((m) => m.body));
+          const line = lines.filter((l) => !recent.has(l))[Math.floor(Math.random() * lines.length)] ?? null;
+          if (who && line) { s.liveChat = [...(s.liveChat ?? []), { id: id(), showId, userId: who.id, body: line, at: new Date().toISOString() }]; x.peakViewers += Math.random() < 0.5 ? 1 : 0; save(); }
+        }
+        onChange();
+      }, 1500);
+      return () => window.clearInterval(t);
     },
     async productItem(productId) {
       await mediaReady;

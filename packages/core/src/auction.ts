@@ -6,6 +6,10 @@ export const AUCTION_DAYS = [1, 3, 5, 7] as const;
 export const AUCTION_PAY_HOURS = 2;
 /** A bid in the last 60 seconds resets the clock to 60 seconds (like eBay), so nobody wins by sniping. Decided 11 Nov 2026. */
 export const AUCTION_EXTEND_SECONDS = 60;
+/** Live auctions (in a show): a bid in the last 10 seconds resets the clock to 10, unless the seller picked sudden death. */
+export const LIVE_AUCTION_EXTEND_SECONDS = 10;
+/** How long a live auction can run, in seconds. */
+export const LIVE_AUCTION_SECONDS = [15, 30, 60] as const;
 
 /** The smallest raise over the current bid: R10 under R500, R20 under R2,000, then R50. */
 export function bidStep(currentCents: number): number {

@@ -22,7 +22,7 @@ Checked 7 Nov 2026 with the live health check. "Practical completion" here means
 | Team dashboard | Done and live |
 | Phone apps | Built (Capacitor). Store accounts, D-U-N-S, Mac for the iPhone build and push keys still to do |
 | Legal and company | Company registered. Company details in Terms and Privacy, Information Officer registration, help@myhaul.co.za still open |
-| Live selling | Not started (not needed for launch) |
+| Live selling | Built and tested in demo (shows, chat, Buy now, quick auctions, planned shows, reminders). Not live: needs migration 0040, the live-token function and a LiveKit Cloud project |
 
 ## Run the current version
 
@@ -63,10 +63,10 @@ Checked 7 Nov 2026 with the live health check. "Practical completion" here means
 
 ## Next up
 
-- **Deploy the finished app (needs Ofentse's "okay deploy"):** migration 0038, then functions checkout, delivery, order-action, seller-bank and run-due, then push main (branch `flat-prices` holds the work). The app on main must not go live before the server, or prices and payouts won't match. [Claude]
+- **Deploy the finished app (needs Ofentse's "okay deploy"):** migrations 0038, 0039 and 0040, then functions checkout, delivery, order-action, seller-bank, run-due and live-token, then push main (branch `flat-prices` holds the work). The app on main must not go live before the server, or prices and payouts won't match. [Claude]
 - **Bob Go sandbox:** key and sandbox mode are in and work. Ofentse adds the "Tracking updated" webhook in Bob Go (URL in docs/SETUP.md section 4: `.../functions/v1/bobgo-webhook`). Then test a full sandbox booking from a real order. Later: read "Shipment submission status" and "Shipment health status" to alert sellers when a booking fails or a parcel is stuck. [Ofentse, Claude]
 - **Mux Robots:** check videos when they're ready (hold flagged posts), suggest covers and listing details. [Claude]
-- **Live selling on Mux:** go live from the phone, watch, buy or bid during a live. [Claude]
+- **LiveKit for live video:** make a LiveKit Cloud project (livekit.io, free Build plan to test), then add `LIVEKIT_URL`, `LIVEKIT_API_KEY` and `LIVEKIT_API_SECRET` in Supabase > Edge Functions > Secrets (docs/SETUP.md section 5). Until then live shows open with a "Live video isn't set up yet" note. Then test a real show with two phones. [Ofentse, then Claude]
 - **Bob Go:** sandbox key and webhook secret in Supabase secrets (docs/SETUP.md section 4), then set `BOBGO_MODE=sandbox`. Everything else is already live. [Ofentse]
 - **Make Ofentse a team member (one line, Ofentse):** Supabase > SQL Editor, run `update profiles set role = 'admin' where id = (select id from auth.users where email = 'fentsechoshane@gmail.com');` Claude was not allowed to grant team access itself.
 - **Secrets (Ofentse or Lehloma, in Supabase > Edge Functions > Secrets):** `TRADESAFE_MODE=mock` and `APP_URL=https://myhaul-app.netlify.app` while testing. Payments are refused until TRADESAFE_MODE is set. Later: Mux, Anthropic, Telegram, Resend, Firebase and Apple push keys.
@@ -106,6 +106,21 @@ Debug as we go: anyone who finds or fixes a problem updates this list. Highest r
 Fixed in this round: Safari double back on the edge swipe (now only in the installed app), deleting an account now also deletes the person's photos and videos, React Router warnings.
 
 ## Log
+
+### 2026-11-11: Live selling
+
+Asked by Ofentse: "set up the entire live selling side". Picked LiveKit Cloud for video, and all four parts: the show, selling during it, live auctions, planned shows. **Not live yet** (branch `flat-prices`, needs migration 0040, the `live-token` function and LiveKit keys).
+
+- **Watch (`/live/:id`):** full screen video, LIVE badge with time and viewers, Follow, chat over the video, the pinned item with Buy now (normal checkout), and quick live auctions with hold to bid and the round +. "Tap for sound" when the phone blocks sound.
+- **Host (`/live/host/:id`):** camera preview, Go live, flip camera, mute, End. Pin an item, start a quick auction (pick the item, starting bid, 15, 30 or 60 seconds, sudden death switch), hide chat messages by tapping them. Ending shows "That's a wrap": time live, most watching, orders, sales, auctions sold.
+- **Planned shows:** start now or pick a time in the next 30 days (5 planned at most). Followers see them under "Coming up" in the Live tab and can tap Remind me. Going live tells followers and everyone with a reminder.
+- **Live tab** next to Following: "Live now" tiles (shops you follow first), then "Coming up". Live is on by default now (`VITE_LIVE=0` hides it).
+- **Who can go live:** shop checked, account in good standing, at least 5 items in stock (or 5 of one), and 5 good orders unless our team switches live on for the account. Same rule on the server and in the demo.
+- **Live auctions:** one unit comes off the listing's stock and is sold as its own short auction. A bid in the last 10 seconds resets the clock to 10 (sudden death: no reset). If nobody wins or the winner doesn't pay, the unit goes back to the listing. Designer items with a proof can't be live auctioned yet. Normal auctions keep the 60 second rule.
+- **Server (migration 0040):** tables `live_shows`, `live_reminders`, `live_chat` (Realtime on), functions to plan, go live, pin, start auctions, chat (20 a minute, rude words stopped), hide chat, end with a summary; run-due ends shows left on for over 6 hours. `live-token` function gives the seller a 6 hour pass to send video and viewers a 3 hour watch only pass (hidden, can't send video). Keys stay in Supabase secrets.
+- **Demo:** a sample live show and a planned one, bots chatting, the seller sees their own camera; nothing is sent anywhere.
+- Tests: database block (go live notifies, chat, pin, auction stock, 10 second reset, unpaid unit returned, sudden death, summary, cancelling), 2 token tests, e2e (host auction, watch, chat, bid, reminder, end summary, the stock rule).
+- **Open:** LiveKit Ship plan tops out at 1,000 watching one show at once [CONFIRM plan]. Live auction bid info refreshes every second (fine now, move to Realtime at scale). Needs a real two phone test after deploy.
 
 ### 2026-11-11: Custom bid sheet (option A) and Max bid
 

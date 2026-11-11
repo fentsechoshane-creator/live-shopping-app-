@@ -1,4 +1,6 @@
 import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
+import { WatchLive } from "./screens/live/Watch";
+import { HostLive } from "./screens/live/Host";
 import { MockLabel } from "./screens/MockLabel";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useSwipe } from "./components/gestures";
@@ -226,7 +228,8 @@ export function App() {
   const [welcome, setWelcome] = useState(() => !hasSeenWelcome() && loc.pathname === "/");
   useEffect(() => { if (loc.pathname === "/" && !hasSeenWelcome()) setWelcome(true); }, [loc.pathname]);
   useEffect(() => { setNavigator((path) => nav(path)); startNative(() => (window.history.length > 1 ? nav(-1) : nav("/"))); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { statusBarFor(welcome || loc.pathname === "/" || loc.pathname.startsWith("/post")); }, [loc.pathname, welcome]);
+  const fullScreen = loc.pathname.startsWith("/post") || loc.pathname.startsWith("/live/");
+  useEffect(() => { statusBarFor(welcome || loc.pathname === "/" || fullScreen); }, [loc.pathname, welcome, fullScreen]);
   // Only re-registers if notifications were already allowed. The question itself comes after an order or a first message.
   useEffect(() => { if (user) registerPush((token, platform) => api.savePushToken(token, platform)); }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const edgeBack = {
@@ -261,6 +264,8 @@ export function App() {
           <Route path="/sell" element={<Navigate to="/me?tab=selling" replace />} />
           <Route path="/sell/start" element={guard(<Onboarding />)} />
           <Route path="/post" element={guard(<Post />)} />
+          <Route path="/live/:id" element={<WatchLive />} />
+          <Route path="/live/host/:id" element={guard(<HostLive />)} />
           <Route path="/sell/new" element={<Navigate to="/post?mode=create" replace />} />
           <Route path="/sell/orders" element={guard(<SellerOrders />)} />
           <Route path="/sell/orders/:id" element={guard(<SellerOrderDetail />)} />
@@ -277,9 +282,9 @@ export function App() {
           <Route path="*" element={<NotFound />} />
         </Routes>
         </ErrorBoundary>
-        {!loc.pathname.startsWith("/post") && <Tabs />}
+        {!fullScreen && <Tabs />}
         <SideMenu />
-        {user && !welcome && !loc.pathname.startsWith("/post") && !loc.pathname.startsWith("/mock-pay") && <RewardSurprise />}
+        {user && !welcome && !fullScreen && !loc.pathname.startsWith("/mock-pay") && <RewardSurprise />}
         <SignInSheet />
         {welcome && <Welcome onDone={() => setWelcome(false)} />}
         {needsSetup && <AccountSetup />}

@@ -57,6 +57,20 @@ begin
 end $$;
 revoke execute on function run_max_bids(uuid, int) from public, anon, authenticated;
 
+-- No sniping (changed 11 Nov 2026 from 2 minutes, like eBay): a bid in the last 60 seconds resets the clock to 60 seconds.
+-- Live auctions replace this with their own rule in migration 0040.
+create function extend_auction_after_bid(p_product uuid) returns void
+language plpgsql security definer set search_path = public as $$
+declare ends timestamptz;
+begin
+  select auction_ends_at into ends from products where id = p_product;
+  if ends - now() < interval '60 seconds' then
+    perform set_config('app.auction_internal', '1', true);
+    update products set auction_ends_at = now() + interval '60 seconds' where id = p_product;
+  end if;
+end $$;
+revoke execute on function extend_auction_after_bid(uuid) from public, anon, authenticated;
+
 -- place_bid gains p_max: true sets (or raises) your max instead of bidding an exact amount.
 drop function place_bid(uuid, int);
 create function place_bid(p_product uuid, p_amount int, p_max boolean default false) returns jsonb
@@ -109,11 +123,7 @@ begin
   select * into nt from bids where product_id = p.id and round = p.auction_round order by amount_cents desc, created_at limit 1;
 
   if nt.id is distinct from t.id then
-    -- No sniping (changed 11 Nov 2026 from 2 minutes, like eBay): a bid in the last 60 seconds resets the clock to 60 seconds.
-    if p.auction_ends_at - now() < interval '60 seconds' then
-      perform set_config('app.auction_internal', '1', true);
-      update products set auction_ends_at = now() + interval '60 seconds' where id = p.id;
-    end if;
+    perform extend_auction_after_bid(p.id);
     -- Everyone who was on top or bid for by their max in this go, and isn't on top now, is told once.
     -- (You see the result straight away on screen, so you're not sent a notice.)
     for r in

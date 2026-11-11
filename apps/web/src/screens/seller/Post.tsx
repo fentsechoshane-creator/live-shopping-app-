@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { showTime } from "../live/Watch";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { FEATURES } from "../../features";
 import { goLiveBlockers, liveStock, MIN_LIVE_STOCK } from "@app/core";
 import { api } from "../../api";
-import { useLoad } from "../../session";
+import { useLoad, useSession } from "../../session";
 import { Icon } from "../../components/Icon";
-import { Loading, useGoBack } from "../../components/ui";
+import { ErrorNote, Loading, useGoBack } from "../../components/ui";
 import { CreateListing } from "./Create";
 import { EditVideo } from "./EditVideo";
 import type { EditDraft } from "../../api";
@@ -353,11 +354,18 @@ function Review({ file, onRetake, onUse, onEdit }: { file: File; onRetake: () =>
   );
 }
 
-/** Live: checks stock first. Streaming itself is coming next. */
+/** Live: checks the shop can go live (stock first), then start now or plan a show. Planned shows are listed to start or cancel. */
 function GoLive({ onCreate }: { onCreate: () => void }) {
   const [shop] = useLoad(() => api.myShop(), []);
   const [features] = useLoad(() => api.myFeatures(), []);
+  const [shows, , reloadShows] = useLoad(() => api.liveShows(), []);
+  const { toast } = useSession();
   const [tried, setTried] = useState(false);
+  const [title, setTitle] = useState("");
+  const [later, setLater] = useState(false);
+  const [when, setWhen] = useState(() => { const d = new Date(Date.now() + 86400e3); d.setHours(18, 0, 0, 0); return toLocalInput(d); });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const nav = useNavigate();
   const stock = shop ? liveStock(shop.products) : 0;
   const blockers = useCallback(() => {
@@ -368,37 +376,80 @@ function GoLive({ onCreate }: { onCreate: () => void }) {
   }, [shop, stock, features]);
   if (shop === undefined) return <div className="cam"><div className="cam-msg"><Loading /></div></div>;
   const list = blockers();
+  const mine = (shows ?? []).filter((x) => x.mine);
+  const submit = async () => {
+    setBusy(true); setError(null);
+    try {
+      const sid = await api.createShow(title, later ? new Date(when).toISOString() : null);
+      if (later) { toast("Show planned. Followers can ask for a reminder."); setTitle(""); setLater(false); setTried(false); reloadShows(); }
+      else nav(`/live/host/${sid}`);
+    } catch (e) { setError(e instanceof Error ? e.message : "That didn't work. Try again."); }
+    finally { setBusy(false); }
+  };
 
   return (
     <div className="cam live-bg">
       <div className="live-panel">
         <span className="live-badge"><span className="dot-live" />LIVE</span>
-        <b>Sell live with pop up Buy now cards</b>
+        <b>Sell live with Buy now cards and quick auctions</b>
         <span className="muted-on-video">You need at least {MIN_LIVE_STOCK} items in stock, or {MIN_LIVE_STOCK} of one item. You have {stock}.</span>
         <div className="stock-bar" aria-hidden="true"><span style={{ width: `${Math.min(100, (stock / MIN_LIVE_STOCK) * 100)}%` }} /></div>
         <button className="btn go-live" onClick={() => setTried(true)}>Go live</button>
+        {mine.length > 0 && (
+          <div className="live-mine">
+            {mine.map((x) => (
+              <div key={x.id} className="live-later-row vglass">
+                <span className="live-later-main"><span><b>{x.title}</b><span>{x.status === "live" ? "Live now" : showTime(x.startsAt)}</span></span></span>
+                <button className="btn small green" onClick={() => nav(`/live/host/${x.id}`)}>{x.status === "live" ? "Open" : "Start"}</button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {tried && (
         <div className="sheet-backdrop" onClick={(e) => e.target === e.currentTarget && setTried(false)}>
-          <div className="sheet glass" role="dialog" aria-modal="true" aria-label={list.length ? "Can't go live yet" : "Going live"}>
+          <div className="sheet glass" role="dialog" aria-modal="true" aria-label={list.length ? "Can't go live yet" : "Start a show"}>
             <div className="grabber" />
-            <div className="sheet-head"><h2>{list.length ? "Can't go live yet" : "You're ready to go live"}</h2>
+            <div className="sheet-head"><h2>{list.length ? "Can't go live yet" : "Start a show"}</h2>
               <button className="icon-btn" onClick={() => setTried(false)} aria-label="Close"><Icon name="close" /></button></div>
             <div className="sheet-body stack">
-              {list.length ? list.map((b) => <div key={b} className="note amber">{b}</div>)
-                : <div className="note green">Your stock and record are ready. Live streaming with pop up Buy now cards is coming next, and you'll be one of the first to get it.</div>}
+              {list.length ? list.map((b) => <div key={b} className="note amber">{b}</div>) : (
+                <>
+                  <div className="field">
+                    <label htmlFor="show-title">Show title</label>
+                    <input id="show-title" value={title} onChange={(e) => setTitle(e.target.value.slice(0, 80))} placeholder="Friday thrift drop" enterKeyHint="done" />
+                  </div>
+                  <div className="seg-row" role="radiogroup" aria-label="When">
+                    <button role="radio" aria-checked={!later} className={!later ? "on" : ""} onClick={() => setLater(false)}>Now</button>
+                    <button role="radio" aria-checked={later} className={later ? "on" : ""} onClick={() => setLater(true)}>Later</button>
+                  </div>
+                  {later && (
+                    <div className="field">
+                      <label htmlFor="show-when">Starts</label>
+                      <input id="show-when" type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} />
+                    </div>
+                  )}
+                  <p className="small muted">{later ? "Followers see it in the Live tab and can ask for a reminder." : "Next you'll see your camera. Nothing goes out until you tap Go live."}</p>
+                  <ErrorNote error={error} />
+                </>
+              )}
             </div>
-            {list.length > 0 && (
-              <div className="sheet-foot">
-                {!shop || shop.status !== "open"
-                  ? <button className="btn green block big" onClick={() => nav("/sell/start")}>Open my shop</button>
-                  : <button className="btn green block big" onClick={() => { setTried(false); onCreate(); }}>Create a listing</button>}
-              </div>
-            )}
+            <div className="sheet-foot">
+              {list.length > 0 ? (!shop || shop.status !== "open"
+                ? <button className="btn green block big" onClick={() => nav("/sell/start")}>Open my shop</button>
+                : <button className="btn green block big" onClick={() => { setTried(false); onCreate(); }}>Create a listing</button>)
+                : <button className="btn green block big" disabled={busy || title.trim().length < 3} onClick={submit}>{later ? "Plan show" : "Open camera"}</button>}
+            </div>
           </div>
         </div>
       )}
     </div>
   );
+}
+
+/** A date for an <input type="datetime-local">, in the phone's own time. */
+function toLocalInput(d: Date) {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 }

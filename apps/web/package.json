@@ -29,6 +29,7 @@
     "@capacitor/status-bar": "8.0.4",
     "@supabase/supabase-js": "2.118.0",
     "hls.js": "1.5.17",
+    "livekit-client": "2.23.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "react-router-dom": "7.18.5"

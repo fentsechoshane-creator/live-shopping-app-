@@ -1107,6 +1107,41 @@ try {
   await page.getByText("Paid once a month from now on").waitFor();
   await shot("payouts-owed");
 
+  // ===== Live selling: host a show, pin, a quick auction, watch, chat, bid, reminders, end =====
+  await page.goto(`${BASE}/live/host/ls-1`);
+  await page.getByRole("button", { name: /Pin item/ }).waitFor();
+  await page.getByRole("button", { name: /Auction/ }).click();
+  await page.getByRole("dialog", { name: "Start an auction" }).waitFor();
+  await page.getByRole("button", { name: /Start 30 second auction/ }).click();
+  await page.locator(".live-auction").waitFor();
+  await shot("live-host-auction");
+  await signOut();
+  await signIn("buyer@test.co.za");
+  await page.goto(`${BASE}/?tab=live`);
+  await page.getByText("Live now").waitFor();
+  await page.getByRole("button", { name: /thrift.with.lebo is live/ }).click();
+  await page.locator(".live-auction").waitFor();
+  await page.getByLabel("Say something").fill("Do you have it in XL?");
+  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByText("Do you have it in XL?").waitFor();
+  await hold(page.locator(".live-auction").getByRole("button", { name: /^Hold to bid/ }), 3400);
+  await page.getByText(/You're the top bidder/).first().waitFor();
+  await shot("live-watch-bid");
+  await page.goto(`${BASE}/live/ls-2`);
+  await page.getByRole("button", { name: /Remind me/ }).click();
+  await page.getByRole("button", { name: /Reminder on/ }).waitFor();
+  await signOut();
+  await signIn("lebo@shop.demo");
+  await page.goto(`${BASE}/live/host/ls-1`);
+  await page.getByRole("button", { name: "End", exact: true }).click({ force: true });
+  await page.getByRole("button", { name: "End show" }).click();
+  await page.getByText("That's a wrap").waitFor();
+  await shot("live-summary");
+  await page.goto(`${BASE}/post?mode=live`);
+  // Selling took stock below 5 during this run, so going live is stopped until there's more.
+  await page.getByRole("button", { name: "Go live" }).click();
+  await page.getByText(/You can't go live without stock/).waitFor();
+
   // For the screen audit (e2e/audit.mjs): keep the demo state this run built up.
   if (process.env.DUMP_STATE) writeFileSync(process.env.DUMP_STATE, await page.evaluate(() => JSON.stringify(Object.fromEntries(Object.entries(localStorage)))));
   if (errors.length) throw new Error("Page errors: " + errors.join(" | "));

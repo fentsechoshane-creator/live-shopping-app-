@@ -1488,3 +1488,135 @@ button.g3 { border: 0; padding: 0; display: block; width: 100%; }
 .fold-head > span { line-height: 22px; display: flex; align-items: center; }
 .fold-head .fold-count { font-size: 16px; font-weight: 400; color: var(--ink-3); font-variant-numeric: tabular-nums; }
 .fold-head svg { display: block; flex: none; }
+
+/* ===== Live selling (Nov 2026): watch, host, the Live tab. Always on dark video, like the feed. ===== */
+.live-screen { position: fixed; inset: 0; background: #0b0b0d; color: #fff; overflow: hidden; z-index: 5; }
+.live-video, .live-video > * { position: absolute; inset: 0; width: 100%; height: 100%; }
+.live-video video { object-fit: cover; background: #000; }
+.live-video video.mirror { transform: scaleX(-1); }
+.live-demo-bg { background: radial-gradient(120% 80% at 50% 25%, #3d4a5c, #0b0b0d 70%); }
+.live-shade { position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(180deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0) 22%, rgba(0,0,0,0) 48%, rgba(0,0,0,0.72) 100%); }
+.live-center { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; }
+.live-top { position: absolute; left: 0; right: 0; top: calc(env(safe-area-inset-top, 0px) + 10px); padding: 0 12px; display: flex; align-items: center; gap: 10px; z-index: 2; }
+.live-shop { display: flex; align-items: center; gap: 9px; min-width: 0; flex: 1; color: #fff; text-decoration: none; }
+.live-shop > span:last-child { display: flex; flex-direction: column; min-width: 0; }
+.live-shop b { font-size: 15px; }
+.live-title { font-size: 13px; opacity: 0.85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.live-close { flex: none; width: 36px; height: 36px; border-radius: 50%; border: 0; display: grid; place-items: center; color: #fff; }
+.live-badges { position: absolute; left: 12px; top: calc(env(safe-area-inset-top, 0px) + 58px); display: flex; gap: 6px; z-index: 2; }
+.live-screen.host .live-badges { position: static; }
+.live-pill { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 8px; background: #ff3b30; color: #fff;
+  font-size: 13px; font-weight: 700; letter-spacing: 0.04em; }
+.live-pill .dot-live { background: #fff; animation: pulse 1.2s ease-in-out infinite alternate; }
+.live-pill .t { font-family: var(--font-round); font-variant-numeric: tabular-nums; font-weight: 600; letter-spacing: 0; opacity: 0.9; }
+.live-pill.off { background: rgba(30, 30, 34, 0.6); }
+.live-viewers { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 10px; border-radius: 8px; color: #fff; font-size: 13px; font-weight: 600;
+  font-variant-numeric: tabular-nums; }
+.live-demo-tag { position: absolute; right: 12px; top: calc(env(safe-area-inset-top, 0px) + 58px); padding: 4px 10px; border-radius: 8px; font-size: 12px; color: #fff; z-index: 2; }
+.live-sound { position: absolute; left: 50%; top: 40%; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 18px;
+  border-radius: 999px; border: 0; color: #fff; font: inherit; font-weight: 600; z-index: 3; }
+.live-bottom { position: absolute; left: 0; right: 0; bottom: 0; padding: 0 12px calc(env(safe-area-inset-bottom, 0px) + 12px); display: flex; flex-direction: column; gap: 10px; z-index: 2; }
+.live-bottom.start { gap: 14px; padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 24px); }
+.live-ready { text-align: center; display: flex; flex-direction: column; gap: 4px; }
+.live-ready b { font-size: 20px; }
+.live-ready span { font-size: 15px; opacity: 0.85; }
+.btn.go-live.block { width: 100%; margin: 0; min-height: 52px; gap: 8px; }
+.btn.go-live .dot-live { background: #fff; }
+
+/* Chat: newest at the bottom, older lines fade at the top. */
+.live-chat { display: flex; flex-direction: column; gap: 8px; }
+.live-chat-list { max-height: 30vh; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; padding-top: 24px; scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 32px); mask-image: linear-gradient(180deg, transparent 0, #000 32px); }
+.live-chat-list::-webkit-scrollbar { display: none; }
+.live-msg { align-self: flex-start; max-width: 82%; font-size: 15px; line-height: 1.3; padding: 5px 11px; border-radius: 14px; background: rgba(0, 0, 0, 0.32);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4); overflow-wrap: anywhere; }
+.live-msg b { font-weight: 600; opacity: 0.8; margin-right: 2px; }
+.live-msg.seller b { color: var(--green); opacity: 1; }
+.live-say { display: flex; align-items: center; gap: 6px; height: 44px; padding: 0 4px 0 16px; border-radius: 999px; }
+.live-say input { flex: 1; min-width: 0; border: 0; background: none; color: #fff; font: inherit; font-size: 16px; outline: none; padding: 0; box-shadow: none; min-height: 0; }
+.live-say input::placeholder { color: rgba(255, 255, 255, 0.7); }
+.live-say button { flex: none; width: 36px; height: 36px; border-radius: 50%; border: 0; display: grid; place-items: center; background: var(--green); color: var(--green-ink); }
+.live-say button:disabled { background: rgba(255, 255, 255, 0.16); color: rgba(255, 255, 255, 0.6); }
+
+/* Pinned item and live auction cards. */
+.live-card, .live-auction { border-radius: 18px; padding: 10px; color: #fff; }
+.live-card { display: flex; align-items: center; gap: 10px; }
+.live-card > span:first-child, .live-auction-top > span:first-child, .live-pick-art { position: relative; flex: none; width: 48px; height: 48px; border-radius: 12px; overflow: hidden; display: block; }
+.live-card-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.live-card-text > b { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.live-card-text > span { font-size: 13px; opacity: 0.85; }
+.live-card .btn { flex: none; min-height: 40px; padding: 0 16px; font-size: 15px; }
+.live-auction { display: flex; flex-direction: column; gap: 10px; transition: box-shadow 0.3s ease; }
+.live-auction.ending { box-shadow: inset 0 0 0 1.5px rgba(255, 149, 0, 0.9), 0 0 24px rgba(255, 149, 0, 0.25); }
+.live-auction-top { display: flex; align-items: center; gap: 10px; }
+.live-clock { flex: none; width: 50px; height: 50px; border-radius: 50%; display: grid; place-items: center; font-size: 19px; font-weight: 700;
+  background: conic-gradient(#ff9500 calc(var(--frac, 0) * 360deg), rgba(255, 255, 255, 0.16) 0); position: relative; }
+.live-clock::before { content: ""; position: absolute; inset: 4px; border-radius: 50%; background: rgba(20, 20, 24, 0.92); }
+.live-clock span { position: relative; }
+.live-auction.ending .live-clock span { color: #ff9f0a; }
+.live-auction-note { text-align: center; font-size: 15px; font-weight: 600; opacity: 0.9; }
+.live-auction-note.green { color: var(--green); }
+.live-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.live-tools .btn { min-height: 44px; gap: 8px; }
+.live-end { flex: none; height: 36px; padding: 0 16px; border-radius: 999px; border: 0; background: #ff3b30; color: #fff; font: inherit; font-size: 15px; font-weight: 600; }
+
+/* End of show summary. */
+.live-wait .live-center { background: radial-gradient(120% 80% at 50% 20%, #23282f, #0b0b0d 70%); }
+.live-summary { width: 100%; max-width: 360px; display: flex; flex-direction: column; align-items: center; gap: 16px; color: #fff; }
+.live-summary h1 { margin: 0; color: #fff; }
+.live-summary > svg { color: var(--green); }
+.live-summary .group { width: 100%; }
+.live-summary .cell { display: flex; justify-content: space-between; }
+
+/* Picking items (host sheets). */
+.cell.live-pick { width: 100%; display: flex; align-items: center; gap: 12px; border: 0; background: none; text-align: left; font: inherit; color: var(--ink); }
+.cell.live-pick .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.live-pick-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 10px; scrollbar-width: none; }
+.live-pick-chip { flex: none; display: flex; align-items: center; gap: 8px; max-width: 220px; padding: 6px 12px 6px 6px; border-radius: 16px; border: 0;
+  background: var(--surface); box-shadow: inset 0 0 0 1px var(--hairline); color: var(--ink); font: inherit; font-size: 14px; text-align: left; }
+.live-pick-chip > span:last-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.live-pick-chip .live-pick-art { width: 36px; height: 36px; border-radius: 10px; }
+.live-pick-chip.on { box-shadow: inset 0 0 0 2px var(--green); }
+.seg-row { display: grid; grid-template-columns: 1fr 1fr; padding: 2px; border-radius: 10px; background: var(--surface-2); }
+.seg-row button { height: 34px; border: 0; border-radius: 8px; background: none; color: var(--ink); font: inherit; font-size: 15px; font-weight: 600; }
+.seg-row button.on { background: var(--surface); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12); }
+
+/* The Live tab. */
+.live-list { position: absolute; inset: 0; overflow-y: auto; background: #0b0b0d; color: #fff;
+  padding: calc(env(safe-area-inset-top, 0px) + 64px) 12px calc(var(--tab-space) + 24px); }
+.live-h { font-size: 20px; margin: 8px 4px 10px; color: #fff; }
+.live-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 18px; }
+.live-tile { position: relative; aspect-ratio: 3 / 4.4; border-radius: 16px; overflow: hidden; border: 0; padding: 0; color: #fff; text-align: left; font: inherit; }
+.live-tile-bg { position: absolute; inset: 0; background: linear-gradient(160deg, #4a3a5c, #15171b); }
+.live-tile-bg[data-cat="clothes"] { background: linear-gradient(160deg, #5b4636, #15171b); }
+.live-tile-bg[data-cat="designer"] { background: linear-gradient(160deg, #2f3a4a, #15171b); }
+.live-tile-bg[data-cat="food"] { background: linear-gradient(160deg, #6b4a4a, #15171b); }
+.live-tile .live-pill { position: absolute; left: 8px; top: 8px; height: 22px; font-size: 12px; }
+.live-tile .live-viewers { position: absolute; right: 8px; top: 8px; height: 22px; font-size: 12px; }
+.live-tile-foot { position: absolute; left: 0; right: 0; bottom: 0; padding: 28px 10px 10px; display: flex; gap: 8px; align-items: flex-end;
+  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.7)); }
+.live-tile-foot > span:last-child { display: flex; flex-direction: column; min-width: 0; }
+.live-tile-foot b { font-size: 13px; }
+.live-tile-foot span span { font-size: 13px; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.live-later { display: flex; flex-direction: column; gap: 8px; }
+.live-later-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 16px; color: #fff; }
+.live-later-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; border: 0; background: none; color: inherit; font: inherit; text-align: left; padding: 0; }
+.live-later-main > span:last-child { display: flex; flex-direction: column; min-width: 0; }
+.live-later-main b { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.live-later-main span span { font-size: 13px; opacity: 0.8; }
+.live-later-row .btn.small { flex: none; gap: 6px; }
+.live-mine { width: 100%; margin-top: 18px; display: flex; flex-direction: column; gap: 8px; text-align: left; }
+.live-video { z-index: 0; isolation: isolate; pointer-events: none; }
+.live-video .vbar, .live-video .vcontrols { display: none; }
+.live-video .live-center { pointer-events: auto; }
+/* Small square item pictures in live cards and pickers (the art inside fills them). */
+.live-thumb, .live-pick-art { position: relative; flex: none; width: 48px; height: 48px; border-radius: 12px; overflow: hidden; display: block; background: #222; }
+.live-thumb > *, .live-pick-art > * { position: absolute !important; inset: 0; width: 100% !important; height: 100% !important; }
+.live-pick-chip .live-pick-art { width: 36px; height: 36px; border-radius: 10px; }
+.cell.live-pick .live-pick-art { width: 44px; height: 44px; }
+/* Sheets opened over a live keep the normal page colours. */
+.live-screen .sheet, .live-screen .sheet-backdrop .sheet { color: var(--ink); }
+/* Notices on a live drop in below the top bar, so they never cover Close, End or the viewer count. */
+body:has(.live-screen) .toast { top: calc(env(safe-area-inset-top, 0px) + 96px); }
+.live-chat-list { max-height: 26vh; }

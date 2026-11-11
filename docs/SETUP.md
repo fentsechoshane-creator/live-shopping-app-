@@ -117,6 +117,17 @@ myHaul books every courier and locker parcel through Bob Go when the seller mark
 
 Without Bob Go set (`BOBGO_MODE` empty), checkout offers collection only. `BOBGO_MODE=mock` fakes bookings for testing, and never runs on the myhaul.co.za site. If a webhook is missed, run-due checks tracking every 15 minutes as a backup.
 
+## 5. LiveKit (live video)
+
+Live shows send video through LiveKit Cloud. The app never sees the keys: the `live-token` function gives each phone a short pass.
+
+1. Sign up at https://cloud.livekit.io and create a project (the free Build plan is enough to test).
+2. In the project, Settings, Keys: create an API key. Copy the WebSocket URL (starts with `wss://`), the key and the secret.
+3. In Supabase, Edge Functions, Secrets, add `LIVEKIT_URL`, `LIVEKIT_API_KEY` and `LIVEKIT_API_SECRET`. Never paste them into chat.
+4. Deploy the `live-token` function (it runs without a signed in user so guests can watch; it checks the seller itself).
+
+Without these, live shows still open but say "Live video isn't set up yet." Chat, pinning and auctions work either way.
+
 ## Hosting the web app
 
 `npm run build` makes `apps/web/dist`, a static site. Any static host works (Vercel, Netlify, Cloudflare Pages). Set the three `VITE_` variables there and send all routes to `index.html`.
