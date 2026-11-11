@@ -107,6 +107,10 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-11: Faster first load
+
+Ofentse said the site loaded a bit slowly. The database answers in under 5 ms, so it was the download. Screens most visits don't open (seller tools, the camera and editor, live screens, the team dashboard, stats) now load only when opened, so the main download is 180 kB compressed (was 215 kB after today's features, 190 kB before). App files also get a one year cache (`/assets/*` in public/_headers and netlify.toml): they change name on every build, so repeat visits don't download them again. netlify.toml also got the LiveKit and Google addresses it was missing.
+
 ### 2026-11-11: Google address search, and the live video security fix
 
 - **Security fix:** the site's content security rule (public/_headers and index.html) only allowed our own server and Mux, so the browser would have blocked LiveKit video and Google. Added `https://*.livekit.cloud`, `wss://*.livekit.cloud` and `https://places.googleapis.com`.

@@ -1,8 +1,5 @@
 import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
-import { WatchLive } from "./screens/live/Watch";
-import { HostLive } from "./screens/live/Host";
-import { MockLabel } from "./screens/MockLabel";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Suspense, lazy, useEffect, useRef, useState, type ReactNode } from "react";
 import { useSwipe } from "./components/gestures";
 import { isNative, registerPush, setNavigator, startNative, statusBarFor } from "./native";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -21,15 +18,23 @@ import { Inbox, ShopPage, SignIn, SignInSheet } from "./screens/buyer/Account";
 import { FindFriends, FriendThread, PersonPage } from "./screens/buyer/Friends";
 import { RewardSurprise } from "./components/Rewards";
 import { Profile } from "./screens/buyer/Profile";
-import { Onboarding } from "./screens/seller/Onboarding";
-import { Payouts, SellerOrderDetail, SellerOrders } from "./screens/seller/Selling";
-import { Post, SellerGate } from "./screens/seller/Post";
-import { TeamApp } from "./screens/team/Team";
 import { Thread } from "./screens/buyer/Messages";
 import { BlockedAccounts, DeliverySettings, DeleteAccountSheet, Privacy, Terms, CONTACT } from "./screens/Settings";
 import { APP_VERSION, BUILT_AT } from "./lib/report";
-import { SellerStatsScreen } from "./screens/seller/Stats";
 import { InviteCatcher, InviteScreen } from "./screens/buyer/Invite";
+
+// Screens most people don't open on a visit load only when opened, so the feed shows sooner.
+const WatchLive = lazy(() => import("./screens/live/Watch").then((m) => ({ default: m.WatchLive })));
+const HostLive = lazy(() => import("./screens/live/Host").then((m) => ({ default: m.HostLive })));
+const MockLabel = lazy(() => import("./screens/MockLabel").then((m) => ({ default: m.MockLabel })));
+const Onboarding = lazy(() => import("./screens/seller/Onboarding").then((m) => ({ default: m.Onboarding })));
+const SellerOrders = lazy(() => import("./screens/seller/Selling").then((m) => ({ default: m.SellerOrders })));
+const SellerOrderDetail = lazy(() => import("./screens/seller/Selling").then((m) => ({ default: m.SellerOrderDetail })));
+const Payouts = lazy(() => import("./screens/seller/Selling").then((m) => ({ default: m.Payouts })));
+const Post = lazy(() => import("./screens/seller/Post").then((m) => ({ default: m.Post })));
+const SellerGate = lazy(() => import("./screens/seller/Post").then((m) => ({ default: m.SellerGate })));
+const TeamApp = lazy(() => import("./screens/team/Team").then((m) => ({ default: m.TeamApp })));
+const SellerStatsScreen = lazy(() => import("./screens/seller/Stats").then((m) => ({ default: m.SellerStatsScreen })));
 
 function RequireUser({ children }: { children: ReactNode }) {
   const { user, ready } = useSession();
@@ -97,7 +102,7 @@ function Tabs() {
         {myPhoto ? <span className="tab-avatar"><img src={myPhoto} alt="" /></span> : <Icon name="user" />}<span>Me</span>{toShip > 0 && <span className="dot" />}
       </NavLink>
     </nav>
-    <SellerGate open={ask} onClose={() => setAsk(false)} onYes={() => setAsk(false)} unfinished={!!shop} />
+    {ask && <Suspense fallback={null}><SellerGate open={ask} onClose={() => setAsk(false)} onYes={() => setAsk(false)} unfinished={!!shop} /></Suspense>}
     </>
   );
 }
@@ -245,11 +250,12 @@ export function App() {
     },
   };
   // The team dashboard is a full width page for laptops, outside the phone layout.
-  if (loc.pathname === "/team" || loc.pathname.startsWith("/team/")) return <TeamApp />;
+  if (loc.pathname === "/team" || loc.pathname.startsWith("/team/")) return <Suspense fallback={<div className="screen"><Loading /></div>}><TeamApp /></Suspense>;
   return (
     <div className="phone">
       <div className="content" {...edgeBack}>
         <ErrorBoundary resetKey={loc.pathname} onHome={() => nav("/")}>
+        <Suspense fallback={<div className="screen"><Loading /></div>}>
         <Routes>
           <Route path="/" element={<Feed />} />
           <Route path="/explore" element={<Explore />} />
@@ -286,6 +292,7 @@ export function App() {
           <Route path="/terms" element={<Terms />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
+        </Suspense>
         </ErrorBoundary>
         {!fullScreen && <Tabs />}
         <SideMenu />

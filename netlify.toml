@@ -27,10 +27,15 @@
     Referrer-Policy = "strict-origin-when-cross-origin"
     Permissions-Policy = "camera=(self), microphone=(self), geolocation=(self), payment=(), usb=(), interest-cohort=()"
     Cross-Origin-Opener-Policy = "same-origin"
-    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://gingqryoycwtzbfvfbln.supabase.co https://image.mux.com; media-src 'self' blob: https://gingqryoycwtzbfvfbln.supabase.co https://*.mux.com; connect-src 'self' https://gingqryoycwtzbfvfbln.supabase.co wss://gingqryoycwtzbfvfbln.supabase.co https://*.mux.com https://storage.googleapis.com; worker-src 'self' blob:; base-uri 'self'; form-action 'self'; object-src 'none'; frame-ancestors 'none'; upgrade-insecure-requests"
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://gingqryoycwtzbfvfbln.supabase.co https://image.mux.com; media-src 'self' blob: https://gingqryoycwtzbfvfbln.supabase.co https://*.mux.com; connect-src 'self' https://gingqryoycwtzbfvfbln.supabase.co wss://gingqryoycwtzbfvfbln.supabase.co https://*.mux.com https://storage.googleapis.com https://places.googleapis.com https://*.livekit.cloud wss://*.livekit.cloud; worker-src 'self' blob:; base-uri 'self'; form-action 'self'; object-src 'none'; frame-ancestors 'none'; upgrade-insecure-requests"
 
 # Every app screen is served by the single page app.
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
