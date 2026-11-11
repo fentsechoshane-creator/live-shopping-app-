@@ -12,7 +12,7 @@ Checked 7 Nov 2026 with the live health check. "Practical completion" here means
 
 | Area | Status |
 | --- | --- |
-| Business rules, database, security rules, server functions | Done and tested. Live database up to 0041 (11 Nov) |
+| Business rules, database, security rules, server functions | Done and tested. Live database up to 0042 (11 Nov) |
 | Buyer side (feed, Explore, checkout, orders, returns, cancelling, friends, sharing, Inbox) | Done and live |
 | Seller side (sign up, checks, Create with camera and editor, orders, shipping, payouts) | Done. Editing or taking down a listing after posting is built, not live yet |
 | Payments (TradeSafe escrow) | Working in TradeSafe's developer sandbox (real test payments with Ozow). Needs the production account and keys |
@@ -115,7 +115,7 @@ Asked by Ofentse: the code sign in was confusing (the email only had a confirm l
 - **Sign in:** username or email, and password. **Forgot password?** emails a code, then you pick a new password. Accounts made before passwords use this once.
 - **Server:** migration 0042 `password_login_check` (service role only; 10 tries per account per 15 minutes) and the `password-login` function: it checks the password, then gives the phone a one time sign in token. A username never reveals the email behind it.
 - **Thumbnails:** items only ever showed the demo drawings, so real listings were dark boxes in Explore, profiles, orders, checkout, chats, stats and live. Now each shows its cover: a still from the Mux video, the photo, or the first frame of the video file. One batched lookup for every list on screen (0042 `product_thumbs`; removed items only for their buyer and seller).
-- **Not live yet:** needs migration 0042, the password-login function, the email template change (docs/SETUP.md section 7), then main. Pushed to `flat-prices` only, because the new sign in needs the server first.
+- **Deployed 11 Nov (Ofentse: "deploy"):** migration 0042 (live version 20261111191921), the password-login function, then main. Ofentse to update the Confirm signup and Magic Link email templates so the code shows (docs/SETUP.md section 7) [CONFIRM done].
 
 ### 2026-11-11: Faster first load
 
