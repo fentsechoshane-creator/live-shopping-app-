@@ -78,7 +78,7 @@ Checked 7 Nov 2026 with the live health check. "Practical completion" here means
 - **Links open the app:** put the Apple Team ID in `public/.well-known/apple-app-site-association` and the Play signing SHA256 in `assetlinks.json`; turn on Associated Domains and Push in Xcode. [Lehloma]
 - Developer accounts, Google's 12 tester 14 day closed test, reviewer test account. [Ofentse]
 - Apple and Firebase keys for push (the sender is built), PUDO and Courier Guy accounts for real lockers and tracking. [Lehloma]
-- Then: video cover and trim. Decide whether inviting a friend earns money (built without a reward for now). [Ofentse]
+- Then: video cover and trim. Confirm the invite reward cap (10 friends) and that the friend still gets R50 when the inviter never bought. [Ofentse]
 
 ## Known issues and risks
 
@@ -116,7 +116,8 @@ Asked by Ofentse ("let's do those nice to haves and the 1%"). **Not live yet** (
 - **Search with filters (Explore):** the server searches everything for sale (every word has to match). Filters: sort (best, newest, price both ways), size (from what's listed), price (quick ranges or your own), ships from (province of the seller's pickup address; city and street stay private). Applied filters show as chips you can tap off. "Show more" loads the next 20.
 - **Shop reviews:** stars, count and "4.7, 3 reviews" under the shop name; tap for the spread of stars and the written reviews. Who wrote it stays hidden (the 5 Nov privacy fix): "Verified buyer", the item and the month. Suspended buyers' reviews don't count.
 - **Seller stats (Me, Stats):** 7, 30 or 90 days: sales, orders, views and people, buyers, followers, views and sales by day (tap a bar), likes, reposts, returns, live shows, top 5 items. A view is one signed in person watching a post for 2 seconds, once a day; your own views and guests don't count. Views older than 120 days are cleared by run-due.
-- **Invite a friend (menu):** share `myhaul.co.za/?invite=<username>`. A brand new account (under a day old, no orders) that opens it is linked once to the inviter; they follow each other and the inviter is told. **No money for inviting** [CONFIRM with Ofentse]: a sign up reward gets farmed, the same reason the welcome credit was dropped.
+- **Invite a friend (menu):** share `myhaul.co.za/?invite=<username>`. A brand new account (under a day old, no orders) that opens it is linked once to the inviter; they follow each other and the inviter is told.
+- **Invite reward (Ofentse, 11 Nov):** when the friend's first purchase passes its return window, the friend gets R50 and so does the inviter, if the inviter had already bought something. Both are ready to use straight away (one reward per order of R200 or more, as before). Guards, same as surprise rewards: R100 or more, courier or locker with tracking, not from the inviter's own shop, suspended accounts and the "welcome_credit" switch off get nothing, the R15,000 budget applies. At most 10 invite rewards per inviter [CONFIRM the cap]. The friend still gets theirs if the inviter never bought [CONFIRM]. Terms section 8 updated. Rewards can now be earned more than once for inviting (one per friend); the other kinds stay once each.
 - Tests: database block (posts by id, search words, price, size, the % sign, reviews hide the buyer, views once a day and not your own, stats, invites once only and only new accounts, ticks hold nothing private), e2e (stats, invite, filters, no results, reviews sheet). All pass: core 61, functions 20, database, e2e.
 
 ### 2026-11-11: Live selling

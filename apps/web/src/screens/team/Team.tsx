@@ -910,7 +910,7 @@ function LateOrders() {
 /** Surprise rewards this person earned (never advertised). */
 function PersonRewards({ userId }: { userId: string }) {
   const [rows] = useLoad(() => api.teamRewards(userId), [userId]);
-  const word: Record<string, string> = { first_buy: "First order", first_auction: "First auction win", first_sale: "First sale" };
+  const word: Record<string, string> = { first_buy: "First order", first_auction: "First auction win", first_sale: "First sale", invite_sent: "Invited a friend", invite_joined: "Joined with an invite" };
   const st: Record<string, [string, string]> = { pending: ["amber", "Waiting for return window"], ready: ["green", "Ready"], used: ["", "Used"], forfeited: ["red", "Removed (returned)"] };
   return (
     <section className="team-card">

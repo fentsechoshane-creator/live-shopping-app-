@@ -1,5 +1,5 @@
 // Invite a friend: share your link. A new account that opens it is linked to you and you follow each other.
-// No money for inviting (a sign up reward gets farmed); that's Ofentse's call to add later.
+// Once the friend's first order is done, both get R50 (the inviter only if they've bought before). Rules in migration 0041.
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../../api";
@@ -30,7 +30,7 @@ export function InviteScreen() {
       <div className="invite-hero">
         <span className="ic"><Icon name="gift" size={30} /></span>
         <h1>Invite a friend</h1>
-        <p>Send your link. When a friend joins with it, you follow each other straight away, so you can chat and share finds.</p>
+        <p>Send your link. When a friend joins with it, you follow each other straight away. Once their first order is done, you both get R50.</p>
       </div>
       {handle ? (
         <>
@@ -38,6 +38,14 @@ export function InviteScreen() {
           <p className="small muted" style={{ textAlign: "center" }}>
             {count == null ? " " : count === 0 ? "Nobody has joined from your link yet." : `${count} ${count === 1 ? "friend has" : "friends have"} joined from your link.`}
           </p>
+          <div className="note" style={{ marginTop: 18 }}>
+            <b>How the R50 works</b>
+            <ul className="invite-rules">
+              <li>Your friend joins with your link and buys something of R100 or more, sent by courier or locker.</li>
+              <li>Once their return window closes, you each get R50. It comes off an order of R200 or more.</li>
+              <li>You get yours if you've bought something on myHaul before. Up to 10 friends.</li>
+            </ul>
+          </div>
         </>
       ) : (
         <button className="btn green block" style={{ marginTop: 18 }} onClick={() => nav("/me")}>Pick a username first</button>

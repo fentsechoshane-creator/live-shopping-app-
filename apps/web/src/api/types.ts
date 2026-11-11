@@ -396,7 +396,7 @@ export interface TeamFeature { state: FeatureState; reason: string | null; at: s
 
 /** A surprise reward: R50 after a first delivered order, auction win or sale. Usable once that order's return window closes. */
 export interface Reward {
-  id: string; kind: "first_buy" | "first_auction" | "first_sale"; amountCents: number;
+  id: string; kind: "first_buy" | "first_auction" | "first_sale" | "invite_sent" | "invite_joined"; amountCents: number;
   status: "pending" | "ready" | "used" | "forfeited"; usableFrom: string | null; createdAt: string; seen: boolean; orderTitle?: string | null;
 }
 

@@ -11,6 +11,8 @@ const WHY: Record<Reward["kind"], string> = {
   first_buy: "for your first order",
   first_auction: "for your first auction win",
   first_sale: "for your first sale",
+  invite_sent: "for inviting a friend",
+  invite_joined: "for joining with an invite",
 };
 
 /** Your rewards, refreshed when you move around the app. */

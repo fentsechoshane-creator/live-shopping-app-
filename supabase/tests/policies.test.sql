@@ -1488,6 +1488,45 @@ update profiles set created_at = now() - interval '3 days' where id = '00000000-
 select pg_temp.act_as('00000000-0000-0000-0000-00000000041b');
 do $$ begin assert not accept_invite((select handle from profiles where id = '00000000-0000-0000-0000-00000000000d')), 'old accounts can''t be claimed'; end $$;
 reset role;
+-- Invite rewards: the friend's first tracked order of R100+ completes; both get R50 ready to use, if the inviter had bought before.
+set session_replication_role = replica;
+insert into orders (id, buyer_id, shop_id, product_id, mode, item_price_cents, delivery, delivery_fee_cents, protection_fee_cents, total_cents, seller_fee_cents, seller_payout_cents, status, tracking_ref, created_at)
+  values ('40000000-0000-0000-0000-000000000411', '00000000-0000-0000-0000-00000000041a', (select id from shops where handle = 'other.shop'), '50000000-0000-0000-0000-000000000041',
+    'buy_now', 42000, 'courier', 11000, 1200, 54200, 2520, 50480, 'delivered', 'TRK411', now()),
+    ('40000000-0000-0000-0000-000000000412', '00000000-0000-0000-0000-00000000000d', (select id from shops where handle = 'other.shop'), '50000000-0000-0000-0000-000000000041',
+    'buy_now', 42000, 'courier', 11000, 1200, 54200, 2520, 50480, 'completed', 'TRK412', now() - interval '30 days');
+set session_replication_role = default;
+create temp table rewards_before as select count(*) n from rewards;
+update orders set status = 'completed' where id = '40000000-0000-0000-0000-000000000411';
+do $$ begin
+  assert exists (select 1 from rewards where user_id = '00000000-0000-0000-0000-00000000041a' and kind = 'invite_joined' and status = 'ready' and amount_cents = 5000), 'friend gets R50';
+  assert exists (select 1 from rewards where user_id = '00000000-0000-0000-0000-00000000000d' and kind = 'invite_sent' and status = 'ready'), 'inviter gets R50';
+  assert exists (select 1 from notifications where user_id = '00000000-0000-0000-0000-00000000000d' and title = 'You earned R50 for inviting a friend'), 'inviter told';
+end $$;
+-- A second order from the same friend earns nothing more.
+set session_replication_role = replica;
+insert into orders (id, buyer_id, shop_id, product_id, mode, item_price_cents, delivery, delivery_fee_cents, protection_fee_cents, total_cents, seller_fee_cents, seller_payout_cents, status, tracking_ref)
+  values ('40000000-0000-0000-0000-000000000413', '00000000-0000-0000-0000-00000000041a', (select id from shops where handle = 'other.shop'), '50000000-0000-0000-0000-000000000041',
+    'buy_now', 42000, 'courier', 11000, 1200, 54200, 2520, 50480, 'delivered', 'TRK413');
+set session_replication_role = default;
+update orders set status = 'completed' where id = '40000000-0000-0000-0000-000000000413';
+do $$ begin
+  assert (select count(*) from rewards where kind in ('invite_sent', 'invite_joined')) = 2, 'only the first order counts';
+end $$;
+-- An inviter who never bought anything gets nothing (the friend still does).
+insert into auth.users (id, email) values ('00000000-0000-0000-0000-00000000041c', 'nobuy@test.co.za'), ('00000000-0000-0000-0000-00000000041d', 'friend3@test.co.za');
+update profiles set handle = 'never.bought' where id = '00000000-0000-0000-0000-00000000041c';
+update profiles set invited_by = '00000000-0000-0000-0000-00000000041c' where id = '00000000-0000-0000-0000-00000000041d';
+set session_replication_role = replica;
+insert into orders (id, buyer_id, shop_id, product_id, mode, item_price_cents, delivery, delivery_fee_cents, protection_fee_cents, total_cents, seller_fee_cents, seller_payout_cents, status, tracking_ref)
+  values ('40000000-0000-0000-0000-000000000414', '00000000-0000-0000-0000-00000000041d', (select id from shops where handle = 'other.shop'), '50000000-0000-0000-0000-000000000041',
+    'buy_now', 42000, 'courier', 11000, 1200, 54200, 2520, 50480, 'delivered', 'TRK414');
+set session_replication_role = default;
+update orders set status = 'completed' where id = '40000000-0000-0000-0000-000000000414';
+do $$ begin
+  assert exists (select 1 from rewards where user_id = '00000000-0000-0000-0000-00000000041d' and kind = 'invite_joined'), 'friend still gets theirs';
+  assert not exists (select 1 from rewards where user_id = '00000000-0000-0000-0000-00000000041c'), 'inviter who never bought gets nothing';
+end $$;
 -- Auction ticks: every bid bumps a public row with no bidder in it.
 do $$ begin
   assert (select count(*) from auction_ticks) >= 1, 'bids bumped the tick';

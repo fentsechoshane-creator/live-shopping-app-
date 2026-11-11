@@ -218,7 +218,7 @@ grant execute on function seller_stats(int) to authenticated;
 -- ===== 6. Invite a friend =====
 -- Your invite link is myhaul.co.za/?invite=<your username>. A new account that opens it (within a day of joining,
 -- before any order) is linked to you: you follow each other, so you're friends straight away, and you're told.
--- No money for inviting yet: that's Ofentse's call, and a sign up reward gets farmed ([CONFIRM] if wanted later).
+-- Rewards for inviting are in section 7 below.
 alter table profiles add column invited_by uuid references profiles (id) on delete set null;
 
 create function accept_invite(p_handle text) returns boolean language plpgsql security definer set search_path = public, pg_temp as $$
@@ -249,3 +249,109 @@ create function prune_post_seen() returns void language sql security definer set
 $$;
 revoke execute on function prune_post_seen() from public, anon, authenticated;
 grant execute on function prune_post_seen() to service_role;
+
+-- ===== 7. Invite rewards (Ofentse, 2026-11-11) =====
+-- When an invited friend's first purchase passes its return window (the order is completed), the friend gets R50 and
+-- so does the inviter, if the inviter had already bought something themselves. Both are ready to use straight away.
+-- Abuse guards, same as the surprise rewards: the order must be R100 or more and carried by a courier with tracking;
+-- the friend can't buy from the inviter's own shop; suspended accounts and the team switch "welcome_credit" off get
+-- nothing; the R15,000 reward budget applies; an inviter earns at most 10 invite rewards [CONFIRM the cap].
+alter table rewards drop constraint rewards_kind_check;
+alter table rewards add constraint rewards_kind_check check (kind in ('first_buy', 'first_auction', 'first_sale', 'invite_sent', 'invite_joined'));
+-- One of each kind per person, except inviting, which you can earn once per friend.
+alter table rewards drop constraint rewards_user_id_kind_key;
+create unique index rewards_one_each on rewards (user_id, kind) where kind <> 'invite_sent';
+create unique index rewards_invite_once_per_order on rewards (user_id, earned_order_id) where kind = 'invite_sent';
+insert into app_limits (key, value, note) values
+  ('invite_rewards_per_person', 10, 'Most invite rewards one person can earn. [CONFIRM with Ofentse]')
+  on conflict (key) do nothing;
+
+-- Same as before, but the "one of each" check names the new index.
+create or replace function grant_reward(p_user uuid, p_kind text, p_order uuid) returns void language plpgsql security definer set search_path = public as $$
+declare o orders; budget bigint;
+begin
+  select * into o from orders where id = p_order;
+  if p_user is null or is_suspended(p_user) or feature_state(p_user, 'welcome_credit') = 'off' then return; end if;
+  if exists (select 1 from rewards where user_id = p_user and kind = p_kind) then return; end if;
+  if o.item_price_cents < 10000 then return; end if;
+  if o.delivery not in ('courier', 'pudo_locker') or o.tracking_ref is null then return; end if;
+  if p_kind <> 'first_sale' and (select count(*) from rewards r join orders x on x.id = r.earned_order_id
+      where x.shop_id = o.shop_id and r.kind <> 'first_sale' and r.created_at > now() - interval '30 days')
+      >= (select value from app_limits where key = 'welcome_credit_per_seller_30d') then return; end if;
+  select value into budget from app_limits where key = 'welcome_credit_budget_cents';
+  if (select coalesce(sum(amount_cents), 0) from rewards where status <> 'forfeited') + 5000 > coalesce(budget, 0) then return; end if;
+  insert into rewards (user_id, kind, amount_cents, earned_order_id, usable_from)
+    values (p_user, p_kind, 5000, p_order, coalesce(o.releasable_at, now() + interval '7 days'))
+    on conflict (user_id, kind) where kind <> 'invite_sent' do nothing;
+  if found then
+    perform notify(p_user, 'reward', 'Surprise! You earned R50',
+      case p_kind when 'first_buy' then 'A thank you for your first order.' when 'first_auction' then 'A thank you for your first auction win.'
+                  else 'A thank you for your first sale.' end
+      || ' It''s yours to spend once the return window closes. One reward comes off an order of R200 or more.', '/me');
+  end if;
+end $$;
+revoke execute on function grant_reward(uuid, text, uuid) from public, anon, authenticated;
+
+create function invite_rewards() returns trigger language plpgsql security definer set search_path = public, pg_temp as $$
+declare friend profiles; inviter profiles; budget bigint; given bigint;
+begin
+  if new.status <> 'completed' or old.status = 'completed' then return new; end if;
+  select * into friend from profiles where id = new.buyer_id;
+  if friend.invited_by is null then return new; end if;
+  select * into inviter from profiles where id = friend.invited_by;
+  -- Only the friend's first purchase counts, and only a real, tracked one.
+  if exists (select 1 from rewards where user_id = friend.id and kind = 'invite_joined') then return new; end if;
+  if new.item_price_cents < 10000 or new.delivery not in ('courier', 'pudo_locker') or new.tracking_ref is null then return new; end if;
+  if shop_owner(new.shop_id) = inviter.id then return new; end if;
+  if exists (select 1 from orders x where x.buyer_id = friend.id and x.id <> new.id and x.status = 'completed' and x.created_at < new.created_at) then return new; end if;
+  select value into budget from app_limits where key = 'welcome_credit_budget_cents';
+
+  -- The friend.
+  given := (select coalesce(sum(amount_cents), 0) from rewards where status <> 'forfeited');
+  if not is_suspended(friend.id) and feature_state(friend.id, 'welcome_credit') is distinct from 'off' and given + 5000 <= coalesce(budget, 0) then
+    insert into rewards (user_id, kind, amount_cents, earned_order_id, status, usable_from)
+      values (friend.id, 'invite_joined', 5000, new.id, 'ready', now())
+      on conflict (user_id, kind) where kind <> 'invite_sent' do nothing;
+    if found then
+      perform notify(friend.id, 'reward', 'You earned R50 for joining with an invite',
+        'A thank you from @' || coalesce(inviter.handle, 'your friend') || ' and us. It comes off your next order of R200 or more, by itself.', '/me');
+    end if;
+  end if;
+
+  -- The inviter, if they had already bought something themselves.
+  given := (select coalesce(sum(amount_cents), 0) from rewards where status <> 'forfeited');
+  if inviter.id is not null and not is_suspended(inviter.id) and feature_state(inviter.id, 'welcome_credit') is distinct from 'off'
+     and exists (select 1 from orders x where x.buyer_id = inviter.id and x.status in ('delivered', 'completed') and x.created_at < new.created_at)
+     and (select count(*) from rewards where user_id = inviter.id and kind = 'invite_sent')
+         < coalesce((select value from app_limits where key = 'invite_rewards_per_person'), 10)
+     and given + 5000 <= coalesce(budget, 0) then
+    insert into rewards (user_id, kind, amount_cents, earned_order_id, status, usable_from)
+      values (inviter.id, 'invite_sent', 5000, new.id, 'ready', now())
+      on conflict (user_id, earned_order_id) where kind = 'invite_sent' do nothing;
+    if found then
+      perform notify(inviter.id, 'reward', 'You earned R50 for inviting a friend',
+        coalesce(nullif(friend.display_name, ''), 'Your friend') || '''s first order is done. It comes off your next order of R200 or more, by itself.', '/me');
+    end if;
+  end if;
+  return new;
+end $$;
+revoke execute on function invite_rewards() from public, anon, authenticated;
+create trigger zz_invite_rewards after update on orders for each row execute function invite_rewards();
+
+-- The invite notice now mentions the reward.
+create or replace function accept_invite(p_handle text) returns boolean language plpgsql security definer set search_path = public, pg_temp as $$
+declare me profiles; inviter profiles;
+begin
+  select * into me from profiles where id = auth.uid();
+  if me.id is null or me.invited_by is not null then return false; end if;
+  if me.created_at < now() - interval '1 day' or exists (select 1 from orders where buyer_id = me.id) then return false; end if;
+  select * into inviter from profiles where handle = lower(trim(p_handle));
+  if inviter.id is null or inviter.id = me.id or is_suspended(inviter.id) or blocked_between(me.id, inviter.id) then return false; end if;
+  update profiles set invited_by = inviter.id where id = me.id;
+  insert into people_follows (follower_id, followee_id) values (me.id, inviter.id), (inviter.id, me.id) on conflict do nothing;
+  perform notify(inviter.id, 'invite', coalesce(nullif(me.display_name, ''), 'Someone') || ' joined from your invite',
+    'You follow each other now. When their first order is done, you both get R50.', case when me.handle is not null then '/u/' || me.handle end);
+  return true;
+end $$;
+revoke execute on function accept_invite(text) from public, anon;
+grant execute on function accept_invite(text) to authenticated;

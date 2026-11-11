@@ -311,6 +311,29 @@ export function createDemoApi(): Api {
       seen: false, orderTitle: o.product.title, earnedOrderId: o.id, usedOrderId: null });
     notify(uid, "Surprise! You earned R50", `${kind === "first_buy" ? "A thank you for your first order." : kind === "first_auction" ? "A thank you for your first auction win." : "A thank you for your first sale."} It's yours to spend once the return window closes. One reward comes off an order of R200 or more.`, "/me");
   }
+  // Invite rewards, same rules as the database (0041): the friend's first tracked order of R100+ is done, both get R50
+  // ready to use, the inviter only if they had bought something before. At most 10 per inviter.
+  function inviteRewards(o: DOrder) {
+    const inviterId = s.invitedBy?.[o.buyerId];
+    s.rewards = s.rewards ?? [];
+    if (!inviterId || s.rewards.some((r) => r.userId === o.buyerId && r.kind === "invite_joined")) return;
+    if (o.totals.itemPrice < 10000 || !["courier", "pudo_locker"].includes(o.delivery) || o.shopOwnerId === inviterId) return;
+    if (s.orders.some((x) => x.buyerId === o.buyerId && x.id !== o.id && x.status === "completed" && x.createdAt < o.createdAt)) return;
+    const room = () => s.rewards!.filter((r) => r.status !== "forfeited").reduce((n, r) => n + r.amountCents, 0) + 5000 <= 1_500_000;
+    const give = (uid: string, kind: Reward["kind"], title: string, body: string) => {
+      s.rewards!.unshift({ id: id(), userId: uid, kind, amountCents: 5000, status: "ready", usableFrom: now().toISOString(), createdAt: now().toISOString(),
+        seen: false, orderTitle: o.product.title, earnedOrderId: o.id, usedOrderId: null });
+      notify(uid, title, body, "/me");
+    };
+    const inviter = s.users.find((u) => u.id === inviterId);
+    const friend = s.users.find((u) => u.id === o.buyerId);
+    if (!s.suspensions?.[o.buyerId] && featureState(o.buyerId, "welcome_credit") !== "off" && room())
+      give(o.buyerId, "invite_joined", "You earned R50 for joining with an invite", `A thank you from @${inviter?.handle ?? "your friend"} and us. It comes off your next order of R200 or more, by itself.`);
+    const boughtBefore = s.orders.some((x) => x.buyerId === inviterId && ["delivered", "completed"].includes(x.status) && x.createdAt < o.createdAt);
+    if (inviter && boughtBefore && !s.suspensions?.[inviterId] && featureState(inviterId, "welcome_credit") !== "off" && room()
+        && s.rewards.filter((r) => r.userId === inviterId && r.kind === "invite_sent").length < 10)
+      give(inviterId, "invite_sent", "You earned R50 for inviting a friend", `${friend?.displayName || "Your friend"}'s first order is done. It comes off your next order of R200 or more, by itself.`);
+  }
   const readyReward = (uid: string) => (s.rewards ?? []).filter((r) => r.userId === uid && r.status === "ready").sort((a, b) => a.createdAt.localeCompare(b.createdAt))[0];
 
   function setStatus(o: DOrder, to: OrderStatus) {
@@ -350,6 +373,7 @@ export function createDemoApi(): Api {
       (s.rewards ?? []).filter((r) => r.earnedOrderId === o.id && r.status === "pending").forEach((r) => {
         r.status = "ready"; notify(r.userId, "Your R50 is ready", "It comes off your next order of R200 or more, by itself.", "/me");
       });
+      inviteRewards(o);
     }
     if (to === "refunded" || to === "cancelled") {
       (s.stamps ?? []).forEach((x) => { if (x.usedOrderId === o.id) x.usedOrderId = null; });
@@ -1495,7 +1519,7 @@ export function createDemoApi(): Api {
       const pf = (s.peopleFollows = s.peopleFollows ?? []);
       const at = now().toISOString();
       for (const [a, b] of [[u.id, inviter.id], [inviter.id, u.id]]) if (!pf.some((x) => x.followerId === a && x.followeeId === b)) pf.push({ followerId: a, followeeId: b, at });
-      notify(inviter.id, `${u.displayName || "Someone"} joined from your invite`, "You follow each other now, so you can chat and share finds.", u.handle ? `/u/${u.handle}` : null);
+      notify(inviter.id, `${u.displayName || "Someone"} joined from your invite`, "You follow each other now. When their first order is done, you both get R50.", u.handle ? `/u/${u.handle}` : null);
       save();
       return true;
     },

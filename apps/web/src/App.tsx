@@ -140,7 +140,7 @@ function SideMenu() {
         <div className="menu-h">Shopping</div>
         <div className="group">
           <MenuRow icon="bag" t="My orders" s="Track, return or rate an order" onClick={() => go("/orders")} />
-          <MenuRow icon="gift" t="Invite a friend" s="Share your link; you follow each other when they join" onClick={() => go("/invite")} />
+          <MenuRow icon="gift" t="Invite a friend" s="You both get R50 after their first order" onClick={() => go("/invite")} />
           <MenuRow icon="help" t="Returns and help" s="7 day returns on Buy now, buyer protection" onClick={() => go("/help")} />
           <MenuRow icon="chat" t="Contact us" s={`${CONTACT}, we reply within 2 working days`} onClick={() => { window.location.href = `mailto:${CONTACT}?subject=${encodeURIComponent("myHaul help")}`; }} />
         </div>
