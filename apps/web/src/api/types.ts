@@ -81,6 +81,7 @@ export interface LiveShow {
   mine: boolean;
 }
 export interface LiveChatMessage { id: string; who: string; isSeller: boolean; body: string; at: string }
+export interface Thumb { image?: string; video?: string }
 /** A shop's reviews for its page. Who wrote each one stays hidden. */
 export interface ShopReviews {
   count: number; average: number | null; stars: Record<"1" | "2" | "3" | "4" | "5", number>;
@@ -436,7 +437,10 @@ export interface Api {
   // Auth
   currentUser(): Promise<User | null>;
   onAuthChange(cb: (u: User | null) => void): () => void;
-  sendCode(contact: string): Promise<void>;
+  /** Emails a 6 digit code. `create: false` only works for existing accounts (Forgot password). */
+  sendCode(contact: string, opts?: { create?: boolean }): Promise<void>;
+  /** Sets (or changes) the signed in person's password. */
+  setPassword(password: string): Promise<void>;
   verifyCode(contact: string, code: string): Promise<User>;
   signOut(): Promise<void>;
   // Buying
@@ -528,7 +532,8 @@ export interface Api {
   /** Team only: the latest error reports. */
   recentErrors(): Promise<AppError[]>;
   /** Email and password sign in (used for the app store reviewers' test account). */
-  signInWithPassword(email: string, password: string): Promise<User>;
+  /** Username or email, and password. */
+  signInWithPassword(login: string, password: string): Promise<User>;
   openReports(): Promise<OpenReport[]>;
   handleReport(id: string, action: "remove" | "dismiss"): Promise<void>;
 
@@ -594,6 +599,8 @@ export interface Api {
   sendTyping(conversationId: string): void;
   /** Calls back when any of these auctions gets a bid or ends. */
   watchAuctions(productIds: string[], onChange: () => void): () => void;
+  /** Cover pictures for a list of items: a Mux still, a photo, or a video file to show the first frame of. */
+  productThumbs(productIds: string[]): Promise<Record<string, Thumb>>;
   /** Search everything for sale, with filters. */
   search(q: string, filters: SearchFilters, offset?: number): Promise<FeedItem[]>;
   /** Sizes on sale right now, most common first. */

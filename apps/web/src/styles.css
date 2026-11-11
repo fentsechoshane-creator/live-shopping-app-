@@ -1686,3 +1686,27 @@ body:has(.live-screen) .toast { top: calc(env(safe-area-inset-top, 0px) + 96px);
 .addr-list button span { display: grid; gap: 2px; }
 .addr-list li + li:not(.addr-google) { border-top: 0.5px solid var(--hairline); }
 .addr-google { padding: 6px 14px 4px; text-align: right; font-size: 11px; }
+
+/* ===== Sign in and sign up ===== */
+.auth .segmented { margin-bottom: 4px; }
+.auth-body { padding-top: 14px; }
+.auth .back-link { display: inline-flex; align-items: center; gap: 4px; margin-bottom: 12px; }
+.pw-input, .email-input { position: relative; display: flex; align-items: center; }
+.pw-input input, .email-input input { flex: 1; min-width: 0; }
+.pw-input input { padding-right: 64px; }
+.pw-input .link { position: absolute; right: 14px; font-size: 15px; }
+.email-input input { padding-right: 116px; }
+.email-input .btn.small { position: absolute; right: 6px; min-height: 36px; padding: 0 14px; font-size: 14px; }
+.email-input .state, .handle-input .state { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; }
+.email-input .state { position: absolute; right: 14px; background: var(--green); color: #052e16; }
+.email-input.ok input { box-shadow: inset 0 0 0 1.5px var(--green); border-color: var(--green); }
+.pw-rules { list-style: none; margin: -4px 0 14px; padding: 0 4px; display: grid; gap: 6px; font-size: 13px; color: var(--ink-3); }
+.pw-rules li { display: flex; align-items: center; gap: 8px; }
+.pw-rules .tick { display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--hairline-strong, rgba(120,120,128,.36)); }
+.pw-rules li.ok { color: var(--green-text); }
+.pw-rules li.ok .tick { background: var(--green); box-shadow: none; color: #052e16; }
+.auth .bday-picker { margin-top: 2px; }
+
+/* Item pictures: the real cover fills the box. */
+.art-fill { position: absolute; inset: 0; overflow: hidden; }
+.art-fill img, .art-fill video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }

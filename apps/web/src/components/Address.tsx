@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { addressFromPlace, placesOn, suggestAddresses, type AddressSuggestion } from "../lib/places";
 import { api, PROVINCES, type PickupPoint, type ShopPickup, type StreetAddress } from "../api";
-import { Choice, ErrorNote, Field, useAction } from "./ui";
+import { Choice, ErrorNote, Field, FieldWith, useAction } from "./ui";
 import { Icon } from "./Icon";
 
 export const EMPTY_ADDRESS: StreetAddress = { street: "", suburb: "", city: "", province: "", postalCode: "" };
@@ -63,12 +63,12 @@ function AddressSearch({ onPick }: { onPick: (a: Partial<StreetAddress>) => void
   };
   return (
     <div className="addr-search">
-      <Field label="Find your address">
+      <FieldWith label="Find your address">{(id) => (
         <span className="addr-input"><Icon name="search" size={17} />
-          <input value={q} onChange={(e) => setQ(e.target.value)} onFocus={() => list.length && setOpen(true)} placeholder="Start typing your street address"
+          <input id={id} value={q} onChange={(e) => setQ(e.target.value)} onFocus={() => list.length && setOpen(true)} placeholder="Start typing your street address"
             autoComplete="off" enterKeyHint="search" aria-autocomplete="list" aria-expanded={open && list.length > 0} role="combobox" aria-controls="addr-list" />
         </span>
-      </Field>
+      )}</FieldWith>
       {open && list.length > 0 && (
         <ul className="addr-list" id="addr-list" role="listbox">
           {list.map((s) => (

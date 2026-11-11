@@ -35,3 +35,6 @@ verify_jwt = false
 
 [functions.live-token]
 verify_jwt = false
+
+[functions.password-login]
+verify_jwt = false

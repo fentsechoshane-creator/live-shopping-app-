@@ -264,7 +264,7 @@ function ChatProduct({ productId, compact, canBuy, onBuy }: { productId: string;
   const held = !!p.heldUntil && new Date(p.heldUntil) > new Date();
   const thumb = it.video?.url
     ? (it.video.kind === "image" ? <img src={it.video.url} alt="" /> : <video src={`${it.video.url}#t=0.1`} muted playsInline preload="metadata" />)
-    : <ProductArt productId={p.id} fallback={it.video?.demo?.bg ?? swatch(p.id)} />;
+    : <ProductArt productId={p.id} video={it.video} fallback={it.video?.demo?.bg ?? swatch(p.id)} />;
   return (
     <span className={`chat-product ${compact ? "compact" : ""}`}>
       <Link to={`/s/${it.shop.handle}?item=${p.id}`} className="row grow" style={{ gap: 10, minWidth: 0 }} aria-label={`Item: ${p.title}, ${R(p.priceCents)}`}>

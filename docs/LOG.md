@@ -107,6 +107,16 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-11: Sign in and Sign up tabs with passwords; real thumbnails
+
+Asked by Ofentse: the code sign in was confusing (the email only had a confirm link) and there was no password.
+- **New screen** (components/AuthForm.tsx), two tabs: **Sign in** (left) and **Sign up**. New visitors start on Sign up; people who signed in on this phone before start on Sign in.
+- **Sign up, all checked on one page:** name, email confirmed with a 6 digit code (or the email link), @username checked while typing with free suggestions, password twice (8 or more characters with a letter and a number, ticks show what's left), birthday (18 or older), the terms. Sign up stays greyed out with "Still needed: ..." until everything passes. Then the optional photo and delivery address steps (Skip for now), then whatever you tapped (Buy now) carries on. An email that already has an account just signs in.
+- **Sign in:** username or email, and password. **Forgot password?** emails a code, then you pick a new password. Accounts made before passwords use this once.
+- **Server:** migration 0042 `password_login_check` (service role only; 10 tries per account per 15 minutes) and the `password-login` function: it checks the password, then gives the phone a one time sign in token. A username never reveals the email behind it.
+- **Thumbnails:** items only ever showed the demo drawings, so real listings were dark boxes in Explore, profiles, orders, checkout, chats, stats and live. Now each shows its cover: a still from the Mux video, the photo, or the first frame of the video file. One batched lookup for every list on screen (0042 `product_thumbs`; removed items only for their buyer and seller).
+- **Not live yet:** needs migration 0042, the password-login function, the email template change (docs/SETUP.md section 7), then main. Pushed to `flat-prices` only, because the new sign in needs the server first.
+
 ### 2026-11-11: Faster first load
 
 Ofentse said the site loaded a bit slowly. The database answers in under 5 ms, so it was the download. Screens most visits don't open (seller tools, the camera and editor, live screens, the team dashboard, stats) now load only when opened, so the main download is 180 kB compressed (was 215 kB after today's features, 190 kB before). App files also get a one year cache (`/assets/*` in public/_headers and netlify.toml): they change name on every build, so repeat visits don't download them again. netlify.toml also got the LiveKit and Google addresses it was missing.

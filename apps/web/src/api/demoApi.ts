@@ -1,11 +1,12 @@
 // Demo adapter: the whole app runs in the browser with sample data, using the same rules as the server.
 // Used when no Supabase keys are set. Sign in with any email or phone and the code 123456.
+import { passwordProblem } from "../lib/password";
 import {
   bidStep, maxBidReplies, AUCTION_EXTEND_SECONDS, liveStock, MIN_LIVE_STOCK, GOOD_ORDERS_FOR_AUCTIONS, LIVE_AUCTION_EXTEND_SECONDS, maskHandle, canTransition, isRude, orderTotals, payoutDate, releasableAt, returnReasonsFor, shipBy, tierFor, TRUST_POINTS, validateListing,
   RETURN_POSTAGE_PAYER, ACCOUNT_FEATURE_KEYS, canForceOn, featureOffMessage, type AccountFeature, type OrderStatus, type TrustEventKind, bookedByUs, deliveryFee, PARCEL_SIZES, orderParcelSize, DELIVERY_PERKS, validateEdit, refundFee, formatRand, type PayoutSchedule } from "@app/core";
 import { handleProblem } from "../lib/handle";
 import type {
-  ShopReviews,
+  ShopReviews, Thumb,
   Api, LiveShow, LiveChatMessage, LiveSummary, Person, SharedPost, Category, ReportReason, ReportTarget, CheckoutInput, FeedItem, ListingInput, MyShop, Notification, Order, Payout, PendingReview, ProductPublic, ReviewStatus,
   ShopPublic, User, SavedDelivery, AppError, PickupPoint, ShopPickup, ShipmentEvent, AuctionInfo, TeamAlert, TeamOverview, TeamPerson, TeamPersonDetail, TeamOrder, TeamListing, TeamLogEntry, TeamFeature, Reward, SellerCharge,
 } from "./types";
@@ -26,7 +27,7 @@ interface DPost { id: string; shopId: string; productId: string; caption: string
 interface DOrder extends Order { shopOwnerId: string; bundleIds?: string[]; offerId?: string | null; paymentMethod?: string | null;
   packingVideo?: string; packingPhoto?: string; packingReview?: "ok" | "strike"; packingReviewedAt?: string }
 interface DUser extends User { trust: number; welcomeUsed: boolean; admin: boolean; createdAt?: string; bio?: string;
-  handle?: string | null; avatar?: string | null; handleChangedAt?: string | null; adult?: boolean; terms?: boolean }
+  handle?: string | null; avatar?: string | null; handleChangedAt?: string | null; adult?: boolean; terms?: boolean; password?: string }
 type DPayout = Payout & { shopId: string; topUpCents: number; topUpPaid: boolean };
 interface State {
   users: DUser[]; currentUserId: string | null; shops: DShop[]; products: DProduct[]; posts: DPost[]; orders: DOrder[];
@@ -597,9 +598,16 @@ export function createDemoApi(): Api {
       listeners.add(cb);
       return () => listeners.delete(cb);
     },
-    async sendCode(contact) {
+    async sendCode(contact, opts) {
       await wait();
       if (contact.trim().length < 5) throw new Error("Enter your email or cell number.");
+      const key = contact.trim().toLowerCase();
+      if (opts?.create === false && !s.users.some((x) => x.email === key) && !key.endsWith("@shop.demo")) throw new Error("There's no account with that email. Tap Sign up instead.");
+    },
+    async setPassword(password) {
+      const p = passwordProblem(password);
+      if (p) throw new Error(p);
+      me().password = password; save();
     },
     async verifyCode(contact, code) {
       await wait();
@@ -1055,9 +1063,13 @@ export function createDemoApi(): Api {
       if (!me().admin) throw new Error("Team only.");
       return s.errors ?? [];
     },
-    async signInWithPassword(email, password) {
-      if (password !== CODE) throw new Error("Wrong email or password. In the demo, the password is 123456.");
-      return this.verifyCode(email, CODE);
+    async signInWithPassword(login, password) {
+      await wait();
+      const key = login.trim().toLowerCase().replace(/^@/, "");
+      const u = s.users.find((x) => x.email === key || x.handle === key);
+      // Demo: accounts made before passwords existed (and the sample shops) take 123456.
+      if (!u ? password !== CODE : (u.password ?? CODE) !== password) throw new Error("Wrong username or password. No password yet? Tap Forgot password to make one.");
+      return this.verifyCode(u?.email ?? key, CODE);
     },
     async deleteAccount() {
       const u = me();
@@ -1428,6 +1440,18 @@ export function createDemoApi(): Api {
       if (!productIds.length) return () => {};
       const t = window.setInterval(onChange, 1000);
       return () => window.clearInterval(t);
+    },
+    async productThumbs(ids) {
+      // Sample items draw their own pictures; listings made in the demo use their own photo or video.
+      const out: Record<string, Thumb> = {};
+      for (const pid of ids) {
+        const p = s.products.find((x) => x.id === pid);
+        const po = s.posts.filter((x) => x.productId === (p?.fromProductId ?? pid)).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+        const v = po ? toFeed(po).video : null;
+        if (!v || v.demo) continue;
+        if (v.url) out[pid] = v.kind === "image" ? { image: v.url } : { video: v.url };
+      }
+      return out;
     },
     async search(q, f, offset = 0) {
       await mediaReady;

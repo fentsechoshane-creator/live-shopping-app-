@@ -1533,3 +1533,43 @@ do $$ begin
   assert not exists (select 1 from information_schema.columns where table_name = 'auction_ticks' and column_name not in ('product_id', 'at')), 'tick holds no private detail';
 end $$;
 select 'extras tests passed' as result;
+
+-- ===== Password sign in (0042): username or email, right password only, never callable by the app =====
+update auth.users set encrypted_password = extensions.crypt('Haul2026!', extensions.gen_salt('bf')) where id = '00000000-0000-0000-0000-00000000000d';
+do $$ declare h text := (select handle from profiles where id = '00000000-0000-0000-0000-00000000000d'); begin
+  assert (select user_id from password_login_check(h, 'Haul2026!')) = '00000000-0000-0000-0000-00000000000d', 'username and password';
+  assert (select user_id from password_login_check('@' || upper(h), 'Haul2026!')) = '00000000-0000-0000-0000-00000000000d', 'with @ and capitals';
+  assert (select user_id from password_login_check((select email from auth.users where id = '00000000-0000-0000-0000-00000000000d'), 'Haul2026!')) is not null, 'email and password';
+  assert not exists (select 1 from password_login_check(h, 'wrong')), 'wrong password';
+  assert not exists (select 1 from password_login_check('nobody.here', 'Haul2026!')), 'unknown username';
+  assert not exists (select 1 from password_login_check('seller2@test.co.za', '')), 'no password set';
+end $$;
+do $$ declare h text := (select handle from profiles where id = '00000000-0000-0000-0000-00000000000d'); i int; ok boolean := false; begin
+  for i in 1..12 loop
+    begin perform password_login_check(h, 'wrong'); exception when others then ok := sqlerrm like 'Too many tries%'; end;
+  end loop;
+  assert ok, 'stops after 10 tries';
+end $$;
+select pg_temp.act_as_anon();
+select pg_temp.expect_error($$select * from password_login_check('x', 'y')$$, 'permission denied');
+reset role;
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000d');
+select pg_temp.expect_error($$select * from password_login_check('x', 'y')$$, 'permission denied');
+reset role;
+select 'password sign in tests passed' as result;
+
+-- ===== Thumbnails (0042): the cover of each item, nothing for removed items unless it's yours =====
+select pg_temp.act_as_anon();
+do $$ begin
+  assert (select storage_path from product_thumbs(array['50000000-0000-0000-0000-000000000041'::uuid])) like '%denim.mp4', 'cover from the post';
+  assert (select count(*) from product_thumbs(array['00000000-0000-0000-0000-000000000999'::uuid])) = 0, 'unknown item';
+end $$;
+reset role;
+update products set status = 'removed' where id = '50000000-0000-0000-0000-000000000041';
+select pg_temp.act_as_anon();
+do $$ begin assert (select count(*) from product_thumbs(array['50000000-0000-0000-0000-000000000041'::uuid])) = 0, 'removed items hidden'; end $$;
+reset role;
+select pg_temp.act_as('00000000-0000-0000-0000-00000000041a'); -- bought it earlier in these tests
+do $$ begin assert (select count(*) from product_thumbs(array['50000000-0000-0000-0000-000000000041'::uuid])) = 1, 'the buyer still sees it'; end $$;
+reset role;
+select 'thumbnail tests passed' as result;

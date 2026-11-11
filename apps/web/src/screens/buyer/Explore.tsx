@@ -124,7 +124,7 @@ export function Explore() {
           <div className="grid2">
             {shown.map((it) => (
               <button key={it.postId} className="tile" onClick={() => nav(`/s/${it.shop.handle}?item=${it.product.id}`)} aria-label={`${it.product.title}, ${R(it.product.priceCents)}`}>
-                <div className="media"><ProductArt productId={it.product.id} fallback={it.video.demo?.bg ?? swatch(it.product.id)} />
+                <div className="media"><ProductArt productId={it.product.id} video={it.video} fallback={it.video.demo?.bg ?? swatch(it.product.id)} />
                   {it.product.mode === "order_now" && <span className="vchip vglass amber"><span className="d" />Made to order</span>}
                 </div>
                 <div className="body">

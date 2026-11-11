@@ -9,7 +9,7 @@ import { ErrorNote, useAction } from "./ui";
 import { DeliveryDetailsForm } from "./DeliveryDetails";
 
 /** How old someone is today, from a yyyy-mm-dd birthday. */
-function ageFrom(birthday: string) {
+export function ageFrom(birthday: string) {
   const b = new Date(birthday + "T00:00:00");
   if (Number.isNaN(b.getTime())) return -1;
   const t = new Date();
@@ -34,7 +34,7 @@ function Wheel({ label, value, set, options, wide, placeholder }: { label: strin
 }
 
 /** Day, month and year as three big wheels, centred. On an iPhone each opens the native scroll wheel. */
-function BirthdayPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+export function BirthdayPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const [y0, m0, d0] = value ? value.split("-") : ["", "", ""];
   const [d, setD] = useState(d0 ? String(Number(d0)) : "");
   const [m, setM] = useState(m0 ? String(Number(m0)) : "");
@@ -61,15 +61,15 @@ function BirthdayPicker({ value, onChange }: { value: string; onChange: (v: stri
  * 3. Profile photo (optional).
  * 4. Where to deliver your orders (optional, Skip for now), so your first Buy now is one tap.
  */
-export function AccountSetup() {
-  const { user, profile, refreshProfile, toast } = useSession();
-  const [step, setStep] = useState(0);
+export function AccountSetup({ start = 0 }: { start?: 0 | 2 } = {}) {
+  const { user, profile, refreshProfile, toast, setAfterSignUp } = useSession();
+  const [step, setStep] = useState<number>(start);
   const [birthday, setBirthday] = useState("");
   const age = birthday ? ageFrom(birthday) : null;
   const tooYoung = age !== null && age >= 0 && age < 18;
   const startName = profile?.displayName && !profile.displayName.includes("@") ? profile.displayName : "";
   const [name, setName] = useState(startName);
-  const [handle, setHandle] = useState("");
+  const [handle, setHandle] = useState(start === 2 ? profile?.handle ?? "" : "");
   const [touched, setTouchedState] = useState(false);
   const touchedRef = useRef(false); // read inside timers, so a late suggestion never overwrites what was typed
   const setTouched = (v: boolean) => { touchedRef.current = v; setTouchedState(v); };
@@ -116,6 +116,7 @@ export function AccountSetup() {
   // Closing the setup (refreshing the profile) only at the very end.
   const finish = () => run(async () => {
     await refreshProfile();
+    setAfterSignUp(false);
     toast(`Welcome to myHaul, @${handle}`);
   });
   const pick = async (f: File | undefined) => {

@@ -231,7 +231,7 @@ export function App() {
   const isTabRoot = ["/", "/explore", "/inbox", "/me", "/post"].includes(loc.pathname);
   // Only in the installed app: Safari and Chrome already swipe back from the edge, and doing it too would go back two screens.
   const standalone = isNative || (typeof window !== "undefined" && (window.matchMedia?.("(display-mode: standalone)").matches || (navigator as any).standalone === true));
-  const { user, needsSetup } = useSession();
+  const { user, needsSetup, afterSignUp } = useSession();
   // First open: the welcome screens, but not when someone arrives on a shared link (show it later, on the feed).
   const [welcome, setWelcome] = useState(() => !hasSeenWelcome() && loc.pathname === "/");
   useEffect(() => { if (loc.pathname === "/" && !hasSeenWelcome()) setWelcome(true); }, [loc.pathname]);
@@ -301,6 +301,7 @@ export function App() {
         <SignInSheet />
         {welcome && <Welcome onDone={() => setWelcome(false)} />}
         {needsSetup && <AccountSetup />}
+        {afterSignUp && !needsSetup && <AccountSetup start={2} />}
       </div>
     </div>
   );

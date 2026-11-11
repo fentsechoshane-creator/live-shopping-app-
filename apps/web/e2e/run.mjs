@@ -97,13 +97,49 @@ async function pickBirthday(scope, y, m, d) {
   await scope.getByLabel("Day", { exact: true }).selectOption(d);
 }
 
+// Accounts made in this run, with their passwords. Sample shops and older demo accounts take 123456.
+const PASSWORD = "Haul2026x";
+const accounts = new Set();
+/** The Sign in / Sign up tabs, inside `scope` (the page or a sheet). */
+const authTab = (scope, which) => scope.getByRole("group", { name: "Sign in or sign up" }).getByRole("button", { name: which });
+const authSubmit = (scope, label) => scope.locator(".auth-body").getByRole("button", { name: label, exact: true });
+/** Sign up on one page: name, email confirmed with the code, username, password twice, birthday. */
+async function signUpForm(scope, email, name, handle) {
+  await authTab(scope, "Sign up").click();
+  await scope.getByLabel("Name", { exact: true }).fill(name);
+  await scope.getByLabel("Email", { exact: true }).fill(email);
+  await scope.getByRole("button", { name: "Send code" }).click();
+  await scope.getByLabel("Code from the email").fill("123456");
+  await scope.getByText("Email confirmed").waitFor();
+  await scope.getByLabel("Username", { exact: true }).fill(handle);
+  await scope.getByText(`@${handle} is available`).waitFor();
+  await scope.getByLabel("Password", { exact: true }).fill(PASSWORD);
+  await scope.getByLabel("Password again", { exact: true }).fill(PASSWORD);
+  await pickBirthday(scope, "1999", "4", "12");
+  await authSubmit(scope, "Sign up").click();
+  accounts.add(email);
+  // Then the optional steps, both skipped here.
+  const after = page.getByRole("dialog", { name: "Create your account" });
+  await after.getByText("Add a profile photo").waitFor();
+  await after.getByRole("button", { name: "Skip for now" }).click();
+  await after.getByText("Where should we send your orders?").waitFor();
+  await after.getByRole("button", { name: "Skip for now" }).click();
+  await after.waitFor({ state: "detached" });
+}
+
 async function signIn(email, name) {
   await page.goto(`${BASE}/signin`);
-  await page.getByLabel("Email").fill(email);
-  await page.getByRole("button", { name: "Send code" }).click();
-  await page.getByLabel("Code").fill("123456"); // signs in by itself once 6 digits are in
-  await page.waitForURL((u) => !u.pathname.startsWith("/signin"));
-  await maybeSetup(name);
+  if (accounts.has(email) || /@shop\.demo$|^admin|@example\.com$/.test(email)) {
+    await authTab(page, "Sign in").click();
+    await page.getByLabel("Username or email").fill(email);
+    await page.getByLabel("Password", { exact: true }).fill(accounts.has(email) ? PASSWORD : "123456");
+    await authSubmit(page, "Sign in").click();
+    await page.waitForURL((u) => !u.pathname.startsWith("/signin"));
+    await maybeSetup(name); // older accounts without a username still get the Create account steps
+  } else {
+    await signUpForm(page, email, name ?? "Test Person", `tester.${++setupCount}${Date.now() % 1000}`);
+    await page.waitForURL((u) => !u.pathname.startsWith("/signin"));
+  }
   // Someone with a new surprise reward sees it first (for example a seller after a first sale).
   const surprise = page.getByRole("dialog", { name: "Surprise reward" });
   if (await surprise.waitFor({ timeout: 1500 }).then(() => true, () => false)) await surprise.getByRole("button", { name: "Nice!" }).click();
@@ -143,26 +179,37 @@ try {
   // Signed out Buy now: sign in over the feed, then checkout opens by itself. No lost place.
   await page.getByRole("region", { name: /Oversized tee/ }).getByRole("button", { name: "Buy now" }).click();
   const signSheet = page.getByRole("dialog", { name: "Sign in to buy" });
-  await signSheet.getByLabel("Email").fill("buyer@test.co.za");
+  // A first visit opens on Sign up. Everything is checked on this one page before the account is made.
+  await check(authTab(signSheet, "Sign up").getAttribute("aria-pressed").then((v) => v === "true"), "new visitors start on Sign up");
+  const signUpBtn = authSubmit(signSheet, "Sign up");
+  await signSheet.getByLabel("Name", { exact: true }).fill("Thandi Mokoena");
+  await signSheet.getByLabel("Email", { exact: true }).fill("buyer@test.co.za");
   await signSheet.getByRole("button", { name: "Send code" }).click();
-  await signSheet.getByLabel("Code").fill("123456");
-  // A new account: Create account first (age check, name, unique username, photo), then checkout opens by itself.
-  const setup = page.getByRole("dialog", { name: "Create your account" });
-  await setup.getByText("When's your birthday?").waitFor();
-  await pickBirthday(setup, "2012", "1", "1");
-  await setup.getByText("You need to be 18 or older").waitFor();
-  await check(setup.getByRole("button", { name: "Next" }).isDisabled(), "under 18 can't continue");
-  await pickBirthday(setup, "1999", "4", "12");
-  await setup.getByRole("button", { name: "Next" }).click();
-  await setup.getByLabel("Name", { exact: true }).fill("Thandi Mokoena");
-  await setup.getByLabel("Username", { exact: true }).fill("lebo.m"); // a sample seller already has this one
-  await setup.getByText("@lebo.m is taken").waitFor();
-  await setup.getByLabel("Username", { exact: true }).fill("support");
-  await setup.getByText("That username is reserved.").waitFor();
-  await setup.getByLabel("Username", { exact: true }).fill("thandi.mokoena");
-  await setup.getByText("@thandi.mokoena is available").waitFor();
+  await signSheet.getByLabel("Code from the email").fill("123456");
+  await signSheet.getByText("Email confirmed").waitFor();
+  await check(signUpBtn.isDisabled(), "can't sign up with only an email");
+  await signSheet.getByLabel("Username", { exact: true }).fill("lebo.m"); // a sample seller already has this one
+  await signSheet.getByText("@lebo.m is taken").waitFor();
+  await signSheet.getByLabel("Username", { exact: true }).fill("support");
+  await signSheet.getByText("That username is reserved.").waitFor();
+  await signSheet.getByLabel("Username", { exact: true }).fill("thandi.mokoena");
+  await signSheet.getByText("@thandi.mokoena is available").waitFor();
+  await signSheet.getByLabel("Password", { exact: true }).fill("short1");
+  await signSheet.getByLabel("Password again", { exact: true }).fill("short1");
+  await check(signUpBtn.isDisabled(), "a weak password can't sign up");
+  await signSheet.getByLabel("Password", { exact: true }).fill(PASSWORD);
+  await signSheet.getByLabel("Password again", { exact: true }).fill(PASSWORD + "y");
+  await check(signUpBtn.isDisabled(), "passwords must match");
+  await signSheet.getByLabel("Password again", { exact: true }).fill(PASSWORD);
+  await pickBirthday(signSheet, "2012", "1", "1");
+  await signSheet.getByText("You need to be 18 or older").waitFor();
+  await check(signUpBtn.isDisabled(), "under 18 can't sign up");
+  await pickBirthday(signSheet, "1999", "4", "12");
   await shot("create-account");
-  await setup.getByRole("button", { name: "Create account" }).click();
+  await signUpBtn.click();
+  accounts.add("buyer@test.co.za");
+  // Then the optional steps (photo, where to send orders), then checkout opens by itself.
+  const setup = page.getByRole("dialog", { name: "Create your account" });
   await setup.getByText("Add a profile photo").waitFor();
   await setup.locator('input[type="file"]').setInputFiles(here + "fixtures/denim.jpg");
   await setup.getByRole("button", { name: "Next" }).click();

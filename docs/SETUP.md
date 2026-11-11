@@ -139,6 +139,22 @@ Address fields (checkout and the seller pickup address) get a "Find your address
 
 Cost: a free amount each month (about 5,000 searches and 10,000 address lookups at the time of writing), then about $5 per 1,000 addresses picked [CONFIRM on Google's pricing page].
 
+## 7. Sign in emails (codes) and passwords
+
+The app confirms emails with a 6 digit code (or the link in the same email). Supabase only puts the code in the email if the template asks for it.
+
+1. Supabase, Authentication, Emails (Templates). Edit **Confirm signup** and **Magic Link** (both are used: new emails get the first, existing accounts the second).
+2. Subject: `Your myHaul code`. Body:
+```html
+<h2>Your myHaul code</h2>
+<p>Type this code in myHaul:</p>
+<p style="font-size:28px;font-weight:700;letter-spacing:6px">{{ .Token }}</p>
+<p>Or confirm on this phone: <a href="{{ .ConfirmationURL }}">tap here</a>.</p>
+<p>If you didn't ask for this, you can ignore this email.</p>
+```
+3. Authentication, Providers, Email: set the minimum password length to 8 (the app asks for 8 with a letter and a number).
+4. Deploy the `password-login` function (no signed in user needed; it checks the password itself) and migration 0042.
+
 ## Hosting the web app
 
 `npm run build` makes `apps/web/dist`, a static site. Any static host works (Vercel, Netlify, Cloudflare Pages). Set the three `VITE_` variables there and send all routes to `index.html`.

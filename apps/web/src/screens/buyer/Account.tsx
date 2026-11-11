@@ -12,6 +12,7 @@ import { FriendsRow } from "./Friends";
 import { DmList } from "../../components/DmList";
 import { MoreSheet } from "../../components/Safety";
 import { Avatar } from "../../components/Avatar";
+import { AuthForm } from "../../components/AuthForm";
 import { useIsMine } from "../../lib/mine";
 
 export function SignIn() {
@@ -22,7 +23,6 @@ export function SignIn() {
     <div className="screen">
       <BackButton />
       <div style={{ margin: "18px 0 22px" }}><Wordmark size={40} /></div>
-      <h1 className="large-title" style={{ margin: "0 0 6px" }}>Sign in</h1>
       <SignInForm onDone={() => nav(next, { replace: true })} />
     </div>
   );
@@ -39,55 +39,8 @@ export function SignInSheet() {
   );
 }
 
-/** Email (or phone) and a 6 digit code. New and returning people use the same steps. */
-export function SignInForm({ onDone }: { onDone: () => void }) {
-  const [contact, setContact] = useState("");
-  const [code, setCode] = useState("");
-  const [sent, setSent] = useState(false);
-  const [usePassword, setUsePassword] = useState(false); // for the app store reviewers' test account
-  const [password, setPassword] = useState("");
-  const { busy, error, run } = useAction();
-  const phone = authMethod === "phone";
-  const verify = (c: string) => run(async () => { await api.verifyCode(contact, c); onDone(); });
-
-  return (
-    <>
-      <p className="muted" style={{ marginTop: 0 }}>{sent ? `Check ${contact}. Type the 6 digit code from the email, or tap the sign in link in it on this device.` : "One account for buying and selling. No password needed: we email you a code."}</p>
-      {api.mode === "demo" && <div className="note amber" style={{ marginBottom: 14 }}>Demo: use any email and the code <b>123456</b>. An email starting with “admin” signs in as our team. To try the seller side of chats, use <b>lebo@shop.demo</b>.</div>}
-      <ErrorNote error={error} />
-      {usePassword ? (
-        <form onSubmit={(e) => { e.preventDefault(); run(async () => { await api.signInWithPassword(contact, password); onDone(); }); }}>
-          <Field label="Email"><input value={contact} onChange={(e) => setContact(e.target.value)} type="email" inputMode="email" autoComplete="email" required /></Field>
-          <Field label="Password"><input value={password} onChange={(e) => setPassword(e.target.value)} type="password" autoComplete="current-password" required /></Field>
-          <button className="btn green block big" disabled={busy}>{busy ? "Signing in…" : "Sign in"}</button>
-          <button type="button" className="link" style={{ marginTop: 14 }} onClick={() => setUsePassword(false)}>Get a code instead</button>
-        </form>
-      ) : !sent ? (
-        <form onSubmit={(e) => { e.preventDefault(); run(async () => { await api.sendCode(contact); setSent(true); }); }}>
-          <Field label={phone ? "Cell number" : "Email"}>
-            <input value={contact} onChange={(e) => setContact(e.target.value)} type={phone ? "tel" : "email"} inputMode={phone ? "tel" : "email"}
-              autoComplete={phone ? "tel" : "email"} placeholder={phone ? "082 123 4567" : "you@example.com"} required autoFocus />
-          </Field>
-          <button className="btn green block big" disabled={busy || !contact.trim()}>{busy ? "Sending…" : "Send code"}</button>
-          <button type="button" className="link" style={{ marginTop: 14 }} onClick={() => setUsePassword(true)}>Sign in with a password</button>
-        </form>
-      ) : (
-        <form onSubmit={(e) => { e.preventDefault(); verify(code); }}>
-          <Field label="Code">
-            {/* Signs in by itself once all 6 digits are in (including when the phone fills the code from the message). */}
-            <input value={code} onChange={(e) => { const v = e.target.value.replace(/\D/g, "").slice(0, 6); setCode(v); if (v.length === 6 && !busy) verify(v); }}
-              inputMode="numeric" autoComplete="one-time-code" maxLength={6} required autoFocus />
-          </Field>
-          <button className="btn green block big" disabled={busy || code.length < 6}>{busy ? "Checking…" : "Sign in"}</button>
-          <div className="row between" style={{ marginTop: 14 }}>
-            <button type="button" className="link" onClick={() => { setSent(false); setCode(""); }}>Use a different {phone ? "number" : "email"}</button>
-            <button type="button" className="link" disabled={busy} onClick={() => run(async () => { await api.sendCode(contact); setCode(""); })}>Send again</button>
-          </div>
-        </form>
-      )}
-    </>
-  );
-}
+/** Sign in and Sign up live in components/AuthForm.tsx. */
+export const SignInForm = AuthForm;
 
 type InboxTab = "messages" | "updates";
 const isChat = (n: { link: string | null }) => !!n.link && /^\/(messages|chats)\//.test(n.link);

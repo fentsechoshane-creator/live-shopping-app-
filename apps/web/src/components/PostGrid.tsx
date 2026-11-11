@@ -16,7 +16,7 @@ export function PostGrid({ items, empty, openProductId }: { items: FeedItem[]; e
       <div className="grid3">
         {items.map((it, i) => (
           <button key={it.postId} className="g3" onClick={() => setOpen(i)} aria-label={`${it.product.title}, ${R(it.product.priceCents)}`}>
-            <ProductArt productId={it.product.id} fallback={it.video.demo?.bg ?? swatch(it.product.id)} />
+            <ProductArt productId={it.product.id} video={it.video} fallback={it.video.demo?.bg ?? swatch(it.product.id)} />
             <span className="g3foot">{R(it.product.priceCents)}</span>
             {it.video.url && it.video.kind !== "image" && <TileLength url={it.video.url} />}
           </button>

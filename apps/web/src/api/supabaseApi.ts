@@ -1,7 +1,8 @@
 // Live adapter: talks to Supabase (database, auth, storage) and our server functions.
+import { passwordProblem } from "../lib/password";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { validateListing } from "@app/core";
-import type {
+import type { Thumb,
   ListingSuggestion, SellerStats, Conversation, OpenReport, SharedPost,
   MyProfile, ShopPublic,
   Api, BankInput, Category, CheckoutInput, FeedItem, ListingInput, MyShop, Notification, Order, Payout, PendingReview, SellerCharge,
@@ -150,11 +151,21 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
       const { data } = sb.auth.onAuthStateChange((_e, s) => cb(s?.user ? toUser(s.user) : null));
       return () => data.subscription.unsubscribe();
     },
-    async sendCode(contact) {
+    async sendCode(contact, opts) {
       const res = contact.includes("@")
-        ? await sb.auth.signInWithOtp({ email: contact.trim(), options: { shouldCreateUser: true, emailRedirectTo: backHere() } })
+        ? await sb.auth.signInWithOtp({ email: contact.trim().toLowerCase(), options: { shouldCreateUser: opts?.create !== false, emailRedirectTo: backHere() } })
         : await sb.auth.signInWithOtp({ phone: toE164(contact) });
-      if (res.error) throw new Error(res.error.message);
+      if (res.error) {
+        if (opts?.create === false && /not found|signups not allowed|otp_disabled/i.test(res.error.message)) throw new Error("There's no account with that email. Tap Sign up instead.");
+        if (/rate|seconds/i.test(res.error.message)) throw new Error("Wait a minute, then ask for a new code.");
+        throw new Error(res.error.message);
+      }
+    },
+    async setPassword(password) {
+      const p = passwordProblem(password);
+      if (p) throw new Error(p);
+      const { error } = await sb.auth.updateUser({ password });
+      if (error) throw new Error(/same/i.test(error.message) ? "That's your current password. Pick a new one." : /weak|pwned|leak/i.test(error.message) ? "That password is too easy to guess. Pick another one." : error.message);
     },
     async verifyCode(contact, code) {
       const res = contact.includes("@")
@@ -437,10 +448,12 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
       const rows = check(await sb.from("app_errors").select("*").order("created_at", { ascending: false }).limit(50)) as any[];
       return rows.map((r) => ({ id: String(r.id), message: r.message, stack: r.stack, path: r.path, platform: r.platform, version: r.version, createdAt: r.created_at, userId: r.user_id }));
     },
-    async signInWithPassword(email, password) {
-      const { data, error } = await sb.auth.signInWithPassword({ email: email.trim(), password });
-      if (error || !data.user) throw new Error("Wrong email or password.");
-      return (await api.currentUser())!;
+    async signInWithPassword(login, password) {
+      // The server checks the password (and keeps emails private for usernames), then hands back a one time token.
+      const { tokenHash } = await call<{ tokenHash: string }>("password-login", { login: login.trim(), password });
+      const { data, error } = await sb.auth.verifyOtp({ token_hash: tokenHash, type: "magiclink" });
+      if (error || !data.user) throw new Error("Couldn't sign you in. Try again.");
+      return toUser(data.user);
     },
     async deleteAccount() {
       await call("delete-account", { confirm: "DELETE" });
@@ -672,6 +685,19 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
         .subscribe();
       const t = window.setInterval(onChange, 10000);
       return () => { window.clearInterval(t); sb.removeChannel(ch); };
+    },
+    async productThumbs(ids) {
+      const uniq = [...new Set(ids)].filter((x) => /^[0-9a-f-]{36}$/.test(x)).slice(0, 100);
+      if (!uniq.length) return {};
+      const rows = (check(await sb.rpc("product_thumbs", { p_ids: uniq })) as any[]) ?? [];
+      const out: Record<string, Thumb> = {};
+      for (const r of rows) {
+        if (r.playback_id) out[r.product_id] = { image: `https://image.mux.com/${r.playback_id}/thumbnail.jpg?width=360&fit_mode=smartcrop` };
+        else if (r.storage_path && isImage(r.storage_path)) out[r.product_id] = { image: videoUrl(r.storage_path)! };
+        else if (r.photo_path) out[r.product_id] = { image: videoUrl(r.photo_path)! };
+        else if (r.storage_path) out[r.product_id] = { video: videoUrl(r.storage_path)! };
+      }
+      return out;
     },
     async search(q, f, offset = 0) {
       const rows = check(await sb.rpc("search_items", {

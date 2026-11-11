@@ -66,6 +66,17 @@ export function Field({ label, hint, children }: { label: string; hint?: string;
   );
 }
 
+/** A labelled box whose input sits inside extra markup (a Show button, an icon, a tick). The label still points at the input. */
+export function FieldWith({ label, children }: { label: string; children: (id: string) => ReactNode }) {
+  const id = useId();
+  return (
+    <div className="field">
+      <label htmlFor={id}>{label}</label>
+      {children(id)}
+    </div>
+  );
+}
+
 export function Choice({ on, onClick, title, sub, right }: { on: boolean; onClick: () => void; title: string; sub?: string; right?: ReactNode }) {
   return (
     <button type="button" className="choice" aria-pressed={on} onClick={onClick}>

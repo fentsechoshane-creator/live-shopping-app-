@@ -1,4 +1,5 @@
-import { useId, type ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
+import { api, type Thumb, type VideoSource } from "../api";
 
 /**
  * Demo stand in media. Each product gets a lit product shot drawn in SVG, with slow camera
@@ -139,7 +140,46 @@ function Hanger({ light }: { light?: boolean }) {
 }
 
 /** Small product picture for tiles, rows and chips. Falls back to a colour swatch. */
-export function ProductArt({ productId, fallback }: { productId: string; fallback: string }) {
+// Real items: their cover picture. Asked for in small batches (every list on screen at once), and remembered.
+const thumbCache = new Map<string, Thumb | null>();
+const thumbQueue = new Set<string>();
+const thumbListeners = new Set<() => void>();
+let thumbTimer = 0;
+function askThumb(id: string) {
+  if (thumbCache.has(id) || thumbQueue.has(id)) return;
+  thumbQueue.add(id);
+  window.clearTimeout(thumbTimer);
+  thumbTimer = window.setTimeout(() => {
+    const ids = [...thumbQueue]; thumbQueue.clear();
+    api.productThumbs(ids).then((r) => { ids.forEach((x) => thumbCache.set(x, r[x] ?? null)); }, () => { ids.forEach((x) => thumbCache.set(x, null)); })
+      .finally(() => thumbListeners.forEach((l) => l()));
+  }, 40);
+}
+function useThumb(id: string, wanted: boolean): Thumb | null {
+  const [, bump] = useState(0);
+  useEffect(() => {
+    if (!wanted) return;
+    const l = () => bump((n) => n + 1);
+    thumbListeners.add(l); askThumb(id);
+    return () => { thumbListeners.delete(l); };
+  }, [id, wanted]);
+  return wanted ? thumbCache.get(id) ?? null : null;
+}
+const thumbFrom = (v?: VideoSource | null): Thumb | null =>
+  !v || v.demo ? null : v.muxPlaybackId ? { image: `https://image.mux.com/${v.muxPlaybackId}/thumbnail.jpg?width=360&fit_mode=smartcrop` }
+    : v.url ? (v.kind === "image" ? { image: v.url } : { video: v.url }) : null;
+
+/** An item's picture: the sample art in the demo, or the real cover (a still from the video, or the photo). */
+export function ProductArt({ productId, fallback, video }: { productId: string; fallback: string; video?: VideoSource | null }) {
   const kind = sceneFor(productId);
-  return kind ? <Scene kind={kind} thumb /> : <span style={{ position: "absolute", inset: 0, background: `linear-gradient(160deg, ${fallback}, #111)` }} />;
+  const given = thumbFrom(video);
+  const looked = useThumb(productId, !kind && !given);
+  const t = given ?? looked;
+  if (kind) return <Scene kind={kind} thumb />;
+  return (
+    <span className="art-fill" style={{ background: `linear-gradient(160deg, ${fallback}, #111)` }}>
+      {t?.image ? <img src={t.image} alt="" loading="lazy" decoding="async" />
+        : t?.video ? <video src={`${t.video}#t=0.5`} muted playsInline preload="metadata" aria-hidden="true" tabIndex={-1} /> : null}
+    </span>
+  );
 }

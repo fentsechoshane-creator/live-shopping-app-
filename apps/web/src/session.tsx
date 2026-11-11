@@ -38,6 +38,12 @@ interface Session {
   refreshProfile: () => Promise<void>;
   /** A new account that still needs its name, username and age check (shown as the Create account steps). */
   needsSetup: boolean;
+  /** True while the Sign up form is open with a confirmed email, so the Create account screens don't jump in. */
+  signingUp: boolean;
+  setSigningUp: (v: boolean) => void;
+  /** Just signed up: show the optional steps (photo, delivery address) once. */
+  afterSignUp: boolean;
+  setAfterSignUp: (v: boolean) => void;
 }
 
 const Ctx = createContext<Session>({
@@ -46,6 +52,7 @@ const Ctx = createContext<Session>({
   dataSaver: false, setDataSaver: () => {}, soundOn: false, setSoundOn: () => {}, menuOpen: false, setMenuOpen: () => {},
   withUser: () => {}, signInAsk: null, closeSignIn: () => {}, interests: [], setInterests: () => {},
   profile: null, refreshProfile: async () => {}, needsSetup: false,
+  signingUp: false, setSigningUp: () => {}, afterSignUp: false, setAfterSignUp: () => {},
 });
 
 const readPref = (k: string) => {
@@ -91,7 +98,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     try { setProfile(await api.myProfile()); } catch { setProfile(null); }
   }, []);
   useEffect(() => { if (user) refreshProfile(); else setProfile(null); }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
-  const needsSetup = !!user && !!profile && profile.id === user.id && !profile.setUp;
+  const [signingUp, setSigningUp] = useState(false);
+  const [afterSignUp, setAfterSignUp] = useState(false);
+  const needsSetup = !!user && !!profile && profile.id === user.id && !profile.setUp && !signingUp;
 
   // Signing in from a sheet keeps you where you were, then finishes what you tapped (like, follow, buy, message).
   // A brand new account sets up its name and username first, then the action runs.
@@ -103,8 +112,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     if (!user) setSignInAsk(why ?? "Sign in to continue");
   }, [user, needsSetup]);
   const closeSignIn = useCallback(() => { pending.current = null; setSignInAsk(null); }, []);
-  useEffect(() => { if (user) setSignInAsk(null); }, [user?.id]);
-  const ready2 = !!user && !!profile && profile.id === user.id && profile.setUp;
+  useEffect(() => { if (user && !signingUp) setSignInAsk(null); }, [user?.id, signingUp]); // eslint-disable-line react-hooks/exhaustive-deps
+  const ready2 = !!user && !!profile && profile.id === user.id && profile.setUp && !afterSignUp; // after the optional sign up steps
   useEffect(() => {
     if (!ready2) return;
     const act = pending.current;
@@ -155,7 +164,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <Ctx.Provider value={{ user, ready, toast, following, toggleFollow, liked, reposted, toggleReaction, blockedShops, refreshBlocks, dataSaver, setDataSaver, soundOn, setSoundOn, menuOpen, setMenuOpen, withUser, signInAsk, closeSignIn, interests, setInterests, profile, refreshProfile, needsSetup }}>
+    <Ctx.Provider value={{ user, ready, toast, following, toggleFollow, liked, reposted, toggleReaction, blockedShops, refreshBlocks, dataSaver, setDataSaver, soundOn, setSoundOn, menuOpen, setMenuOpen, withUser, signInAsk, closeSignIn, interests, setInterests, profile, refreshProfile, needsSetup, signingUp, setSigningUp, afterSignUp, setAfterSignUp }}>
       {children}
       {msg && <div className="toast" role="status">{msg}</div>}
     </Ctx.Provider>
