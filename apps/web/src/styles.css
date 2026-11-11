@@ -1484,3 +1484,7 @@ button.g3 { border: 0; padding: 0; display: block; width: 100%; }
 .fold .bid-list { padding: 0 16px; }
 .fold.open .bid-list { padding-bottom: 8px; }
 @media (prefers-reduced-motion: reduce) { .fold-body, .fold-head svg { transition: none; } }
+/* Like an iOS Settings row: label, grey value and arrow share one centre line and one text size. */
+.fold-head > span { line-height: 22px; display: flex; align-items: center; }
+.fold-head .fold-count { font-size: 16px; font-weight: 400; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.fold-head svg { display: block; flex: none; }

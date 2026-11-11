@@ -171,7 +171,7 @@ export function AuctionSheet({ item, info, onInfo, onClose, onPay }: {
             <div className={`fold ${showBids ? "open" : ""}`}>
               <button className="fold-head" onClick={() => setShowBids(!showBids)} aria-expanded={showBids} aria-controls="recent-bids">
                 <span>Recent bids</span>
-                <span className="muted small">{info.bidCount}</span>
+                <span className="fold-count">{info.bidCount} {info.bidCount === 1 ? "bid" : "bids"}</span>
                 <Icon name="down" size={18} />
               </button>
               <div className="fold-body" id="recent-bids">
