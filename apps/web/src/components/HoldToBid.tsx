@@ -84,6 +84,13 @@ export function HoldToBid({ label, price, onConfirm, onTap, disabled, block, gla
     if (onTap && Date.now() - downAt.current < 300) onTap();
   };
 
+  // Which text is showing now, and which was showing just before (so it can leave upwards).
+  const face = phase === "idle" ? (flip ? "hold" : "price") : phase;
+  const prevFace = useRef(face);
+  const lastFace = useRef(face);
+  if (lastFace.current !== face) { prevFace.current = lastFace.current; lastFace.current = face; }
+  const cls = (k: string) => (k === face ? "on" : k === prevFace.current ? "was" : "");
+
   const pad = 4, w = size.w + pad * 2 - 3, h = size.h + pad * 2 - 3;
   const secs = HOLD_MS / 1000;
   return (
@@ -96,13 +103,13 @@ export function HoldToBid({ label, price, onConfirm, onTap, disabled, block, gla
         onKeyDown={(e) => { if ((e.key === " " || e.key === "Enter") && !e.repeat) { e.preventDefault(); start(); } }}
         onKeyUp={(e) => { if (e.key === " " || e.key === "Enter") cancel(); }}
         onClick={(e) => e.preventDefault()}>
-        {/* Every face is always there, stacked; only the one that fits the moment is shown, so changes cross fade. */}
+        {/* Every face is always there, stacked: the one leaving slides up and fades, the new one comes up from below. */}
         <span className="hold-face">
-          <span className={phase === "idle" && !flip ? "on" : ""}><i className="hold-dot" />{price}</span>
-          <span className={phase === "idle" && flip ? "on" : ""}><Icon name="clock" size={16} />Hold to bid</span>
-          <span className={phase === "holding" ? "on" : ""}>Bid {price} in <b className="hold-count">{[3, 2, 1].map((n) => <i key={n} className={left === n ? "on" : ""}>{n}</i>)}</b></span>
-          <span className={phase === "sending" ? "on" : ""}>Placing bid…</span>
-          <span className={phase === "done" ? "on" : ""}><Icon name="check" size={17} strokeWidth={3} />Bid placed</span>
+          <span className={cls("price")}><i className="hold-dot" />{price}</span>
+          <span className={cls("hold")}><Icon name="clock" size={16} />Hold to bid</span>
+          <span className={cls("holding")}>Bid {price} in <b className="hold-count">{[3, 2, 1].map((n) => <i key={n} className={left === n ? "on" : left === n - 1 ? "was" : ""}>{n}</i>)}</b></span>
+          <span className={cls("sending")}>Placing bid…</span>
+          <span className={cls("done")}><Icon name="check" size={17} strokeWidth={3} />Bid placed</span>
         </span>
       </button>
       {size.w > 0 && (
