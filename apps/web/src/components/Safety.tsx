@@ -27,18 +27,21 @@ export function ReportSheet({ kind, targetId, what, onClose }: { kind: ReportTar
 }
 
 /** The "…" menu on a post or shop: report, block, and (on posts) message the seller. */
-export function MoreSheet({ kind, targetId, shopId, shopHandle, onClose, onMessage, mine }: {
+export function MoreSheet({ kind, targetId, shopId, shopHandle, onClose, onMessage, mine, onEdit }: {
   kind: "post" | "shop"; targetId: string; shopId: string; shopHandle: string; onClose: () => void; onMessage?: () => void;
   /** Your own post or shop: no message, report or block (you can't do those to yourself). */
   mine?: boolean;
+  /** Your own post: opens the listing editor. */
+  onEdit?: () => void;
 }) {
   const [reporting, setReporting] = useState(false);
   const { user, toast, refreshBlocks } = useSession();
   const { busy, error, run } = useAction();
   if (mine) return (
     <Sheet title={kind === "post" ? "Your post" : "Your shop"} onClose={onClose}>
-      <p className="small muted" style={{ marginTop: 0 }}>This is yours, so there's nothing to report or block. Manage your listings and orders from your shop.</p>
       <div className="group">
+        {onEdit && <button className="cell" onClick={onEdit}><span className="icon-btn" style={{ width: 34, height: 34, borderRadius: 10 }}><Icon name="edit" size={18} /></span>
+          <span className="grow t">Edit listing</span></button>}
         <a className="cell" href="/sell/orders"><span className="icon-btn" style={{ width: 34, height: 34, borderRadius: 10 }}><Icon name="bag" size={18} /></span>
           <span className="grow t">My orders</span></a>
         <a className="cell" href="/me"><span className="icon-btn" style={{ width: 34, height: 34, borderRadius: 10 }}><Icon name="store" size={18} /></span>

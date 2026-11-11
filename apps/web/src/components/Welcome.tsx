@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Wordmark } from "./ui";
 import type { Category } from "../api";
 import { Icon } from "./Icon";
 import { useSwipe } from "./gestures";
@@ -89,6 +90,7 @@ export function Welcome({ onDone }: { onDone: () => void }) {
   return (
     <div className="welcome" role="dialog" aria-modal="true" aria-label="Welcome to myHaul" {...swipe}>
       <div className="welcome-top">
+        <Wordmark size={24} onVideo />
         <span className="welcome-dots" aria-hidden="true">{[...SLIDES, null].map((_, i) => <span key={i} className={i === step ? "on" : ""} />)}</span>
         {!last && <button className="link on-dark" onClick={() => setStep(PICK)}>Skip</button>}
       </div>

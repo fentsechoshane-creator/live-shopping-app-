@@ -5,7 +5,7 @@ import { useLoad, useSession } from "../../session";
 import { Icon } from "../../components/Icon";
 import { RewardChip } from "../../components/Rewards";
 import { ProductArt } from "../../components/Scene";
-import { ErrorNote, Loading, R, swatch } from "../../components/ui";
+import { Blank, ErrorNote, Loading, R, swatch } from "../../components/ui";
 import { useMyShopId } from "../../lib/mine";
 
 const CATS: { id: Category | "all"; label: string }[] = [
@@ -72,7 +72,7 @@ export function Explore() {
       {items && (
         <>
           <h2 className="section-title">{q ? `Results for “${q}”` : "Selling now"}</h2>
-          {filtered.length === 0 && <div className="empty">Nothing matches yet. Try another word or category.</div>}
+          {filtered.length === 0 && <Blank icon="search" title="No results" line={q ? `Nothing matches "${q}". Try another word, or browse a category above.` : "Nothing in this category yet. Try another one."} />}
           <div className="grid2">
             {filtered.map((it) => (
               <button key={it.postId} className="tile" onClick={() => nav(`/s/${it.shop.handle}?item=${it.product.id}`)} aria-label={`${it.product.title}, ${R(it.product.priceCents)}`}>
@@ -91,10 +91,7 @@ export function Explore() {
       )}
 
       {items && !q && (
-        <div className="empty-card" style={{ marginTop: 18 }}>
-          <span className="icon-btn" style={{ background: "var(--red-soft)", color: "var(--red-text)" }}><Icon name="live" /></span>
-          <span className="grow"><b>Auctions are open</b><div className="small muted">Trusted sellers run timed auctions. Bid before the clock runs out.</div></span>
-        </div>
+        <p className="small muted" style={{ margin: "22px 16px 0", textAlign: "center" }}>Trusted sellers also run timed auctions. Look for the Bid button.</p>
       )}
     </div>
   );

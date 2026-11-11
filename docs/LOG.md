@@ -14,7 +14,7 @@ Checked 7 Nov 2026 with the live health check. "Practical completion" here means
 | --- | --- |
 | Business rules, database, security rules, server functions | Done and tested. Live database up to 0037 |
 | Buyer side (feed, Explore, checkout, orders, returns, cancelling, friends, sharing, Inbox) | Done and live |
-| Seller side (sign up, checks, Create with camera and editor, orders, shipping, payouts) | Done and live, except editing a listing after posting |
+| Seller side (sign up, checks, Create with camera and editor, orders, shipping, payouts) | Done. Editing or taking down a listing after posting is built, not live yet |
 | Payments (TradeSafe escrow) | Working in TradeSafe's developer sandbox (real test payments with Ozow). Needs the production account and keys |
 | Delivery (Bob Go) | Working in Bob Go's sandbox (courier bookings, tracking, locker checks). Needs the live key, a balance, and a price check |
 | Video (Mux) | Keys in and working |
@@ -53,7 +53,8 @@ Checked 7 Nov 2026 with the live health check. "Practical completion" here means
 
 - Buyer: welcome screens with interests on first open, feed (For you ranked by interests, loads more as you scroll; Following), Explore with word search, item sheet, checkout that remembers delivery details, My orders with returns and ratings, Inbox (messages and updates), chats with offers and holds.
 - Signing in happens in a sheet over the current screen and then finishes what you tapped (like, follow, buy, message). The code signs in by itself once 6 digits are in.
-- Profile: TikTok style page with Posts, Likes and Reposts.
+- Profile: Posts, Likes and Reposts. Sellers tap their own post to edit it (name, price, stock, sizes, details) or take it down.
+- Look: Apple's system look with one green tint, dark ink on green buttons and rounded numbers. The full rule is in docs/DESIGN.md.
 - Seller: onboarding, Create in steps with drafts and photo suggestions, Camera (Live hidden until built), orders to ship (most urgent first, copy address), payouts.
 - Team dashboard at `/team` (laptop first, works on a phone): search on every page; Overview with sales, fees and what needs doing; To do (reports, checks, returns, late orders, top ups); Accounts with search, filters and a full page per person (shop, checks, ID files, orders, trust history, reports, what the team did); suspend and lift, pause, close or open shops, add or remove team members; Seller checks; Reports; Returns; Orders; Listings (remove with a reason); Money (top ups); App errors; Activity log of every team action. Suspended people can sign in and see orders but can't buy, sell, bid, comment or message; the database blocks it.
 - Phone apps: Capacitor in `apps/web/ios` and `apps/web/android`. Links to items and shops open the app once the domain is set up.
@@ -62,7 +63,7 @@ Checked 7 Nov 2026 with the live health check. "Practical completion" here means
 
 ## Next up
 
-- **Edit your own listing:** price, description, stock, pause, mark sold, delete (sellers can't change a listing after posting yet). [Claude]
+- **Deploy the finished app (needs Ofentse's "okay deploy"):** migration 0038, then functions checkout, delivery, order-action, seller-bank and run-due, then push main (branch `flat-prices` holds the work). The app on main must not go live before the server, or prices and payouts won't match. [Claude]
 - **Bob Go sandbox:** key and sandbox mode are in and work. Ofentse adds the "Tracking updated" webhook in Bob Go (URL in docs/SETUP.md section 4: `.../functions/v1/bobgo-webhook`). Then test a full sandbox booking from a real order. Later: read "Shipment submission status" and "Shipment health status" to alert sellers when a booking fails or a parcel is stuck. [Ofentse, Claude]
 - **Mux Robots:** check videos when they're ready (hold flagged posts), suggest covers and listing details. [Claude]
 - **Live selling on Mux:** go live from the phone, watch, buy or bid during a live. [Claude]
@@ -105,6 +106,19 @@ Debug as we go: anyone who finds or fixes a problem updates this list. Highest r
 Fixed in this round: Safari double back on the edge swipe (now only in the installed app), deleting an account now also deletes the person's photos and videos, React Router warnings.
 
 ## Log
+
+### 2026-11-11: Finishing pass: Apple look with our own kick, listing editing, every screen checked
+
+Asked by Ofentse: fix everything from the screen audit, match Apple's design with a myHaul identity ("option 1": Apple's system green as the one tint), check every page for proportions, so an investor can use it alone and find nothing. **Not live yet**: it sits on branch `flat-prices` with the flat prices and seller charges work, waiting for "okay deploy".
+
+- **Look (docs/DESIGN.md rewritten):** system font and colours, body 17px, large titles 34px, flat 50px capsule buttons, grouped lists, solid sheets. Ours: one green tint for every action, dark ink on green buttons, rounded numbers for prices and the wordmark (`<Wordmark>`). Gone: Tailwind green and amber, glows under buttons, glossy bubbles, tinted icon circles, most helper paragraphs.
+- **One of each:** one empty state (`<Blank>`: thin icon, title, one line, one button) on every list, search, Inbox, blocked, friends, page not found; one Back and title style; grey monogram avatars; form labels the same everywhere (account setup included).
+- **Notices drop in from the top** (a small capsule, like iOS), so they never cover Pay, Save or the message box. On the team dashboard they stay bottom right.
+- **Sellers can edit a listing:** tap your own post on Me or the pencil on your video: name, price, stock, sizes, details, or take it down. Auctions can't be edited. New `EditListing.tsx`, `api.updateListing`, `api.takeDownListing`. The database already allowed owners to do this, so no migration.
+- **Wrong things fixed:** refunded and cancelled orders stop the timeline at "Refunded in full" and show no payout; a seller's money on courier orders adds up on screen (delivery shown as going to the courier); "Owed to myHaul" row; the launch date [CONFIRM] is out of the Terms; new shops show "New" in place of 0.0 stars; the standing label is "Trusted", not "Trusted buyer", on shops.
+- **Proportions:** buttons that share a row are 16px so labels stay on one line ("Refund buyer" replaces "Accept and refund"); the bid row on a video fits "Hold to bid R720" on one line; product and offer cards inside a green chat bubble are plain white cards; the reward pop up has no icon tile; the Payouts note is two lines; the first open screen no longer shows an orange glow from the video behind it.
+- **Checked:** `npm run test:e2e` (72 steps, now also edits a listing), `apps/web/e2e/audit.mjs` (91 screens: signed out, every order status, settings, legal, empty, seller, team, dark) and a third set for returns, sheets and a brand new buyer. Every picture looked at, at 393 x 720, light and dark. Core 53 tests, database and function checks pass.
+- **Open:** person pages stay centred like a contact card while shops and Me are left aligned (on purpose; say if you want them the same). Test screenshots show black video tiles because the test camera has no picture; real posts have covers. Promotions, feed signals and live selling are still not started.
 
 ### 2026-11-10: Screen audit (usability and style), no app changes yet
 

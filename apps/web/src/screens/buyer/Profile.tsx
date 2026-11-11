@@ -6,12 +6,13 @@ import { useLoad, useSession } from "../../session";
 import { Icon } from "../../components/Icon";
 import { RewardChip } from "../../components/Rewards";
 import { ProductArt } from "../../components/Scene";
-import { ErrorNote, Field, Loading, R, Sheet, dateText, swatch, useAction } from "../../components/ui";
+import { Blank, ErrorNote, Field, Loading, R, Sheet, dateText, swatch, useAction } from "../../components/ui";
 import { CertUpload } from "../seller/Selling";
 import { PostGrid } from "../../components/PostGrid";
 import { shareOrCopy } from "../../native";
 import { useTabSwipe } from "../../components/gestures";
 import { Avatar } from "../../components/Avatar";
+import { EditListing } from "../../components/EditListing";
 import { cleanHandle, handleProblem } from "../../lib/handle";
 import { squarePhoto } from "../../lib/image";
 
@@ -55,7 +56,7 @@ export function Profile() {
   const sold = (sales ?? []).filter((o) => !["cancelled", "refunded"].includes(o.status)).length;
   const toShip = (sales ?? []).filter((o) => o.status === "paid").length;
   const founding = hasShop && shop!.foundingUntil && new Date(shop!.foundingUntil) > new Date();
-  const standing = profile.trustScore >= 70 ? "Trusted buyer" : profile.trustScore >= 40 ? "Good standing" : "Under review";
+  const standing = profile.trustScore >= 70 ? "Trusted" : profile.trustScore >= 40 ? "Good standing" : "Under review";
   const categoryText = shop ? { clothes: "Clothes and thrift", beauty: "Hair and beauty", food: "Food and bakes", designer: "Designer resale" }[shop.category] : "";
 
   const ratings = (sales ?? []).map((o) => o.review?.stars).filter((x): x is number => typeof x === "number");
@@ -106,7 +107,7 @@ export function Profile() {
         : <button className="pbio add" onClick={() => setSheet("edit")}>Add a bio</button>}
 
       {/* Everything you do here, in one row: your orders, and for sellers the shop tools. */}
-      <div className="ppills">
+      <div className={`ppills ${hasShop ? "four" : ""}`}>
         <button className="pill-btn" onClick={() => nav("/orders")}><Icon name="bag" size={14} />My orders</button>
         {hasShop && <>
           <button className="pill-btn green" onClick={() => nav("/post?mode=create")}><Icon name="plus" size={14} strokeWidth={2.5} />List an item</button>
@@ -143,16 +144,13 @@ export function Profile() {
 
 /** Seller rating out of 5. Red at the bottom, green at the top, black when there are no ratings yet. */
 export function RatingBubble({ rating, count }: { rating: number | null; count: number }) {
-  if (rating === null) return <span className="rating none" aria-label="No ratings yet">★ 0.0</span>;
-  const hue = Math.round(Math.max(0, Math.min(1, (rating - 1) / 3.5)) * 135);
-  return (
-    <span className="rating" style={{ background: `hsl(${hue} 72% 38%)` }} aria-label={`Rated ${rating.toFixed(1)} out of 5 from ${count} reviews`}>
-      ★ {rating.toFixed(1)}
-    </span>
-  );
+  // Plain, like the App Store: the number and a star. A shop with no reviews is "New", never 0.0.
+  if (rating === null) return <span className="rating none" aria-label="No ratings yet">New</span>;
+  return <span className="rating" aria-label={`Rated ${rating.toFixed(1)} out of 5 from ${count} reviews`}>{rating.toFixed(1)} ★</span>;
 }
 
 function SellerGrid({ shop, error, sold, reload }: { shop: MyShop | null | undefined; error: string | null; sold: number; reload: () => void }) {
+  const [editing, setEditing] = useState<MyShop["products"][number] | null>(null);
   const [open, setOpen] = useState(false);
   const nav = useNavigate();
   if (error) return <ErrorNote error={error} />;
@@ -160,9 +158,9 @@ function SellerGrid({ shop, error, sold, reload }: { shop: MyShop | null | undef
   if (!shop || shop.status === "onboarding") {
     return (
       <div className="pprompt">
-        <span className="pprompt-ic"><Icon name="store" size={22} /></span>
+        <span className="pprompt-ic"><Icon name="store" size={40} /></span>
         <b>{shop ? "Finish opening your shop" : "Open your shop to post"}</b>
-        <span>Sell from short videos with the money held safely. The first 50 shops pay 0% for 3 months, then 6% only when you sell.</span>
+        <span>Sell from short videos. The first 50 shops pay no fee for 3 months.</span>
         <button className="btn green" onClick={() => nav("/sell/start")}>{shop ? "Continue" : "Open my shop"}</button>
       </div>
     );
@@ -202,22 +200,23 @@ function SellerGrid({ shop, error, sold, reload }: { shop: MyShop | null | undef
       )}
       {shop.products.length === 0 ? (
         <div className="pprompt">
-          <span className="pprompt-ic"><Icon name="plus" size={22} strokeWidth={2.5} /></span>
+          <span className="pprompt-ic"><Icon name="camera" size={40} /></span>
           <b>Post your first item</b>
-          <span>A short video of the item sells best. Show it from every side, and any marks.</span>
+          <span>A short video sells best. Show every side, and any marks.</span>
           <button className="btn green" onClick={() => nav("/post?mode=create")}>Post an item</button>
         </div>
       ) : (
         <div className="grid3">
           {shop.products.map((p) => (
-            <Link key={p.id} to={`/s/${shop.handle}`} className="g3" aria-label={`${p.title}, ${R(p.priceCents)}`}>
+            <button key={p.id} onClick={() => setEditing(p)} className="g3" aria-label={`Edit ${p.title}, ${R(p.priceCents)}`}>
               <ProductArt productId={p.id} fallback={swatch(p.id)} />
               {p.status !== "live" && <span className="g3chip">{p.status === "draft" && p.proofStatus === "pending" ? "Checking" : p.status === "sold_out" ? "Sold out" : "Draft"}</span>}
               <span className="g3foot">{R(p.priceCents)}</span>
-            </Link>
+            </button>
           ))}
         </div>
       )}
+      {editing && <EditListing product={editing} onClose={() => setEditing(null)} onDone={() => { setEditing(null); reload(); }} />}
     </>
   );
 }
@@ -229,7 +228,7 @@ function ReactionGrid({ kind }: { kind: "like" | "repost" }) {
   if (error) return <ErrorNote error={error} />;
   if (!posts) return <Loading />;
   return <PostGrid items={posts} empty={
-    <div className="pempty">{kind === "like" ? "Videos you like show here. Tap the heart on any video." : "Videos you repost show here and in your followers' Following feed."}<br />Everyone can see them.</div>
+    <Blank icon={kind === "like" ? "heart" : "repost"} title={kind === "like" ? "No likes yet" : "No reposts yet"} line={kind === "like" ? "Tap the heart on a video to keep it here. Everyone can see your likes." : "Videos you repost show here and to your followers."} />
   } />;
 }
 

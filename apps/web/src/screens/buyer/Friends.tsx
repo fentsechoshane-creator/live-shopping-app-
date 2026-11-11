@@ -6,7 +6,7 @@ import { useLoad, useSession } from "../../session";
 import { Icon } from "../../components/Icon";
 import { Avatar } from "../../components/People";
 import { ReportSheet } from "../../components/Safety";
-import { ErrorNote, Loading, R, timeAgo, useAction, useGoBack } from "../../components/ui";
+import { Blank, ErrorNote, Loading, R, timeAgo, useAction, useGoBack } from "../../components/ui";
 import { CheckoutSheet } from "./Checkout";
 import { askForNotifications } from "../../lib/push";
 import type { FeedItem } from "../../api";
@@ -37,7 +37,7 @@ export function FriendsRow({ friends }: { friends: Friend[] }) {
   return (
     <div className="friends-row" role="group" aria-label="Friends">
       <Link to="/friends" className="friend-face" aria-label="Find friends">
-        <span className="ring add"><Icon name="addperson" size={22} /></span><span className="n">Find friends</span>
+        <span className="ring add"><Icon name="addperson" size={22} /></span><span className="n">Find</span>
       </Link>
       {friends.map((f) => (
         <button key={f.id} className="friend-face" onClick={() => open(f)} aria-label={`Chat with ${f.name}`}>
@@ -83,17 +83,14 @@ export function FindFriends() {
 
   return (
     <div className="screen">
-      <div className="row" style={{ gap: 8, marginBottom: 6 }}>
-        <button className="bare" onClick={goBack} aria-label="Back"><Icon name="back" /></button>
-        <h1 className="title" style={{ margin: 0 }}>Find friends</h1>
-      </div>
-      <p className="muted small" style={{ marginTop: 0 }}>Friends are people you follow who follow you back. You can send each other posts and messages.</p>
+      <button className="back" onClick={goBack}><Icon name="back" size={20} />Back</button>
+      <h1>Find friends</h1>
       <input className="setup-input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search names or usernames" aria-label="Search people" autoCapitalize="none" autoCorrect="off" />
 
       {found && (
         <>
           <h2 className="section-title">Results</h2>
-          {found.list.length === 0 ? <div className="empty-card"><span className="muted">No one called "{found.q}". Check the username and try again.</span></div> : (
+          {found.list.length === 0 ? <Blank icon="search" title="No one found" line={`Nobody is called "${found.q}". Check the username and try again.`} /> : (
             <div className="group">
               {found.list.map((p) => (
                 <div key={p.id} className="cell">
@@ -141,7 +138,7 @@ export function FindFriends() {
         </>
       )}
       {!found && backs?.length === 0 && friends?.length === 0 && (
-        <div className="empty-card" style={{ marginTop: 16 }}><span className="muted">Search for a friend's name or username to follow them. When they follow you back, you can send them posts.</span></div>
+        <Blank icon="addperson" title="Find your people" line="Follow someone. When they follow you back, you're friends and can send each other posts." />
       )}
     </div>
   );

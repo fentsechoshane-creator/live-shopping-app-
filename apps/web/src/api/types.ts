@@ -251,6 +251,8 @@ export interface SellerChecks {
   payoutSchedule?: PayoutSchedule;
 }
 
+export interface ListingChanges { title: string; description: string; priceCents: Cents; stock: number; sizes: string[] }
+
 /** Something a seller owes us, taken from their next sale (migration 0038). */
 export interface SellerCharge {
   id: string;
@@ -550,6 +552,10 @@ export interface Api {
   createListing(input: ListingInput, video: File | null, proof: File | null, onProgress?: (pct: number) => void, photos?: File[], edit?: EditDraft | null): Promise<{ live: boolean; message?: string }>;
   /** Extra photos of a listing, in order. */
   productPhotos(productId: string): Promise<string[]>;
+  /** A seller changes their own listing. Auctions can't be changed once posted. */
+  updateListing(productId: string, changes: ListingChanges): Promise<void>;
+  /** A seller takes their own listing down. Orders already placed carry on. */
+  takeDownListing(productId: string): Promise<void>;
   /** Suggested title, type, condition and price from a photo. Null when suggestions are not available. */
   suggestListing(photo: Blob): Promise<ListingSuggestion | null>;
   sellerOrders(): Promise<Order[]>;

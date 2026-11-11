@@ -70,7 +70,7 @@ export function ShareSheet({ postId, productId, title, priceCents, onClose }: { 
           })}
           <Link to="/friends" className="share-friend" onClick={onClose} aria-label="Find friends">
             <span className="ring add"><Icon name="addperson" size={24} /></span>
-            <span className="n">Find friends</span>
+            <span className="n">Find</span>
           </Link>
         </div>
       )}

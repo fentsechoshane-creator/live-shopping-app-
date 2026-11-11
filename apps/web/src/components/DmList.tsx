@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import type { Conversation, FriendChat } from "../api";
 import { Avatar } from "./Avatar";
 import { Icon } from "./Icon";
-import { timeAgo } from "./ui";
+import { Blank, timeAgo } from "./ui";
 
 /** One row in the messages list, friend or shop, shaped the same. */
 interface Row { key: string; to: string; name: string; photo: string | null; preview: string; at: string; unread: number; tag: string | null; shop: boolean }
@@ -14,6 +14,7 @@ interface Row { key: string; to: string; name: string; photo: string | null; pre
  */
 export function DmList({ friends, shops }: { friends: FriendChat[]; shops: Conversation[] }) {
   const [q, setQ] = useState("");
+  const navigate = useNavigate();
   const rows = useMemo<Row[]>(() => {
     const f: Row[] = friends.map((c) => ({
       key: `f${c.id}`, to: `/chats/${c.id}`, name: c.other.name, photo: c.other.avatarUrl, at: c.lastAt, unread: c.unread, tag: null, shop: false,
@@ -38,17 +39,9 @@ export function DmList({ friends, shops }: { friends: FriendChat[]; shops: Conve
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search messages" aria-label="Search messages" />
         </label>
       )}
-      {rows.length === 0 && (
-        <div className="dm-empty">
-          {q ? <span className="muted">No chats match "{q}".</span> : (
-            <>
-              <b>No messages yet</b>
-              <span className="muted">Message a shop from any item, or follow friends to send them posts.</span>
-              <Link to="/friends" className="btn green">Find friends</Link>
-            </>
-          )}
-        </div>
-      )}
+      {rows.length === 0 && (q
+        ? <Blank icon="search" title="No chats found" line={`Nothing matches "${q}".`} />
+        : <Blank icon="chat" title="No messages yet" line="Message a shop from any item, or follow friends to send them posts." action="Find friends" onAction={() => navigate("/friends")} />)}
       <nav className="dm-list" aria-label="Messages">
         {rows.map((r) => (
           <Link key={r.key} to={r.to} className={`dm-row ${r.unread ? "unread" : ""}`}

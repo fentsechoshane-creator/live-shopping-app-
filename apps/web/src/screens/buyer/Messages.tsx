@@ -5,7 +5,7 @@ import { api, type Conversation, type FeedItem, type MyShop, type Offer, type Or
 import { ProductArt } from "../../components/Scene";
 import { useLoad, useSession } from "../../session";
 import { Icon } from "../../components/Icon";
-import { ErrorNote, Loading, R, Sheet, swatch, timeAgo, useAction, useGoBack } from "../../components/ui";
+import { Blank, ErrorNote, Loading, R, Sheet, swatch, timeAgo, useAction, useGoBack } from "../../components/ui";
 import { CheckoutSheet } from "./Checkout";
 import { ReportSheet } from "../../components/Safety";
 import { askForNotifications } from "../../lib/push";
@@ -33,7 +33,7 @@ export function ConversationList({ list: given }: { list?: Conversation[] } = {}
   const list = given ?? loaded;
   if (error) return <ErrorNote error={error} />;
   if (!list) return <Loading />;
-  if (list.length === 0) return <div className="empty-card"><span className="muted">No messages yet. Tap Message on a shop or item to ask a question.</span></div>;
+  if (list.length === 0) return <Blank icon="chat" title="No messages yet" line="Tap Message on a shop or item to ask a question." />;
   return (
     <div className="group">
       {list.map((c) => (
@@ -101,7 +101,13 @@ export function Thread() {
   useEffect(() => { if (c?.iAmSeller) setReplies(loadReplies(c.shopId)); }, [c?.iAmSeller, c?.shopId]);
 
   useEffect(() => { const t = window.setInterval(reload, 3000); return () => window.clearInterval(t); }, [reload]); // new messages
-  useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [data?.messages.length, data?.typing]);
+  // Keep the newest message in view. Offer cards, photos and the quick replies settle a moment after the first
+  // paint, so scroll again once they have (the newest offer's buttons used to end up behind the quick replies).
+  useEffect(() => {
+    const go = () => endRef.current?.scrollIntoView({ block: "end" });
+    go(); const raf = requestAnimationFrame(go); const t = setTimeout(go, 300);
+    return () => { cancelAnimationFrame(raf); clearTimeout(t); };
+  }, [data?.messages.length, data?.typing, text === ""]);
 
   if (error) return <div className="screen"><button className="bare" onClick={goBack} aria-label="Back"><Icon name="back" /></button><ErrorNote error={error} /></div>;
   if (!data || !c) return <div className="screen"><Loading /></div>;

@@ -101,6 +101,23 @@ export function BackButton({ to, label = "Back" }: { to?: string; label?: string
   return <button className="back" onClick={back}><Icon name="back" size={20} />{label}</button>;
 }
 
+/** The one empty state, used everywhere: a large quiet symbol, a title, one line, and at most one button. */
+export function Blank({ icon, title, line, action, onAction, onVideo }: { icon: string; title: string; line?: string; action?: string; onAction?: () => void; onVideo?: boolean }) {
+  return (
+    <div className={`blank ${onVideo ? "on-video" : ""}`}>
+      <Icon name={icon} size={44} strokeWidth={1.5} />
+      <b>{title}</b>
+      {line && <span>{line}</span>}
+      {action && onAction && <button className={`btn ${onVideo ? "vglass" : "green"}`} onClick={onAction}>{action}</button>}
+    </div>
+  );
+}
+
+/** myHaul's wordmark. */
+export function Wordmark({ size = 28, onVideo }: { size?: number; onVideo?: boolean }) {
+  return <span className={`wordmark ${onVideo ? "on-video" : ""}`} style={{ fontSize: size }} aria-label="myHaul">my<i>Haul</i></span>;
+}
+
 /** Grouped list row, like iOS settings. */
 export function Cell({ icon, title, sub, right, onClick, to }: { icon?: string; title: ReactNode; sub?: ReactNode; right?: ReactNode; onClick?: () => void; to?: string }) {
   const nav = useNavigate();

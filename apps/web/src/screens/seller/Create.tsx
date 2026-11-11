@@ -178,7 +178,7 @@ export function CreateListing({ shop, media, onMedia, onCamera, onStep, startAtD
         {step === 0 && (
           <div className="wz-media">
             <h1>Create a listing</h1>
-            <p className="muted">Start with a short video or a photo. Show the whole item and every mark.</p>
+            <p className="muted">Show the whole item and every mark.</p>
             {draft && !media.length && (
               <div className="wz-draft">
                 <span className="grow"><b>Continue your draft?</b><small>{draft.title || "Untitled item"} · saved {new Date(draft.savedAt).toLocaleString("en-ZA", { weekday: "short", hour: "2-digit", minute: "2-digit" })}</small></span>
@@ -217,7 +217,7 @@ export function CreateListing({ shop, media, onMedia, onCamera, onStep, startAtD
               </>
             ) : (
               <div className="wz-pick">
-                <button className="wz-big" onClick={onCamera}><Icon name="live" size={26} /><b>Use the camera</b><span>Tap for a photo, hold for a video</span></button>
+                <button className="wz-big" onClick={onCamera}><Icon name="camera" size={26} /><b>Use the camera</b><span>Tap for a photo, hold for a video</span></button>
                 <button className="wz-big" onClick={() => pickRef.current?.click()}><Icon name="grid" size={26} /><b>Choose from gallery</b><span>Up to 10 photos, or a video and photos</span></button>
               </div>
             )}
@@ -354,7 +354,7 @@ export function CreateListing({ shop, media, onMedia, onCamera, onStep, startAtD
         {step === 3 && (
           <>
             <h1>Tell buyers more</h1>
-            <p className="muted" style={{ marginTop: -4 }}>Both are optional. You can skip this.</p>
+            <p className="muted">Both are optional.</p>
             <label className="wz-label" htmlFor="wz-caption">Caption</label>
             <input id="wz-caption" className="wz-input" value={caption} onChange={(e) => setCaption(e.target.value)} maxLength={150} placeholder={title || "3 ways to style it"} />
             <label className="wz-label" htmlFor="wz-desc">Description</label>

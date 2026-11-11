@@ -2,23 +2,39 @@
 
 ## The rule for every new version
 
-1. **The prototype is the design reference.** Every screen in the real app must look and work like its screen in the clickable prototype. Reference screenshots live in `docs/design/prototype/`. If a new version changes a screen, compare it side by side with the reference before shipping.
-2. **Liquid Glass, kept very clean.** Use the design system below. Do not add new colours, fonts, shadows or one off styles; use the tokens and classes in `apps/web/src/styles.css`.
-3. **Real features only.** Where the prototype shows something not built yet (lives, auctions, chat), the real app shows a clear "coming next" state in the same place, never fake data.
-4. **Check before shipping.** Run `npm run test:e2e`. It saves screenshots of every main screen to `apps/web/e2e/shots/`. Look at them next to the references.
+1. **Apple's look, with myHaul's own kick.** The app should feel like it shipped with the iPhone: system font, system colours, grouped lists, sheets, large titles. On top of that sit three things that are ours (see "What makes it myHaul"). Nothing else is decorated.
+2. **Tokens only.** Do not add new colours, fonts, shadows or one off styles. Use the tokens and classes in `apps/web/src/styles.css`.
+3. **Real features only.** Where something is not built yet, the app says so plainly in the same place. Never fake data.
+4. **Every screen is finished.** Every list has an empty state (`<Blank>`), every action says what happened, every screen has a way back.
+5. **Check before shipping.** Run `npm run test:e2e` (screenshots land in `apps/web/e2e/shots/`) and `node apps/web/e2e/audit.mjs` for the screens the test does not reach. Look at every picture at phone size (393 x 720) in light and dark.
+
+## What makes it myHaul
+
+| Signature | Rule |
+| --- | --- |
+| One green tint | Apple's system green (`--green`) is the only action colour: Buy, Pay, links, Back, switches, focus rings, selected choices. Green words on a light page use `--tint`. |
+| Dark ink on green | Text on a green button is near black green (`--green-ink`), never white. This is the one place we break from Apple on purpose. |
+| Rounded numbers | Prices, big numbers, monogram avatars and the wordmark use the rounded system font (`--font-round`). Everything else is the normal system font. |
+| The wordmark | `<Wordmark>`: "my" in ink, "Haul" in green, rounded. Sign in, welcome, the menu footer. No logo tile, no gradient. |
 
 ## Design system
 
 | Part | Rule |
 | --- | --- |
-| Type | The phone's system font (SF Pro on iPhone), Inter as fallback. Large bold titles (32px) on main tabs, 15px body. No other fonts. |
-| Colour | Tokens only (`--ink`, `--surface`, `--green` and so on). Light and dark follow the phone's setting. Green is for Buy now, Order now and success. Amber for attention and made to order. Red only for errors and the Live dot. |
-| Glass | `.glass` for bars, sheets and menus on light screens: frosted, see through, a thin bright edge. `.vglass` for anything floating over video: always dark glass with white text. |
-| Shape | Capsule buttons and pills. Cards 18px radius. Sheets 30px top corners. The tab bar floats as a glass capsule above the bottom edge. |
-| Layout | One phone column. Content scrolls under the floating bars. Grouped lists (`.group` with `.cell`) for settings, orders and menus, like iOS. |
+| Type | The phone's system font. Body 17px. Large title (`h1`) 34px bold on main screens, 28px (`h1.item`) for an item or order name. Section title (`h2`) 22px bold. Small print 13px. Form labels 13px grey capitals above the field. |
+| Colour | System colours only: green (tint and success), orange (`--amber`: attention, auctions, made to order), red (`--red`: errors, destructive actions, unread badges). Page `--bg` is the iOS grouped grey, cards are `--surface` white. Light and dark follow the phone. |
+| Buttons | Capsules, 50px high, 17px semibold, flat (no gradient, no glow). One green button per screen for the main action. Others are plain surface buttons. Disabled buttons go grey. Two buttons in a row use `.btn.grow` (16px) so labels stay on one line. |
+| Lists | Grouped lists (`.group` with `.cell`) for settings, menus, orders and details, as in iOS Settings. Chevron on the right when a row opens something. |
+| Sheets | Solid (not see through), 30px top corners, a grab handle, a title and a close button. Main action pinned in the sheet foot. |
+| Glass | Only for bars that float over content: the tab bar, the top bar on the feed, controls over video (`.vglass`, always dark with white text). |
+| Avatars | The person's photo, or a grey monogram circle with their first letter, like Contacts. Shop avatars carry a thin green ring. |
+| Chat | Messages style: my bubbles green with dark ink, theirs white. Product and offer cards inside a bubble are plain white cards. |
+| Empty states | One pattern, `<Blank>`: a thin grey icon, a 22px title, one grey line, at most one button. |
+| Notices | Short capsule that drops in from the top and leaves by itself. Never covers a Pay button or the message box. Errors that need action stay on the page as a red note. |
+| Shape | Cards 20px radius (`--r`), small parts 12px, sheets 30px. |
 | Motion | Short and soft: sheets rise, the menu slides in, buttons press in slightly. Off when the phone asks for reduced motion. |
-| Size | Compact by default. Top bar icons 38px, small capsule buttons 34px, avatar 64px. Nothing bigger than it needs to be. |
-| Words | Plain South African English. No hyphens or em dashes in app text. Say what happens: "Pay R311", "Ask for a return". |
+| Touch | Nothing you tap is smaller than 44px. |
+| Words | Plain South African English. No hyphens or em dashes in app text. Say what happens: "Pay R311", "Ask for a return". Helper text is one short line or it goes. |
 
 ## Screen map (prototype to real app)
 

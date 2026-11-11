@@ -1431,6 +1431,23 @@ export function createDemoApi(): Api {
       const sh = myShopRow();
       return sh ? s.payouts.filter((p) => p.shopId === sh.id) : [];
     },
+    async updateListing(productId, c) {
+      await wait(300);
+      const sh = myShopRow(); const p = s.products.find((x) => x.id === productId);
+      if (!sh || !p || p.shopId !== sh.id) throw new Error("That listing is gone.");
+      if (p.mode === "auction") throw new Error("Auctions can't be changed once they're posted.");
+      if (c.title.trim().length < 4) throw new Error("Give it a name of at least 4 letters.");
+      if (/\b(replica|fake|aaa|1:1|mirror)\b/i.test(c.title + " " + c.description)) throw new Error("Replicas and fakes are not allowed. Selling counterfeit goods is an offence under the Counterfeit Goods Act.");
+      p.title = c.title.trim(); p.description = c.description.trim(); p.priceCents = c.priceCents; p.sizes = c.sizes;
+      if (p.mode === "buy_now") { p.stock = c.stock; if (p.status === "live" || p.status === "sold_out") p.status = c.stock < 1 ? "sold_out" : "live"; }
+      save();
+    },
+    async takeDownListing(productId) {
+      await wait(300);
+      const sh = myShopRow(); const p = s.products.find((x) => x.id === productId);
+      if (!sh || !p || p.shopId !== sh.id) throw new Error("That listing is gone.");
+      p.status = "removed"; save();
+    },
     async sellerCharges(shopId) {
       const sid = shopId ?? myShopRow()?.id;
       const charges = (s.sellerCharges ?? []).filter((c) => c.shopId === sid);

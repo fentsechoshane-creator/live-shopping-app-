@@ -136,7 +136,7 @@ export function AccountSetup() {
         <form className="setup-body bday" onSubmit={(e) => { e.preventDefault(); if (age !== null && age >= 18) setStep(1); }}>
           <div className="bday-icon" aria-hidden="true"><Icon name="gift" size={28} /></div>
           <h1>When's your birthday?</h1>
-          <p className="muted">Only to check you're 18 or older. It's never shown.</p>
+          <p className="muted">Only to check you're 18 or older. Never shown.</p>
           <BirthdayPicker value={birthday} onChange={setBirthday} />
           <div className={`bday-age ${age === null ? "" : tooYoung ? "bad" : "ok"}`} role={tooYoung ? "alert" : undefined}>
             {age === null ? "Pick your day, month and year" : tooYoung ? "You need to be 18 or older to use myHaul" : <><Icon name="check" size={14} strokeWidth={2.6} />You're {age}</>}
@@ -150,7 +150,7 @@ export function AccountSetup() {
       {step === 1 && (
         <form className="setup-body" onSubmit={(e) => { e.preventDefault(); create(); }}>
           <h1>Pick your name and username</h1>
-          <p className="muted">Your username is how people find and tag you. You can change it later, once every 30 days.</p>
+          <p className="muted">Your username is how people find you.</p>
           <ErrorNote error={error} />
           <label className="setup-label" htmlFor="setup-name">Name</label>
           <input id="setup-name" className="setup-input" value={name} onChange={(e) => setName(e.target.value)} maxLength={40}
@@ -183,7 +183,7 @@ export function AccountSetup() {
       {step === 2 && (
         <div className="setup-body" style={{ alignItems: "center", textAlign: "center" }}>
           <h1>Add a profile photo</h1>
-          <p className="muted">Buyers and sellers trust faces. You can change it any time.</p>
+          <p className="muted">People trust faces.</p>
           <ErrorNote error={error} />
           <button className="setup-photo" onClick={() => fileRef.current?.click()} aria-label={photo ? "Change photo" : "Choose a photo"}>
             {photo ? <Avatar url={photo.url} name={name} className="pavatar big" /> : <span className="pavatar big empty"><Icon name="user" size={44} /></span>}
@@ -204,7 +204,7 @@ export function AccountSetup() {
       {step === 3 && (
         <div className="setup-body scroll">
           <h1>Where should we send your orders?</h1>
-          <p className="muted">Add it once and Buy now is one tap. You can change it any time in the menu, or at checkout.</p>
+          <p className="muted">Add it once and Buy now is one tap.</p>
           <DeliveryDetailsForm initialName={name} submitLabel="Save and finish" onDone={() => finish()} onSkip={() => finish()} />
         </div>
       )}

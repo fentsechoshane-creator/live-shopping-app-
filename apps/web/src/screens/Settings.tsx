@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 import { useLoad, useSession } from "../session";
-import { BackButton, ErrorNote, Loading, Sheet, useAction } from "../components/ui";
+import { BackButton, Blank, ErrorNote, Loading, Sheet, useAction } from "../components/ui";
 import { DeliveryDetailsForm } from "../components/DeliveryDetails";
 
 /** People you blocked, with Unblock. */
@@ -14,10 +14,9 @@ export function BlockedAccounts() {
     <div className="screen">
       <BackButton />
       <h1>Blocked accounts</h1>
-      <p className="muted" style={{ marginTop: -6 }}>They can't message you or comment on your posts, and you won't see their posts.</p>
       <ErrorNote error={error} />
       {!list && !error && <Loading />}
-      {list?.length === 0 && <div className="empty-card"><span className="muted">You haven't blocked anyone.</span></div>}
+      {list?.length === 0 && <Blank icon="block" title="No one blocked" line="People you block can't message you or comment on your posts." />}
       {list && list.length > 0 && (
         <div className="group">
           {list.map((b) => (
@@ -102,7 +101,7 @@ export function DeliverySettings() {
     <div className="screen">
       <BackButton />
       <h1>Delivery details</h1>
-      <p className="muted" style={{ marginTop: -6 }}>Checkout fills these in for you. Only you can see them; the seller only sees what the courier label needs.</p>
+      <p className="muted">Checkout fills these in for you. Only you can see them.</p>
       <DeliveryDetailsForm initialName={user?.displayName ?? ""} onDone={() => { toast("Saved"); nav(-1); }} />
       <button className="link block-link" style={{ color: "var(--red, #dc2626)" }}
         onClick={() => run(async () => { await api.saveDelivery(null); toast("Removed"); nav(-1); })}>Remove my saved details</button>

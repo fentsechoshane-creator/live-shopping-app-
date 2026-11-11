@@ -78,7 +78,7 @@ export function SellerCancel({ o, onDone, part }: { o: Order; onDone: () => void
           </p>
           <ErrorNote error={error} />
           <div className="row" style={{ gap: 8 }}>
-            <button className="btn green grow" disabled={busy} onClick={() => answer(true)}>Accept and refund</button>
+            <button className="btn green grow" disabled={busy} onClick={() => answer(true)}>Refund buyer</button>
             <button className="btn grow" disabled={busy} onClick={() => answer(false)}>I'll ship it</button>
           </div>
         </div>

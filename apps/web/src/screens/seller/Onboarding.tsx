@@ -61,7 +61,7 @@ function StepCategory({ value, onPick }: { value: Category | null; onPick: (c: C
   return (
     <>
       <h1>What will you sell?</h1>
-      <p className="muted">Pick your main category. It sets the right rules, like food safety for bakers.</p>
+      <p className="muted">Pick your main category.</p>
       {CATEGORIES.map((c) => <Choice key={c.id} on={value === c.id} onClick={() => onPick(c.id)} title={c.title} sub={c.sub} />)}
     </>
   );
@@ -77,7 +77,7 @@ function StepName({ category, onDone }: { category: Category; onDone: () => void
   return (
     <form onSubmit={(e) => { e.preventDefault(); run(async () => { await api.startShop(name.trim(), handle, category); forgetMyShop(); onDone(); }); }}>
       <h1>Name your shop</h1>
-      <p className="muted">Buyers see this on every video. Signed in as {user?.email ?? user?.phone}.</p>
+      <p className="muted">Buyers see this on every video.</p>
       <ErrorNote error={error} />
       <Field label="Shop name"><input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} required /></Field>
       <Field label="Shop handle" hint={`Your shop link: myhaul.co.za/s/${handle || "handle"}. Same as your username unless you change it.`}>
@@ -96,7 +96,7 @@ function StepId({ food, onDone }: { food: boolean; onDone: () => void }) {
   return (
     <form onSubmit={(e) => { e.preventDefault(); run(async () => { await api.submitId(phone, idDoc!, selfie!); onDone(); }); }}>
       <h1>Verify your ID</h1>
-      <p className="muted">Every seller is verified. It keeps fake shops and scams out. Your ID is only seen by our team.</p>
+      <p className="muted">Every seller is verified. Only our team sees your ID.</p>
       <ErrorNote error={error} />
       <Field label="Cell number"><input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" autoComplete="tel" required /></Field>
       <Field label="Photo of your ID or passport"><input type="file" accept="image/*,application/pdf" onChange={(e) => setIdDoc(e.target.files?.[0] ?? null)} required /></Field>
@@ -114,7 +114,7 @@ function StepBank({ onDone }: { onDone: () => void }) {
   return (
     <form onSubmit={(e) => { e.preventDefault(); run(async () => { await api.addBank({ ...f, idNumber: f.idNumber || undefined }); onDone(); }); }}>
       <h1>Where we pay you</h1>
-      <p className="muted">Your bank details go straight to our escrow partner, TradeSafe. We only keep the last 4 digits.</p>
+      <p className="muted">Sent straight to our payment partner, TradeSafe. We keep only the last 4 digits.</p>
       <ErrorNote error={error} />
       <Field label="Bank"><select value={f.bankName} onChange={set("bankName")} required><option value="">Pick your bank</option>{BANKS.map((b) => <option key={b}>{b}</option>)}</select></Field>
       <Field label="Account number"><input value={f.accountNumber} onChange={set("accountNumber")} inputMode="numeric" required /></Field>

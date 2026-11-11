@@ -9,7 +9,7 @@ import {
 import { api, type MyShop } from "../../api";
 import { useLoad, useSession } from "../../session";
 import { ProductArt } from "../../components/Scene";
-import { BackButton, Cell, Choice, ErrorNote, Field, Loading, R, TierPill, dateText, dateTimeText, swatch, useAction } from "../../components/ui";
+import { BackButton, Blank, Cell, Choice, ErrorNote, Field, Loading, R, TierPill, dateText, dateTimeText, swatch, useAction } from "../../components/ui";
 import { Icon } from "../../components/Icon";
 import { addressLine, PickupAddressForm } from "../../components/Address";
 import { CourierTracking, statusPill, Timeline } from "../buyer/Orders";
@@ -34,11 +34,11 @@ export function SellerOrders() {
   return (
     <div className="screen">
       <BackButton to="/me?tab=selling" label="Shop" />
-      <h1 style={{ marginTop: 6 }}>Orders</h1>
+      <h1>Orders</h1>
       <ErrorNote error={error} />
       <PickupCheck />
       {!orders && !error && <Loading />}
-      {orders?.length === 0 && <div className="empty">No orders yet. Post videos to get your first sale.</div>}
+      {orders?.length === 0 && <Blank icon="bag" title="No orders yet" line="Post a video to get your first sale." />}
       {/* Orders to ship come first, the most urgent at the top. */}
       {orders && [...orders].sort((a, b) => (a.status === "paid" ? 0 : 1) - (b.status === "paid" ? 0 : 1)
         || (a.status === "paid" ? new Date(a.shipBy ?? 0).getTime() - new Date(b.shipBy ?? 0).getTime() : 0)).map((o) => (
@@ -48,7 +48,7 @@ export function SellerOrders() {
             <div className="small muted">{DELIVERY_OPTIONS[o.delivery].label} · {o.status === "paid" && o.shipBy ? `ship by ${dateTimeText(o.shipBy)}` : dateText(o.createdAt)}</div>
             <div style={{ marginTop: 4 }}>{statusPill(o, "seller")}</div>
           </div>
-          <b>{R(o.totals.sellerPayout)}</b>
+          {o.status === "refunded" || o.status === "cancelled" ? <span className="small muted">No payout</span> : <b>{R(o.totals.sellerPayout)}</b>}
         </Link>
       ))}
     </div>
@@ -75,7 +75,7 @@ export function SellerOrderDetail() {
   const copy = (text: string) => navigator.clipboard?.writeText(text).then(() => toast("Copied"), () => toast("Couldn't copy"));
   if (error) return <div className="screen"><ErrorNote error={error} /></div>;
   if (o === undefined) return <div className="screen"><Loading /></div>;
-  if (!o) return <div className="screen"><div className="empty">Order not found.</div></div>;
+  if (!o) return <div className="screen"><BackButton to="/sell/orders" label="Orders" /><Blank icon="bag" title="Order not found" line="It may belong to another account." /></div>;
   const act = (fn: () => Promise<void>, msg: string) => run(async () => { await fn(); toast(msg); reload(); });
   // Courier and locker parcels are booked by us through Bob Go when you mark them shipped.
   const booked = bookedByUs(o.delivery);
@@ -84,7 +84,7 @@ export function SellerOrderDetail() {
   return (
     <div className="screen">
       <BackButton to="/sell/orders" label="Orders" />
-      <h1 style={{ marginTop: 6 }}>{o.product.title}</h1>
+      <h1 className="item">{o.product.title}</h1>
       <div className="row between"><span className="small muted">{o.size ? `Size ${o.size} · ` : ""}{DELIVERY_OPTIONS[o.delivery].label}</span>{statusPill(o, "seller")}</div>
       <ErrorNote error={actErr} />
       <CancelledNote o={o} side="seller" />
@@ -167,14 +167,25 @@ export function SellerOrderDetail() {
       <h2>Where it is</h2>
       <Timeline o={o} />
       <h2>Your money</h2>
-      <div className="price-rows">
-        <div className="row"><span>Item</span><span>{R(o.totals.itemPrice)}</span></div>
-        <div className="row"><span>Delivery</span><span>{R(o.totals.deliveryFee)}</span></div>
-        <div className="row"><span>Seller fee</span><span>-{R(o.totals.sellerFee)}</span></div>
-        <div className="row total"><span>You get</span><span>{R(o.totals.sellerPayout)}</span></div>
-      </div>
-      {o.totals.creditTopUp > 0 && <p className="small muted">The buyer used a myHaul reward. {R(o.totals.creditTopUp)} of your payout comes straight from us, paid on the same day.</p>}
-      <p className="small muted">Paid once the buyer's {o.mode === "buy_now" ? "7 day return window" : "check period"} closes with no claim.</p>
+      {o.status === "refunded" || o.status === "cancelled" ? (
+        <p className="small muted">{o.status === "refunded" ? "This order was refunded to the buyer, so there is no payout for it." : "This order was never paid, so there is no payout for it."}</p>
+      ) : (() => {
+        // Courier and locker money goes to the courier, so it isn't part of the seller's sum.
+        const taken = o.totals.chargesTaken ?? 0;
+        const toSeller = o.totals.sellerPayout + o.totals.sellerFee + taken - o.totals.itemPrice;
+        return (<>
+          <div className="price-rows">
+            <div className="row"><span>Item</span><span>{R(o.totals.itemPrice)}</span></div>
+            {toSeller > 0 && <div className="row"><span>Delivery, paid to you</span><span>{R(toSeller)}</span></div>}
+            <div className="row"><span>Seller fee</span><span>{o.totals.sellerFee > 0 ? `-${R(o.totals.sellerFee)}` : "R0"}</span></div>
+            {taken > 0 && <div className="row"><span>Owed to myHaul</span><span>-{R(taken)}</span></div>}
+            <div className="row total"><span>You get</span><span>{R(o.totals.sellerPayout)}</span></div>
+          </div>
+          {o.totals.deliveryFee > toSeller && <p className="small muted">The buyer also paid {R(o.totals.deliveryFee - toSeller)} for delivery. That goes to the courier.</p>}
+          {o.totals.creditTopUp > 0 && <p className="small muted">The buyer used a myHaul reward. {R(o.totals.creditTopUp)} of your payout comes straight from us, paid on the same day.</p>}
+          <p className="small muted">Paid once the buyer's {o.mode === "buy_now" ? "7 day return window" : "check period"} closes with no claim.</p>
+        </>);
+      })()}
     </div>
   );
 }
@@ -193,10 +204,9 @@ export function Payouts() {
   return (
     <div className="screen">
       <BackButton to="/me?tab=selling" label="Shop" />
-      <h1 style={{ marginTop: 6 }}>Payouts</h1>
+      <h1>Payouts</h1>
       <div className="note" style={{ marginBottom: 12 }}>
-        Your money is released once the buyer's return window closes. As a <b>{TIER_INFO[tier].label}</b> seller: {tier === "top" ? "the next working day" : tier === "trusted" ? "within 2 working days" : tier === "restricted" ? "held for review" : "in the weekly Friday run"}.
-        {" "}{schedule === "IMMEDIATE" ? "TradeSafe then pays it straight into your bank" : schedule === "WEEKLY" ? "TradeSafe then pays everything released that week into your bank in one payment" : "TradeSafe then pays everything released that month into your bank in one payment"}{shop?.checks.bankLast4 ? <>, {shop.checks.bankName} ending {shop.checks.bankLast4}</> : null}.
+        Your money is released {tier === "top" ? "the next working day" : tier === "trusted" ? "within 2 working days" : tier === "restricted" ? "after a review" : "in the weekly Friday run"} after the buyer's return window closes{shop?.checks.bankLast4 ? <>, into {shop.checks.bankName} ending {shop.checks.bankLast4}</> : null}.
       </div>
 
       <h3 className="section-title">How often you're paid</h3>
@@ -222,7 +232,7 @@ export function Payouts() {
       <h3 className="section-title">Your payouts</h3>
       <ErrorNote error={error} />
       {!items && !error && <Loading />}
-      {items?.length === 0 && <div className="empty">No payouts yet.</div>}
+      {items?.length === 0 && <Blank icon="payout" title="No payouts yet" line="Your first one shows here once a sale is released." />}
       {items?.map((p) => (
         <div key={p.id} className="list-item">
           <div className="grow"><b>{R(p.amountCents)}</b><div className="small muted">{p.status === "released" ? "Paid" : p.payOn ? `Paying on ${dateText(p.payOn)}` : "Held for review"}</div></div>

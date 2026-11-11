@@ -394,7 +394,7 @@ try {
   await check(page.getByRole("region", { name: /Celebration cake/ }).count().then((n) => n === 0), "blocked shop hidden from the feed");
   await page.goto(`${BASE}/settings/blocked`);
   await page.getByRole("button", { name: "Unblock" }).click();
-  await page.getByText("You haven't blocked anyone.").waitFor();
+  await page.getByText("No one blocked").waitFor();
   await page.goto(`${BASE}/explore`);
   await page.getByRole("heading", { name: "Shops to follow" }).waitFor();
   await shot("explore");
@@ -528,8 +528,24 @@ try {
   await shot("create-review");
   await page.getByRole("button", { name: "Post listing" }).click();
   await page.waitForURL((u) => u.pathname === "/me");
-  await page.getByRole("link", { name: /Vintage denim jacket, size M/ }).waitFor();
+  const tile = page.getByRole("button", { name: /Edit Vintage denim jacket, size M/ });
+  await tile.waitFor();
   await shot("seller-listed");
+  // Sellers can change a listing after posting (11 Nov 2026): price, stock, name, sizes, details, or take it down.
+  await tile.click();
+  const editSheet = page.getByRole("dialog", { name: "Edit listing" });
+  await editSheet.getByLabel("Price in rand").fill("20");
+  await editSheet.getByRole("button", { name: "The lowest price is R50." }).waitFor(); // can't save a price that low
+  await editSheet.getByLabel("Price in rand").fill("480");
+  await editSheet.getByRole("button", { name: "One more" }).click();
+  await shot("edit-listing");
+  await editSheet.getByRole("button", { name: "Save changes" }).click();
+  await page.getByText("Listing updated").waitFor();
+  await page.getByRole("button", { name: /Edit Vintage denim jacket, size M, R480/ }).waitFor();
+  await page.getByRole("button", { name: /Edit Vintage denim jacket, size M, R480/ }).click();
+  await editSheet.getByLabel("Price in rand").fill("450");
+  await editSheet.getByRole("button", { name: "Save changes" }).click();
+  await page.getByRole("button", { name: /Edit Vintage denim jacket, size M, R450/ }).waitFor();
 
   // Camera: tap the shutter for a photo, then Next takes it to Create.
   await page.goto(`${BASE}/post`);
@@ -1038,7 +1054,7 @@ try {
   const ask = page.getByRole("region", { name: "Cancel request" });
   await ask.getByText('"Wrong size or colour"').waitFor();
   await shot("cancel-request-seller");
-  await ask.getByRole("button", { name: "Accept and refund" }).click();
+  await ask.getByRole("button", { name: "Refund buyer" }).click();
   await page.getByText("The buyer cancelled this order.").waitFor();
 
   // ===== Seller fault refunds cost the seller TradeSafe's fee; sellers pick how often they're paid (8 Nov 2026) =====

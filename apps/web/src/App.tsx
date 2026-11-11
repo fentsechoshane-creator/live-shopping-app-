@@ -11,7 +11,7 @@ import { Viewer } from "./components/PostGrid";
 import { api } from "./api";
 import { useLoad, useSession } from "./session";
 import { Icon } from "./components/Icon";
-import { BackButton, Loading } from "./components/ui";
+import { BackButton, Blank, Loading, Wordmark } from "./components/ui";
 import { Feed } from "./screens/buyer/Feed";
 import { Explore } from "./screens/buyer/Explore";
 import { MockPay, OrderDetail, Orders } from "./screens/buyer/Orders";
@@ -43,7 +43,7 @@ function ItemLink() {
   // Auctions open on their own (a won auction is no longer listed in the shop, but the winner needs to pay).
   const single = item && item.product.mode === "auction";
   useEffect(() => { if (item && !single) nav(`/s/${item.shop.handle}?item=${id}`, { replace: true }); }, [item]); // eslint-disable-line react-hooks/exhaustive-deps
-  if (error || item === null) return <div className="screen"><BackButton /><div className="empty">This item isn't available any more.</div></div>;
+  if (error || item === null) return <div className="screen"><BackButton /><Blank icon="bag" title="No longer available" line="This item was sold or taken down." action="See what's selling" onAction={() => nav("/explore")} /></div>;
   if (single) return <Viewer items={[item]} start={0} onClose={() => (window.history.length > 1 ? nav(-1) : nav("/"))} />;
   return <div className="screen"><Loading /></div>;
 }
@@ -163,7 +163,8 @@ function SideMenu() {
         </button>
         <button className="link" style={{ marginTop: 14, color: "var(--red-text)", alignSelf: "center" }} onClick={() => setDeleting(true)}>Delete my account</button>
         {api.demo && <button className="btn line block" style={{ marginTop: 8 }} onClick={() => { setMenuOpen(false); api.demo!.reset().then(() => nav("/")); }}>Reset demo data</button>}
-        <p className="small muted" style={{ textAlign: "center", marginTop: 14, marginBottom: 0 }}>Version {APP_VERSION}{BUILT_AT ? `, updated ${BUILT_AT}` : ""}</p>
+        <div style={{ textAlign: "center", marginTop: 22 }}><Wordmark size={20} /></div>
+        <p className="small muted" style={{ textAlign: "center", marginTop: 6, marginBottom: 0 }}>Version {APP_VERSION}{BUILT_AT ? `, updated ${BUILT_AT}` : ""}</p>
       </aside>
     </div>
   );
@@ -205,6 +206,11 @@ const guard = (el: ReactNode) => <RequireUser>{el}</RequireUser>;
 function OldActivity() {
   const tab = new URLSearchParams(useLocation().search).get("tab");
   return <Navigate to={tab === "orders" ? "/orders" : tab === "messages" ? "/inbox?tab=messages" : "/inbox?tab=updates"} replace />;
+}
+
+function NotFound() {
+  const nav = useNavigate();
+  return <div className="screen"><Blank icon="explore" title="Page not found" line="That link doesn't lead anywhere, or the page has moved." action="Go to Home" onAction={() => nav("/")} /></div>;
 }
 
 export function App() {
@@ -268,7 +274,7 @@ export function App() {
           <Route path="/settings/delivery" element={guard(<DeliverySettings />)} />
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/terms" element={<Terms />} />
-          <Route path="*" element={<div className="screen"><BackButton /><div className="empty">Page not found.</div></div>} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
         </ErrorBoundary>
         {!loc.pathname.startsWith("/post") && <Tabs />}

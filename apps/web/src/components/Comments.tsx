@@ -5,7 +5,7 @@ import { isRude } from "@app/core";
 import { api, type Comment } from "../api";
 import { useLoad, useSession } from "../session";
 import { Icon } from "./Icon";
-import { ErrorNote, Loading, Sheet, timeAgo, useAction } from "./ui";
+import { Blank, ErrorNote, Loading, Sheet, timeAgo, useAction } from "./ui";
 import { ReportSheet } from "./Safety";
 
 /** Comments on a post, in a sheet. Anyone can read; signed in people can comment, report or delete their own. */
@@ -40,7 +40,7 @@ export function CommentsSheet({ postId, postOwnerShopHandle, onClose, onCount }:
       }>
       <ErrorNote error={error ?? sendError} />
       {!list && !error && <Loading />}
-      {list?.length === 0 && <div className="empty">No comments yet. Ask the seller a question.</div>}
+      {list?.length === 0 && <Blank icon="comment" title="No comments yet" line="Ask the seller a question." />}
       <div className="comments">
         {list?.map((c) => (
           <div key={c.id} className="comment">

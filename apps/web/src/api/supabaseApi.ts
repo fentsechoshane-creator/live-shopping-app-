@@ -750,6 +750,19 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
       const rows = check(await sb.from("payouts").select("*").order("created_at", { ascending: false })) as any[];
       return rows.map((p): Payout => ({ id: p.id, orderId: p.order_id, amountCents: p.amount_cents, payOn: p.pay_on, status: p.status, releasableAt: p.releasable_at }));
     },
+    async updateListing(productId, c) {
+      const { data: old } = await sb.from("products").select("status, mode").eq("id", productId).single();
+      if (!old) throw new Error("That listing is gone.");
+      if (old.mode === "auction") throw new Error("Auctions can't be changed once they're posted.");
+      // Stock decides whether a Buy now listing is on sale; made to order listings are always open.
+      const status = old.status === "removed" || old.status === "draft" ? old.status : old.mode === "buy_now" && c.stock < 1 ? "sold_out" : "live";
+      check(await sb.from("products").update({ title: c.title.trim(), description: c.description.trim(), price_cents: c.priceCents,
+        ...(old.mode === "buy_now" ? { stock: c.stock } : {}), sizes: c.sizes, status }).eq("id", productId));
+    },
+    async takeDownListing(productId) {
+      check(await sb.from("products").update({ status: "removed" }).eq("id", productId));
+      check(await sb.from("posts").update({ status: "removed" }).eq("product_id", productId));
+    },
     async sellerCharges(shopId) {
       const id = shopId ?? (check(await sb.from("shops").select("id").eq("owner_id", await uid()).single()) as any).id;
       const [owed, rows] = await Promise.all([

@@ -97,15 +97,13 @@ await s.shot("buyer-inbox-updates", "/inbox?tab=updates", { full: true });
 await s.shot("buyer-me", "/me");
 await s.shot("buyer-me-likes", "/me", { act: async (p) => { await p.getByRole("tab", { name: /Likes/ }).click(); } });
 await s.shot("buyer-menu", "/me", { act: async (p) => { await p.getByRole("button", { name: "Menu and settings" }).click(); } });
-await s.shot("buyer-trust-sheet", "/me", { act: async (p) => { await p.locator(".standing, [aria-label*='standing'], .pill").first().click(); } });
 await s.shot("buyer-settings-delivery", "/settings/delivery", { full: true });
 await s.shot("buyer-settings-blocked", "/settings/blocked");
 await s.shot("buyer-friends", "/friends");
 await s.shot("buyer-post-open-shop", "/post");
 await s.shot("buyer-sell-start", "/sell/start");
 await s.shot("buyer-explore", "/explore", { full: true });
-await s.shot("buyer-following", "/", { act: async (p) => { await p.getByRole("tab", { name: "Following" }).click(); } });
-await s.shot("buyer-live-tab", "/", { act: async (p) => { await p.getByRole("tab", { name: "Live" }).click(); } });
+await s.shot("buyer-following", "/", { act: async (p) => { await p.getByRole("button", { name: "Following", exact: true }).first().click(); } });
 await s.shot("buyer-browse-sheet", "/", { act: async (p) => { await p.locator(".video-card").first().getByRole("button", { name: /Buy now|Order now|Bid/ }).click(); } });
 await s.close();
 
@@ -121,6 +119,8 @@ await s.shot("new-setup-birthday", null);
 const setup = s.page.getByRole("dialog", { name: "Create your account" });
 try {
   await setup.getByLabel("Year", { exact: true }).selectOption("1999");
+  await setup.getByLabel("Month", { exact: true }).selectOption("4");
+  await setup.getByLabel("Day", { exact: true }).selectOption("12");
   await setup.getByRole("button", { name: "Next" }).click();
   await s.shot("new-setup-name", null);
   await setup.getByLabel("Name", { exact: true }).fill("Fresh Buyer");
@@ -138,7 +138,7 @@ await s.shot("empty-inbox-updates", "/inbox?tab=updates");
 await s.shot("empty-me", "/me");
 await s.shot("empty-friends", "/friends");
 await s.shot("empty-blocked", "/settings/blocked");
-await s.shot("empty-following", "/", { act: async (p) => { await p.getByRole("tab", { name: "Following" }).click(); } });
+await s.shot("empty-following", "/", { act: async (p) => { await p.getByRole("button", { name: "Following", exact: true }).first().click(); } });
 await s.close();
 
 // ===== Seller =====

@@ -8,7 +8,7 @@ import { DELIVERY_OPTIONS, ORDER_STATUS_TEXT, returnReasonsFor, type ReturnReaso
 import { api, type Order } from "../../api";
 import { useLoad, useSession } from "../../session";
 import { ProductArt } from "../../components/Scene";
-import { BackButton, ErrorNote, Field, Loading, R, dateText, dateTimeText, swatch, useAction } from "../../components/ui";
+import { BackButton, Blank, ErrorNote, Field, Loading, R, dateText, dateTimeText, swatch, useAction } from "../../components/ui";
 
 const REASON_TEXT: Record<ReturnReason, string> = {
   changed_mind: "I changed my mind",
@@ -46,8 +46,9 @@ export function statusPill(o: Order, side: "buyer" | "seller") {
 }
 
 export function OrderList({ orders }: { orders: Order[] | undefined }) {
+  const nav = useNavigate();
   if (!orders) return <Loading />;
-  if (orders.length === 0) return <div className="empty-card"><span className="muted">No orders yet. Things you buy or order show here.</span></div>;
+  if (orders.length === 0) return <Blank icon="bag" title="No orders yet" line="Things you buy show here, with tracking and returns." action="Start shopping" onAction={() => nav("/")} />;
   return (
     <div className="group">
       {orders.map((o) => (
@@ -72,7 +73,7 @@ export function Orders() {
   return (
     <div className="screen">
       <BackButton />
-      <h1 className="large-title" style={{ margin: "8px 0 0" }}>My orders</h1>
+      <h1>My orders</h1>
       {orders && <div className="tiny-count" style={{ marginBottom: 14 }}>{orders.length} {orders.length === 1 ? "order" : "orders"} in total</div>}
       <ErrorNote error={error} />
       <OrderList orders={orders} />
@@ -97,7 +98,7 @@ export function OrderDetail() {
 
   if (error) return <div className="screen"><ErrorNote error={error} /></div>;
   if (o === undefined) return <div className="screen"><Loading /></div>;
-  if (!o) return <div className="screen"><div className="empty">Order not found.</div></div>;
+  if (!o) return <div className="screen"><BackButton to="/orders" /><Blank icon="bag" title="Order not found" line="It may belong to another account." /></div>;
 
   // After any change, check for a surprise reward (it arrives when an order is delivered).
   const act = (fn: () => Promise<void>, msg: string) => run(async () => { await fn(); toast(msg); reload(); window.dispatchEvent(new Event("rewards-check")); });
@@ -106,7 +107,7 @@ export function OrderDetail() {
   return (
     <div className="screen">
       <BackButton />
-      <h1 style={{ marginTop: 6 }}>{o.product.title}</h1>
+      <h1 className="item">{o.product.title}</h1>
       <div className="row between"><span className="muted small">from {o.shop.name}</span>{statusPill(o, "buyer")}</div>
       <ErrorNote error={actErr} />
 
@@ -158,7 +159,9 @@ export function OrderDetail() {
       {o.ret && (
         <div className="note amber" style={{ marginTop: 16 }}>
           <b>Return: {REASON_TEXT[o.ret.reason]}</b><br />
-          {o.ret.status === "requested" && "Waiting for the seller. If they do not answer in 3 days, a change of mind return is accepted automatically."}
+          {o.ret.status === "requested" && (o.ret.reason === "changed_mind"
+            ? "Waiting for the seller. If they don't answer in 3 days, your return is accepted automatically."
+            : "Waiting for the seller to answer. If they disagree, our team looks at it and decides.")}
           {o.ret.status === "in_transit" && `Send the item back. ${o.ret.postagePayer === "buyer" ? "You pay" : "The seller pays"} the return postage. Your refund follows once it arrives.`}
           {o.ret.status === "refunded" && "Refunded to your card or account."}
           {o.ret.status === "rejected" && "Our team found the item matched the listing, so the seller has been paid."}
@@ -183,7 +186,7 @@ export function OrderDetail() {
       <div className="price-rows">
         <div className="row"><span>Item{o.size ? ` (size ${o.size})` : ""}</span><span>{R(o.totals.itemPrice)}</span></div>
         <div className="row"><span>{DELIVERY_OPTIONS[o.delivery].label}</span><span>{o.totals.deliveryFee ? R(o.totals.deliveryFee) : "Free"}</span></div>
-        {!!o.totals.deliveryDiscount && <div className="row" style={{ color: "#15803d" }}><span>Delivery perk</span><span>-{R(o.totals.deliveryDiscount)}</span></div>}
+        {!!o.totals.deliveryDiscount && <div className="row" style={{ color: "var(--green-text)" }}><span>Delivery perk</span><span>-{R(o.totals.deliveryDiscount)}</span></div>}
         <div className="row"><span>Buyer protection</span><span>{R(o.totals.protectionFee)}</span></div>
         {o.totals.creditUsed > 0 && <div className="row"><span>Reward</span><span>-{R(o.totals.creditUsed)}</span></div>}
         <div className="row total"><span>Total</span><span>{R(o.totals.total)}</span></div>
@@ -194,17 +197,20 @@ export function OrderDetail() {
 }
 
 export function Timeline({ o }: { o: Order }) {
-  const steps: [string, string | null][] = [
+  const stopped = o.status === "refunded" || o.status === "cancelled";
+  let steps: [string, string | null, boolean?][] = [
     ["Paid, money held", o.paidAt],
     ["Shipped" + (o.trackingRef ? ` · ${o.trackingRef}` : ""), o.shippedAt],
     ["Delivered", o.deliveredAt],
     [o.mode === "buy_now" ? "7 day return window closes" : "Check period ends", o.status === "completed" ? o.releasableAt : null],
   ];
+  // A refunded or cancelled order stops where it got to: no steps that will never happen.
+  if (stopped) steps = [...steps.filter(([, at]) => at), [o.status === "refunded" ? "Refunded in full" : "Cancelled, nothing was paid", null, true]];
   return (
     <div className="checklist">
-      {steps.map(([label, at]) => (
+      {steps.map(([label, at, end]) => (
         <div className="item" key={label}>
-          <span className={`dot ${at ? "done" : ""}`}>{at ? "✓" : ""}</span>
+          <span className={`dot ${at ? "done" : end ? "end" : ""}`}>{at ? "✓" : end ? "×" : ""}</span>
           <span className="grow">{label}</span>
           <span className="small muted">{dateTimeText(at)}</span>
         </div>

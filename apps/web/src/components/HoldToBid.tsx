@@ -82,7 +82,7 @@ export function HoldToBid({ label, onConfirm, disabled, block, onNeedUser }: {
           <defs>
             <linearGradient id={grad} x1="0" y1="0" x2="1" y2="1">
               <stop offset="0" stopColor="#fde68a" />
-              <stop offset="0.45" stopColor="#fbbf24" />
+              <stop offset="0.45" stopColor="#ff9f0a" />
               <stop offset="0.75" stopColor="#fff7d6" />
               <stop offset="1" stopColor="#f59e0b" />
             </linearGradient>

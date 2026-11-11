@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate, useParams, useSearchParams } from "reac
 import { api, authMethod } from "../../api";
 import { useLoad, useSession } from "../../session";
 import { Icon } from "../../components/Icon";
-import { safePath, useGoBack, BackButton, ErrorNote, Field, Loading, R, Segmented, Sheet, TierPill, timeAgo, useAction } from "../../components/ui";
+import { safePath, useGoBack, BackButton, Blank, Wordmark, ErrorNote, Field, Loading, R, Segmented, Sheet, TierPill, timeAgo, useAction } from "../../components/ui";
 import { PostGrid } from "../../components/PostGrid";
 import { shareOrCopy } from "../../native";
 import { useTabSwipe } from "../../components/gestures";
@@ -21,7 +21,8 @@ export function SignIn() {
   return (
     <div className="screen">
       <BackButton />
-      <h1 className="large-title" style={{ margin: "8px 0 6px" }}>Sign in</h1>
+      <div style={{ margin: "18px 0 22px" }}><Wordmark size={40} /></div>
+      <h1 className="large-title" style={{ margin: "0 0 6px" }}>Sign in</h1>
       <SignInForm onDone={() => nav(next, { replace: true })} />
     </div>
   );
@@ -149,11 +150,12 @@ export function Inbox() {
           <>
             <ErrorNote error={error} />
             {!updates && !error && <Loading />}
-            {updates?.length === 0 && <div className="empty-card"><span className="muted">Nothing yet. Payments, shipping, returns and shop updates show here.</span></div>}
+            {updates?.length === 0 && <Blank icon="bell" title="No updates yet" line="Payments, shipping and returns show here." />}
             {updates && updates.length > 0 && (
               <div className="group">
                 {updates.map((n) => (
-                  <Link key={n.id} to={n.link ? safePath(n.link) : "#"} className="cell" style={{ alignItems: "flex-start", background: n.readAt ? undefined : "var(--green-soft)" }}>
+                  <Link key={n.id} to={n.link ? safePath(n.link) : "#"} className={`cell upd ${n.readAt ? "" : "unread"}`} style={{ alignItems: "flex-start" }}>
+                    <span className="upd-dot" aria-label={n.readAt ? undefined : "New"} />
                     <span className="icon-btn" style={{ width: 38, height: 38 }}><Icon name={iconFor(n.title)} size={18} /></span>
                     <span className="grow"><span className="t" style={{ display: "block" }}>{n.title}</span><span className="s" style={{ display: "block" }}>{n.body}</span></span>
                     <span className="small muted">{timeAgo(n.createdAt)}</span>
@@ -186,7 +188,7 @@ export function ShopPage() {
   const [reacted] = useLoad(() => (data && tab !== "posts" ? api.reactedPosts(tab === "likes" ? "like" : "repost", data.shop.id) : Promise.resolve([])), [data?.shop.id, tab]);
   if (error) return <div className="screen"><ErrorNote error={error} /></div>;
   if (data === undefined) return <div className="screen"><Loading /></div>;
-  if (!data) return <div className="screen"><BackButton /><div className="empty">Shop not found.</div></div>;
+  if (!data) return <div className="screen"><BackButton /><Blank icon="store" title="Shop not found" line="It may have closed or changed its name." /></div>;
   const { shop, items } = data;
   const isFollowing = following.has(shop.id);
   const share = async () => { if ((await shareOrCopy(`/s/${shop.handle}`)) === "copied") toast("Link copied"); };
@@ -238,8 +240,8 @@ export function ShopPage() {
       </div>
       <div {...swipeShopTabs} className="swipe-area">
       {tab === "posts"
-        ? <PostGrid items={items} openProductId={new URLSearchParams(loc.search).get("item")} empty={<div className="pempty">No videos yet.</div>} />
-        : !reacted ? <Loading /> : <PostGrid items={reacted} empty={<div className="pempty">{tab === "likes" ? "No likes yet." : "No reposts yet."}</div>} />}
+        ? <PostGrid items={items} openProductId={new URLSearchParams(loc.search).get("item")} empty={<Blank icon="play" title="No videos yet" />} />
+        : !reacted ? <Loading /> : <PostGrid items={reacted} empty={<Blank icon={tab === "likes" ? "heart" : "repost"} title={tab === "likes" ? "No likes yet" : "No reposts yet"} />} />}
       </div>
     </div>
   );

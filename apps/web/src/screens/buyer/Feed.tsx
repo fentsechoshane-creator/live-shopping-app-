@@ -14,6 +14,7 @@ import { Loading, R, Segmented, Sheet, TierPill } from "../../components/ui";
 import { CheckoutSheet } from "./Checkout";
 import { CommentsSheet } from "../../components/Comments";
 import { MoreSheet } from "../../components/Safety";
+import { EditListing } from "../../components/EditListing";
 import { useSwipe } from "../../components/gestures";
 import { tap } from "../../native";
 import { ShareSheet } from "../../components/ShareSheet";
@@ -33,7 +34,9 @@ type Tab = "for_you" | "following" | "live";
 
 export function Feed() {
   const [tab, setTab] = useState<Tab>("for_you");
-  const [items, error] = useLoad(() => api.feed(), []);
+  const [items, error, reloadFeed] = useLoad(() => api.feed(), []);
+  // A seller changed or took down their own listing: show the feed as it is now.
+  useEffect(() => { window.addEventListener("listing-changed", reloadFeed); return () => window.removeEventListener("listing-changed", reloadFeed); }, [reloadFeed]);
   const { following, user, blockedShops, interests, withUser } = useSession();
   // For You: ordered once when it loads (so nothing jumps while you scroll), then more posts as you near the end.
   const ranked = useMemo(() => (items ? rankFeed(items, { interests, following }) : undefined), [items, interests]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -62,14 +65,14 @@ export function Feed() {
       {error && <div className="feed-empty" style={{ background: "#0b0b0d" }}><div className="error">{error}</div></div>}
       {!items && !error && <div className="feed-empty" style={{ background: "#0b0b0d" }}><Loading /></div>}
       {items && tab === "live" && (
-        <FeedEmpty title="No one is live right now" body="Lives with pop up Buy now cards and quick auctions are coming next. Follow sellers to hear when they go live." />
+        <FeedEmpty icon="live" title="No one is live" body="Follow sellers to hear when they go live." />
       )}
       {items && tab === "following" && visibleItems.length === 0 && (
-        <FeedEmpty title="Follow sellers to see their drops here" body="Tap Follow on any video, or find shops in Explore."
+        <FeedEmpty icon="addperson" title="Nothing here yet" body="Videos from sellers you follow show here."
           action={<button className="btn vglass" onClick={() => nav("/explore")}>Find sellers</button>} />
       )}
       {items && tab === "for_you" && visibleItems.length === 0 && (
-        <FeedEmpty title="No videos yet" body="Sellers' videos show up here. Got something to sell? Open a shop and post the first one."
+        <FeedEmpty icon="play" title="No videos yet" body="Be the first. Open a shop and post one."
           action={<button className="btn vglass" onClick={() => withUser(() => nav("/post"), "Sign in to sell")}>Start selling</button>} />
       )}
       {items && tab !== "live" && visibleItems.length > 0 && <FeedList items={visibleItems} key={tab} onNearEnd={tab === "for_you" ? loadMore : undefined} />}
@@ -89,12 +92,13 @@ export function Feed() {
   );
 }
 
-function FeedEmpty({ title, body, action }: { title: string; body: string; action?: ReactNode }) {
+function FeedEmpty({ icon, title, body, action }: { icon: string; title: string; body: string; action?: ReactNode }) {
   return (
-    <div className="feed-empty" style={{ background: "radial-gradient(120% 80% at 50% 30%, #2a2a33, #0b0b0d)" }}>
-      <div className="glass-panel vglass stack" style={{ alignItems: "center" }}>
-        <b style={{ fontSize: 17, color: "#fff" }}>{title}</b>
-        <span style={{ fontSize: 14, lineHeight: 1.45 }}>{body}</span>
+    <div className="feed-empty" style={{ background: "#0b0b0d" }}>
+      <div className="blank on-video">
+        <Icon name={icon} size={44} strokeWidth={1.5} />
+        <b>{title}</b>
+        <span>{body}</span>
         {action}
       </div>
     </div>
@@ -147,6 +151,7 @@ export function FeedList({ items, start = 0, onNearEnd }: { items: FeedItem[]; s
   useEffect(() => { api.commentCounts(items.map((it) => it.postId)).then(setCommentCounts).catch(() => {}); }, [items]);
   const [commenting, setCommenting] = useState<FeedItem | null>(null);
   const [more, setMore] = useState<FeedItem | null>(null);
+  const [editingListing, setEditingListing] = useState<FeedItem["product"] | null>(null);
   const messageShop = useMessageShop();
   const myShop = useMyShopId();
   const [offering, setOffering] = useState<FeedItem | null>(null);
@@ -185,7 +190,9 @@ export function FeedList({ items, start = 0, onNearEnd }: { items: FeedItem[]; s
         onPay={() => { const it = bidding; setBidding(null); setBuy(it); }} />}
       {commenting && <CommentsSheet postId={commenting.postId} postOwnerShopHandle={commenting.shop.handle} onClose={() => setCommenting(null)}
         onCount={(n) => setCommentCounts((c) => ({ ...c, [commenting.postId]: n }))} />}
+      {editingListing && <EditListing product={editingListing} onClose={() => setEditingListing(null)} onDone={() => { setEditingListing(null); window.dispatchEvent(new Event("listing-changed")); }} />}
       {more && <MoreSheet kind="post" targetId={more.postId} shopId={more.shop.id} shopHandle={more.shop.handle} onClose={() => setMore(null)} mine={more.shop.id === myShop}
+        onEdit={more.shop.id === myShop ? () => { setEditingListing(more.product); setMore(null); } : undefined}
         onMessage={() => { setMore(null); messageShop(more.shop.id, more.product.id); }} />}
     </>
   );
@@ -363,15 +370,20 @@ function useTaggedItem(productId: string | undefined): FeedItem | null {
 /** On your own post: what buyers see instead of Buy, and where to manage it. */
 function OwnerBar({ item, auction }: { item: FeedItem; auction?: AuctionInfo }) {
   const nav = useNavigate();
+  const [editing, setEditing] = useState(false);
   const p = item.product;
   const status = p.mode === "auction"
     ? (auction?.bidCount ? `${auction.bidCount} ${auction.bidCount === 1 ? "bid" : "bids"}, top ${R(auction.currentCents ?? p.priceCents)}` : "No bids yet")
     : p.status === "sold_out" || (p.mode === "buy_now" && p.stock < 1) ? "Sold out" : p.mode === "buy_now" ? `${p.stock} in stock` : "Taking orders";
   return (
-    <button className="btn vglass grow owner-bar" onClick={() => nav("/sell/orders")} aria-label={`Your listing. ${status}. Open your orders`}>
-      <span className="grow" style={{ textAlign: "left" }}><b style={{ display: "block" }}>Your listing</b><span className="small" style={{ opacity: 0.8 }}>{status}</span></span>
-      <span className="small">Orders</span><Icon name="chevron" size={16} />
-    </button>
+    <div className="row grow" style={{ gap: 8 }}>
+      <button className="btn vglass grow owner-bar" onClick={() => nav("/sell/orders")} aria-label={`Your listing. ${status}. Open your orders`}>
+        <span className="grow" style={{ textAlign: "left" }}><b style={{ display: "block" }}>Your listing</b><span className="small" style={{ opacity: 0.8 }}>{status}</span></span>
+        <span className="small">Orders</span><Icon name="chevron" size={16} />
+      </button>
+      {p.mode !== "auction" && <button className="btn vglass owner-edit" onClick={() => setEditing(true)} aria-label="Edit listing"><Icon name="edit" size={18} /></button>}
+      {editing && <EditListing product={p} onClose={() => setEditing(false)} onDone={() => { setEditing(false); window.dispatchEvent(new Event("listing-changed")); }} />}
+    </div>
   );
 }
 

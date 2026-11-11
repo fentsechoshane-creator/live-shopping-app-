@@ -224,11 +224,11 @@ export function CheckoutSheet({ item, onClose, offer, auctionPrice }: { item: Fe
       {t && <div className="price-rows" style={{ marginTop: 8 }}>
         <div className="row"><span>Item</span><span>{R(t.itemPrice)}</span></div>
         <div className="row"><span>Delivery</span><span>{t.deliveryFee ? R(t.deliveryFee) : "Free"}</span></div>
-        {t.deliveryDiscount > 0 && <div className="row" style={{ color: "#15803d" }}>
+        {t.deliveryDiscount > 0 && <div className="row" style={{ color: "var(--green-text)" }}>
           <span>{t.deliveryPerk === "stamp" ? "Your 5 stamps: half price delivery" : t.deliveryDiscount === t.deliveryFee ? "Free locker on orders of R1,500 or more" : "Half price delivery on orders of R1,000 or more"}</span>
           <span>-{R(t.deliveryDiscount)}</span></div>}
         <div className="row"><span>Buyer protection</span><span>{R(t.protectionFee)}</span></div>
-        {t.creditUsed > 0 && <div className="row" style={{ color: "#15803d" }}><span>Reward</span><span>-{R(t.creditUsed)}</span></div>}
+        {t.creditUsed > 0 && <div className="row" style={{ color: "var(--green-text)" }}><span>Reward</span><span>-{R(t.creditUsed)}</span></div>}
         <div className="row total"><span>Total</span><span>{R(t.total)}</span></div>
       </div>}
     </Sheet>
