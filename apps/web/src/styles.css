@@ -1408,19 +1408,29 @@ button.g3 { border: 0; padding: 0; display: block; width: 100%; }
 
 /* ===== Hold to bid as a live sign (Nov 2026): one slim capsule. At rest it switches between the price and
    "Hold to bid"; held, it counts down while the amber glass ring closes. Tap it to pick your own amount. ===== */
-.hold-face { display: grid; place-items: center; }
+.hold-face { display: grid; place-items: center; font-family: var(--font-round); font-variant-numeric: tabular-nums; }
 .hold-face > span { grid-area: 1 / 1; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
-  opacity: 0; transform: translateY(6px); transition: opacity 0.35s ease, transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); }
-.hold-face > span.on { opacity: 1; transform: none; }
-.hold-face > span:first-child:not(.on) { transform: translateY(-6px); }
-.hold-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--amber); box-shadow: 0 0 0 3px rgba(255, 149, 0, 0.25); animation: pulse 1.2s ease-in-out infinite alternate; }
-.btn.amber .hold-dot { background: #2e1700; box-shadow: none; }
-.hold-face { font-family: var(--font-round); font-variant-numeric: tabular-nums; }
-.hold-count { display: inline-block; min-width: 0.7em; animation: hold-tick 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); }
-@keyframes hold-tick { from { transform: scale(1.5); opacity: 0.3; } to { transform: none; opacity: 1; } }
-.video-card .hold .hold-btn { font-size: 16px; font-weight: 600; padding: 0 14px; letter-spacing: -0.01em; }
-.video-card .hold[data-phase="holding"] .hold-btn { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 0 18px rgba(255, 149, 0, 0.3); }
+  opacity: 0; filter: blur(4px); transform: translateY(5px) scale(0.98);
+  transition: opacity 0.55s cubic-bezier(0.4, 0, 0.2, 1), filter 0.55s cubic-bezier(0.4, 0, 0.2, 1), transform 0.65s cubic-bezier(0.22, 1, 0.36, 1); }
+.hold-face > span.on { opacity: 1; filter: none; transform: none; }
+/* The countdown digits cross fade in place too. */
+.hold-count { display: inline-grid; min-width: 0.65em; }
+.hold-count i { grid-area: 1 / 1; font-style: normal; opacity: 0; transform: scale(1.25); filter: blur(3px);
+  transition: opacity 0.4s ease, transform 0.5s cubic-bezier(0.22, 1, 0.36, 1), filter 0.4s ease; }
+.hold-count i.on { opacity: 1; transform: none; filter: none; }
+.hold-dot { width: 7px; height: 7px; border-radius: 50%; background: #2e1700; animation: hold-breathe 1.6s ease-in-out infinite; }
+@keyframes hold-breathe { 0%, 100% { opacity: 0.35; transform: scale(0.85); } 50% { opacity: 1; transform: scale(1); } }
+/* Amber, the auction colour, as a solid capsule with a glass shine: as strong as Buy now, dark ink like our green buttons. */
+.btn.amber.hold-btn { background: linear-gradient(180deg, #ffad33 0%, #ff9500 55%, #f58a00 100%); color: #2e1700;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), inset 0 -1px 0 rgba(120, 60, 0, 0.18), 0 4px 14px rgba(255, 149, 0, 0.28);
+  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), background 0.5s ease, box-shadow 0.5s ease, color 0.5s ease; }
+.hold[data-phase="holding"] .btn.amber.hold-btn { transform: scale(0.97); background: linear-gradient(180deg, #ff9f1a 0%, #f08a00 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 0 22px rgba(255, 149, 0, 0.45); }
+.hold[data-phase="done"] .btn.amber.hold-btn { background: var(--green); color: var(--green-ink); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35); }
+.hold-ring .fill { filter: drop-shadow(0 0 4px rgba(255, 190, 80, 0.8)); }
+.video-card .hold .hold-btn { font-size: 16px; font-weight: 650; padding: 0 14px; letter-spacing: -0.01em; }
 .video-card .hold { min-width: 0; }
+@media (prefers-reduced-motion: reduce) { .hold-face > span, .hold-count i { transition: opacity 0.2s linear; filter: none; transform: none; } .hold-dot { animation: none; } }
 /* Slim buttons everywhere (asked by Ofentse 11 Nov 2026): main 48px, normal 44px, paired 40px. Taps stay 40px or more. */
 .btn { min-height: 44px; font-size: 16px; padding: 0 20px; }
 .btn.big { min-height: 48px; font-size: 17px; }
@@ -1430,3 +1440,14 @@ button.g3 { border: 0; padding: 0; display: block; width: 100%; }
 .owner-bar { min-height: 44px; }
 .owner-edit { width: 44px; min-height: 44px; }
 .blank .btn, .pprompt .btn { min-height: 40px; font-size: 15px; padding: 0 18px; }
+/* Glass shine on filled buttons (brought back 11 Nov 2026, Ofentse liked it): a light top edge, a gentle fall of
+   light and a soft glow in the button's own colour. Disabled buttons stay flat grey. */
+.btn.green:not(:disabled) { background: linear-gradient(180deg, #4fd672 0%, #34c759 55%, #2db84f 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), inset 0 -1px 0 rgba(0, 60, 20, 0.15), 0 4px 14px rgba(52, 199, 89, 0.3); }
+.btn.amber:not(:disabled) { background: linear-gradient(180deg, #ffad33 0%, #ff9500 55%, #f58a00 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), inset 0 -1px 0 rgba(120, 60, 0, 0.18), 0 4px 14px rgba(255, 149, 0, 0.28); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn.green:not(:disabled) { background: linear-gradient(180deg, #45dc6c 0%, #30d158 55%, #28bf4c 100%); } }
+/* While a bid is being placed the button is briefly disabled; keep its colour so it doesn't flash grey. */
+.hold[data-phase="sending"] .btn.amber.hold-btn:disabled { background: linear-gradient(180deg, #ff9f1a 0%, #f08a00 100%); color: #2e1700; }
+.hold[data-phase="done"] .btn.amber.hold-btn { background: linear-gradient(180deg, #4fd672 0%, #34c759 55%, #2db84f 100%); }
+:root[data-theme="dark"] .btn.green:not(:disabled) { background: linear-gradient(180deg, #45dc6c 0%, #30d158 55%, #28bf4c 100%); }

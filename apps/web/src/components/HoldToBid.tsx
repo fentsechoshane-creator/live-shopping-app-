@@ -54,7 +54,7 @@ export function HoldToBid({ label, price, onConfirm, onTap, disabled, block, gla
   // The live sign: price, then "Hold to bid", every couple of seconds while nothing is happening.
   useEffect(() => {
     if (phase !== "idle" || disabled) { setFlip(false); return; }
-    const t = window.setInterval(() => setFlip((f) => !f), 2200);
+    const t = window.setInterval(() => setFlip((f) => !f), 2600);
     return () => window.clearInterval(t);
   }, [phase, disabled]);
 
@@ -88,7 +88,7 @@ export function HoldToBid({ label, price, onConfirm, onTap, disabled, block, gla
   const secs = HOLD_MS / 1000;
   return (
     <span className={`hold ${block ? "block" : ""}`} data-phase={phase}>
-      <button ref={btn} type="button" className={`btn ${glass ? "vglass" : "amber"} hold-btn ${block ? "block big" : ""}`} disabled={disabled || phase === "sending"}
+      <button ref={btn} type="button" className={`btn amber hold-btn ${glass ? "on-video" : ""} ${block ? "block big" : ""}`} disabled={disabled || phase === "sending"}
         aria-label={phase === "done" ? "Bid placed" : `${label}. Press and hold for ${secs} seconds to confirm${onTap ? ", or tap to pick your own amount" : ""}.`}
         onPointerDown={(e) => { e.stopPropagation(); if (e.button > 0) return; try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* ignore */ } start(); }}
         onPointerUp={cancel} onPointerCancel={cancel} onLostPointerCapture={cancel}
@@ -96,15 +96,14 @@ export function HoldToBid({ label, price, onConfirm, onTap, disabled, block, gla
         onKeyDown={(e) => { if ((e.key === " " || e.key === "Enter") && !e.repeat) { e.preventDefault(); start(); } }}
         onKeyUp={(e) => { if (e.key === " " || e.key === "Enter") cancel(); }}
         onClick={(e) => e.preventDefault()}>
-        {phase === "done" ? <span className="hold-face"><span className="on"><Icon name="check" size={17} strokeWidth={3} />Bid placed</span></span>
-          : phase === "sending" ? <span className="hold-face"><span className="on">Placing bid…</span></span>
-          : phase === "holding" ? <span className="hold-face"><span className="on">Bid {price} in <b className="hold-count" key={left}>{left}</b></span></span>
-          : (
-            <span className="hold-face">
-              <span className={flip ? "" : "on"}><i className="hold-dot" />{price}</span>
-              <span className={flip ? "on" : ""}><Icon name="clock" size={16} />Hold to bid</span>
-            </span>
-          )}
+        {/* Every face is always there, stacked; only the one that fits the moment is shown, so changes cross fade. */}
+        <span className="hold-face">
+          <span className={phase === "idle" && !flip ? "on" : ""}><i className="hold-dot" />{price}</span>
+          <span className={phase === "idle" && flip ? "on" : ""}><Icon name="clock" size={16} />Hold to bid</span>
+          <span className={phase === "holding" ? "on" : ""}>Bid {price} in <b className="hold-count">{[3, 2, 1].map((n) => <i key={n} className={left === n ? "on" : ""}>{n}</i>)}</b></span>
+          <span className={phase === "sending" ? "on" : ""}>Placing bid…</span>
+          <span className={phase === "done" ? "on" : ""}><Icon name="check" size={17} strokeWidth={3} />Bid placed</span>
+        </span>
       </button>
       {size.w > 0 && (
         <svg className="hold-ring" width={size.w + pad * 2} height={size.h + pad * 2} aria-hidden="true">

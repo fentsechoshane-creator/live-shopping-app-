@@ -266,7 +266,7 @@ try {
   await page.waitForTimeout(400);
   await check(await page.getByText("You're the top bidder at R720").count() === 0, "letting go early doesn't bid");
   await page.mouse.move(0, 0); await hold(holdBtn, 1500, true);
-  await jacket.getByText(/Bid R720 in [12]/).waitFor();
+  await jacket.locator('.hold[data-phase="holding"] .hold-count i.on').filter({ hasText: /^[12]$/ }).waitFor(); // counting down
   await shot("hold-to-bid");
   await page.mouse.up();
   await hold(holdBtn, 3400);

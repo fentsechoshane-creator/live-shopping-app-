@@ -111,7 +111,8 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 Asked by Ofentse: the bid button was too fat with the price in it, and so were paired buttons like the refund ones. **Not live yet** (branch `flat-prices`, waiting for "okay deploy").
 
-- **Hold to bid on a video** is one slim dark glass capsule. At rest it switches between the price (with a pulsing amber dot) and "Hold to bid", like a live sign. Held, it counts down ("Bid R720 in 2") while the amber glass ring closes. A quick tap opens the bid sheet to pick your own amount, so the separate Custom button is gone. The bid sheet button works the same way.
+- **Hold to bid on a video** is one slim solid amber capsule with a glass shine (dark glass was too weak a call to action). Every change cross fades with a soft blur, the countdown digits too. At rest it switches between the price (with a pulsing amber dot) and "Hold to bid", like a live sign. Held, it counts down ("Bid R720 in 2") while the amber glass ring closes. A quick tap opens the bid sheet to pick your own amount, so the separate Custom button is gone. The bid sheet button works the same way.
+- **Glass shine is back** on filled green and amber buttons (light top edge, soft glow in their own colour), softer than before the overhaul.
 - **Slim buttons everywhere:** main buttons 48px, normal 44px, two in a row 40px, empty state buttons 40px, the round buttons on videos 44px. Nothing you tap is under 40px.
 - E2E passes (the auction test now taps the same button for a custom bid). Every screen is in one PDF for Ofentse.
 
