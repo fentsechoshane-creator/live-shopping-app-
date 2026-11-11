@@ -128,6 +128,17 @@ Live shows send video through LiveKit Cloud. The app never sees the keys: the `l
 
 Without these, live shows still open but say "Live video isn't set up yet." Chat, pinning and auctions work either way.
 
+## 6. Google address search
+
+Address fields (checkout and the seller pickup address) get a "Find your address" box when this key is set. Without it, people type the address as before.
+
+1. In Google Cloud (console.cloud.google.com), make a project, add billing, and set a budget alert.
+2. Enable **Places API (New)**.
+3. Create an API key. Restrict it to websites (`https://myhaul.pages.dev/*`, `https://*.myhaul.pages.dev/*`, `https://myhaul.co.za/*`, `https://*.myhaul.co.za/*`, `http://localhost:5173/*`, `capacitor://localhost/*`, `https://localhost/*`) and to the Places API (New) only. A daily quota cap is a good extra guard.
+4. In Cloudflare Pages (myhaul, Settings, Variables and Secrets) add `VITE_GOOGLE_PLACES_KEY`, then redeploy. This is a browser key: it ends up in the app, which is fine because of the restrictions in step 3.
+
+Cost: a free amount each month (about 5,000 searches and 10,000 address lookups at the time of writing), then about $5 per 1,000 addresses picked [CONFIRM on Google's pricing page].
+
 ## Hosting the web app
 
 `npm run build` makes `apps/web/dist`, a static site. Any static host works (Vercel, Netlify, Cloudflare Pages). Set the three `VITE_` variables there and send all routes to `index.html`.

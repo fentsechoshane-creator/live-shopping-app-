@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { addressFromPlace, placesOn, suggestAddresses, type AddressSuggestion } from "../lib/places";
 import { api, PROVINCES, type PickupPoint, type ShopPickup, type StreetAddress } from "../api";
 import { Choice, ErrorNote, Field, useAction } from "./ui";
 import { Icon } from "./Icon";
@@ -14,6 +15,7 @@ export function AddressFields({ value, onChange }: { value: StreetAddress; onCha
   const set = (k: keyof StreetAddress) => (e: { target: { value: string } }) => onChange({ ...value, [k]: e.target.value });
   return (
     <>
+      {placesOn() && <AddressSearch onPick={(a) => onChange({ ...value, ...a } as StreetAddress)} />}
       <Field label="Street address"><input value={value.street} onChange={set("street")} autoComplete="address-line1" placeholder="12 Main Road" enterKeyHint="next" /></Field>
       <div className="two-col">
         <Field label="Suburb"><input value={value.suburb} onChange={set("suburb")} autoComplete="address-level3" placeholder="Rondebosch" enterKeyHint="next" /></Field>
@@ -30,6 +32,55 @@ export function AddressFields({ value, onChange }: { value: StreetAddress; onCha
           inputMode="numeric" autoComplete="postal-code" placeholder="7700" enterKeyHint="done" /></Field>
       </div>
     </>
+  );
+}
+
+/** Google address search: type, pick, and the fields below fill in. The fields stay editable. */
+function AddressSearch({ onPick }: { onPick: (a: Partial<StreetAddress>) => void }) {
+  const [q, setQ] = useState("");
+  const [list, setList] = useState<AddressSuggestion[]>([]);
+  const [note, setNote] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  const picked = useRef(false);
+  useEffect(() => {
+    if (picked.current) { picked.current = false; return; }
+    if (q.trim().length < 4) { setList([]); return; }
+    const ctl = new AbortController();
+    const t = window.setTimeout(() => {
+      suggestAddresses(q, ctl.signal).then((r) => { setList(r); setOpen(true); setNote(null); })
+        .catch((e) => { if (!ctl.signal.aborted) setNote(e instanceof Error ? e.message : "Address search isn't working. Type it below."); });
+    }, 350);
+    return () => { ctl.abort(); window.clearTimeout(t); };
+  }, [q]);
+  const pick = async (s: AddressSuggestion) => {
+    picked.current = true;
+    setQ(`${s.main}${s.rest ? `, ${s.rest}` : ""}`); setOpen(false); setList([]);
+    try {
+      const a = await addressFromPlace(s.placeId);
+      onPick(a);
+      setNote(a.street && a.postalCode && a.province ? "Check the details below." : "Some parts are missing. Fill them in below.");
+    } catch (e) { setNote(e instanceof Error ? e.message : "Couldn't load that address. Type it below."); }
+  };
+  return (
+    <div className="addr-search">
+      <Field label="Find your address">
+        <span className="addr-input"><Icon name="search" size={17} />
+          <input value={q} onChange={(e) => setQ(e.target.value)} onFocus={() => list.length && setOpen(true)} placeholder="Start typing your street address"
+            autoComplete="off" enterKeyHint="search" aria-autocomplete="list" aria-expanded={open && list.length > 0} role="combobox" aria-controls="addr-list" />
+        </span>
+      </Field>
+      {open && list.length > 0 && (
+        <ul className="addr-list" id="addr-list" role="listbox">
+          {list.map((s) => (
+            <li key={s.placeId} role="option" aria-selected="false">
+              <button type="button" onClick={() => pick(s)}><Icon name="pin" size={16} /><span><b>{s.main}</b>{s.rest && <span className="small muted">{s.rest}</span>}</span></button>
+            </li>
+          ))}
+          <li className="addr-google small muted">Results from Google</li>
+        </ul>
+      )}
+      {note && <p className="small muted" style={{ margin: "4px 2px 10px" }}>{note}</p>}
+    </div>
   );
 }
 

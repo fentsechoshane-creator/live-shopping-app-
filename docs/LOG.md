@@ -107,6 +107,12 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-11: Google address search, and the live video security fix
+
+- **Security fix:** the site's content security rule (public/_headers and index.html) only allowed our own server and Mux, so the browser would have blocked LiveKit video and Google. Added `https://*.livekit.cloud`, `wss://*.livekit.cloud` and `https://places.googleapis.com`.
+- **Address search:** every address form (checkout courier address, seller pickup address) gets "Find your address" when `VITE_GOOGLE_PLACES_KEY` is set. Type 4 or more letters, pick from Google's list (South Africa only), and street, suburb, city, province and postal code fill in. The fields stay editable, and without the key nothing changes. Uses the Places API (New) from the browser with one session per address to keep cost down (`apps/web/src/lib/places.ts`).
+- Open: Ofentse to create the Google key and add it in Cloudflare (docs/SETUP.md section 6), then redeploy.
+
 ### 2026-11-11: Deployed everything (Ofentse: "okay deploy")
 
 - Live database: 0038 seller charges, 0039 max bids, 0040 live selling, 0041 extras (applied through the Supabase connector as 20261111175108, 175159, 175250, 175349; `scripts/push-live.mjs` maps them).
