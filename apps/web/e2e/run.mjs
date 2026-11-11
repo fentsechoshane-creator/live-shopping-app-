@@ -1142,6 +1142,30 @@ try {
   await page.getByRole("button", { name: "Go live" }).click();
   await page.getByText(/You can't go live without stock/).waitFor();
 
+  // ===== Extras: seller stats, invite, search filters, shop reviews =====
+  await page.goto(`${BASE}/me`);
+  await page.locator(".stats-card").click();
+  await page.locator(".stat-tiles").waitFor();
+  await page.getByRole("button", { name: "30 days" }).click();
+  await page.getByText("Top items").waitFor();
+  await shot("seller-stats");
+  await page.goto(`${BASE}/invite`);
+  await page.getByRole("button", { name: /Share/ }).waitFor();
+  await page.goto(`${BASE}/explore`);
+  await page.getByRole("button", { name: "Filters" }).click();
+  await page.getByRole("button", { name: "R200 to R500" }).click();
+  await page.getByRole("button", { name: "Show results" }).click();
+  await page.getByRole("button", { name: "Remove R200 to R500" }).waitFor();
+  await page.locator(".grid2 .tile").first().waitFor();
+  await page.getByPlaceholder("Search sellers and items").fill("zzqx nothing");
+  await page.getByText("No results").waitFor();
+  await page.getByRole("button", { name: "Clear filters" }).click();
+  await page.getByPlaceholder("Search sellers and items").fill("");
+  await page.goto(`${BASE}/s/thrift.with.lebo`);
+  await page.locator(".prating").click();
+  await page.getByRole("dialog", { name: "Reviews" }).getByText("Verified buyer", { exact: false }).first().waitFor();
+  await shot("shop-reviews");
+
   // For the screen audit (e2e/audit.mjs): keep the demo state this run built up.
   if (process.env.DUMP_STATE) writeFileSync(process.env.DUMP_STATE, await page.evaluate(() => JSON.stringify(Object.fromEntries(Object.entries(localStorage)))));
   if (errors.length) throw new Error("Page errors: " + errors.join(" | "));

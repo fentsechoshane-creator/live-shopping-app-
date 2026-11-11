@@ -46,6 +46,8 @@ Deno.serve(async (req) => {
   // Shows whose host disappeared: end them so they don't sit in the Live tab.
   const { data: staleShows } = await db.rpc("end_stale_live_shows");
   done.live_shows_ended = (staleShows as number | null) ?? 0;
+  // Seller stats only look back 90 days, so drop older views (once a day is plenty; harmless if it runs more).
+  if (new Date().getUTCHours() === 2) await db.rpc("prune_post_seen");
 
   const due = must(await db.from("due_orders").select("*").limit(200), "load due orders") as any[];
   for (const o of due) {

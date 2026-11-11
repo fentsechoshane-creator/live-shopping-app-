@@ -104,6 +104,17 @@ function FeedEmpty({ icon, title, body, action }: { icon: string; title: string;
   );
 }
 
+const viewQueue = new Set<string>();
+const sentToday = new Set<string>();
+let viewTimer = 0;
+function queueView(postId: string) {
+  if (sentToday.has(postId)) return;
+  sentToday.add(postId); viewQueue.add(postId);
+  window.clearTimeout(viewTimer);
+  viewTimer = window.setTimeout(() => { const ids = [...viewQueue]; viewQueue.clear(); api.recordViews(ids).catch(() => {}); }, viewQueue.size >= 10 ? 0 : 5000);
+}
+if (typeof window !== "undefined") window.addEventListener("pagehide", () => { if (viewQueue.size) { api.recordViews([...viewQueue]).catch(() => {}); viewQueue.clear(); } });
+
 /** Full screen video list with Browse and checkout sheets. Used by the feed and shop pages. */
 export function FeedList({ items, start = 0, onNearEnd }: { items: FeedItem[]; start?: number; onNearEnd?: () => void }) {
   const [browse, setBrowse] = useState<FeedItem | null>(null);
@@ -140,6 +151,13 @@ export function FeedList({ items, start = 0, onNearEnd }: { items: FeedItem[]; s
     return () => el.removeEventListener("scroll", onScroll);
   }, []);
   useEffect(() => { if (onNearEnd && index >= items.length - 4) onNearEnd(); }, [index, items.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Seller stats: a post counts as seen after 2 seconds on screen. Sent in small batches.
+  const postId = items[index]?.postId;
+  useEffect(() => {
+    if (!postId || !user) return;
+    const t = window.setTimeout(() => queueView(postId), 2000);
+    return () => window.clearTimeout(t);
+  }, [postId, !!user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [counts, setCounts] = useState<Record<string, { likes: number; reposts: number }>>({});
   useEffect(() => { api.postCounts(items.map((it) => it.postId)).then(setCounts).catch(() => {}); }, [items]);

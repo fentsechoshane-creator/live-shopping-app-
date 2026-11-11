@@ -5,6 +5,7 @@ import {
   RETURN_POSTAGE_PAYER, ACCOUNT_FEATURE_KEYS, canForceOn, featureOffMessage, type AccountFeature, type OrderStatus, type TrustEventKind, bookedByUs, deliveryFee, PARCEL_SIZES, orderParcelSize, DELIVERY_PERKS, validateEdit, refundFee, formatRand, type PayoutSchedule } from "@app/core";
 import { handleProblem } from "../lib/handle";
 import type {
+  ShopReviews,
   Api, LiveShow, LiveChatMessage, LiveSummary, Person, SharedPost, Category, ReportReason, ReportTarget, CheckoutInput, FeedItem, ListingInput, MyShop, Notification, Order, Payout, PendingReview, ProductPublic, ReviewStatus,
   ShopPublic, User, SavedDelivery, AppError, PickupPoint, ShopPickup, ShipmentEvent, AuctionInfo, TeamAlert, TeamOverview, TeamPerson, TeamPersonDetail, TeamOrder, TeamListing, TeamLogEntry, TeamFeature, Reward, SellerCharge,
 } from "./types";
@@ -66,6 +67,10 @@ interface State {
   liveShows?: DShow[];
   liveChat?: { id: string; showId: string; userId: string; body: string; at: string; hidden?: boolean }[];
   liveReminders?: { showId: string; userId: string }[];
+  /** Extras (0041): reviews with their words, posts seen per person per day, who invited whom. */
+  reviews?: { shopId: string; buyerId: string; stars: number; body: string; item: string; at: string }[];
+  seen?: { postId: string; userId: string; day: string }[];
+  invitedBy?: Record<string, string>;
 }
 
 // Sample lockers for testing (the real list comes from Bob Go).
@@ -153,7 +158,12 @@ function seed(): State {
   ];
   // The sample shop has earned live selling and auctions, so the demo can show both.
   const on = { state: "on" as const, reason: "Sample shop", at: ago(60 * 24), by: "team" };
-  return { liveShows, liveChat, liveReminders: [], features: { "u-lebo": { live: on, auctions: on } }, bids, users: bots, currentUserId: null, shops, products, posts, orders: [], notifications: [], payouts: [], clockOffsetMs: 0, follows: [],
+  const reviews = [
+    { shopId: "s-lebo", buyerId: "u-sweet", stars: 5, body: "Exactly like the video. Packed with care and it came in 3 days.", item: "Oversized tee, sand", at: ago(60 * 24 * 9) },
+    { shopId: "s-lebo", buyerId: "u-luxe", stars: 5, body: "Great fit, fast replies.", item: "Chunky white runners", at: ago(60 * 24 * 21) },
+    { shopId: "s-lebo", buyerId: "u-sweet", stars: 4, body: "Lovely denim, a bit bigger than I thought.", item: "Mom jeans, mid wash", at: ago(60 * 24 * 40) },
+  ];
+  return { reviews, liveShows, liveChat, liveReminders: [], features: { "u-lebo": { live: on, auctions: on } }, bids, users: bots, currentUserId: null, shops, products, posts, orders: [], notifications: [], payouts: [], clockOffsetMs: 0, follows: [],
     // Sample activity: Lebo reposted the cake and liked the silk shirt, so the Following feed shows a repost.
     comments: [
       { id: "c-1", postId: "po-1", userId: "u-sweet", body: "The sand colour is so nice. Does it shrink?", createdAt: new Date(now - 3000e3).toISOString() },
@@ -503,6 +513,16 @@ export function createDemoApi(): Api {
       otherAvatarUrl: (() => { const a = s.users.find((x) => x.id === (c.buyerId === viewer ? sh.ownerId : c.buyerId))?.avatar; return a ? mediaUrl(a) : null; })(),
       lastMine: lastMsg?.senderId === viewer };
   };
+  // The feed's order: sales in 30 days, the seller's tier, then newest. Same as the server.
+  const rank = (po: DPost) => {
+    const sales = s.orders.filter((o) => o.shop.id === po.shopId && !["pending_payment", "cancelled", "refunded"].includes(o.status)).length;
+    const bonus = ({ top: 10, trusted: 5, standard: 0, restricted: 0 } as const)[tierFor(ownerOf(po.shopId).trust)];
+    return 3 * sales + bonus - (now().getTime() - new Date(po.createdAt).getTime()) / 86400e3;
+  };
+  // Team switch: "off" hides the shop from the feed, "on" shows it even under trust 40.
+  const inFeed = (po: DPost) => { const o = shopOf(po.shopId).ownerId; const st = featureState(o, "in_feed");
+    return st === "on" ? (() => { const p = s.products.find((x) => x.id === po.productId); return p?.status === "live" && shopOf(po.shopId).status === "open"; })() : st !== "off" && visible(po); };
+  const provinceOf = (shopId: string) => s.pickup?.[shopId]?.province ?? "WC"; // the sample shops are in Cape Town
   const visible = (po: DPost) => {
     const p = s.products.find((x) => x.id === po.productId);
     const sh = shopOf(po.shopId);
@@ -584,12 +604,6 @@ export function createDemoApi(): Api {
       await mediaReady;
       await wait(150);
       runDue();
-      const sales = (shopId: string) => s.orders.filter((o) => o.shop.id === shopId && !["pending_payment", "cancelled", "refunded"].includes(o.status)).length;
-      const bonus = (shopId: string) => ({ top: 10, trusted: 5, standard: 0, restricted: 0 })[tierFor(ownerOf(shopId).trust)];
-      const rank = (po: DPost) => 3 * sales(po.shopId) + bonus(po.shopId) - (now().getTime() - new Date(po.createdAt).getTime()) / 86400e3;
-      // Team switch: "off" hides the shop from the feed, "on" shows it even under trust 40.
-      const inFeed = (po: DPost) => { const o = shopOf(po.shopId).ownerId; const st = featureState(o, "in_feed");
-        return st === "on" ? (() => { const p = s.products.find((x) => x.id === po.productId); return p?.status === "live" && shopOf(po.shopId).status === "open"; })() : st !== "off" && visible(po); };
       return s.posts.filter(inFeed).sort((a, b) => rank(b) - rank(a)).slice(offset, offset + 20).map(toFeed);
     },
     async shop(handle) {
@@ -746,11 +760,12 @@ export function createDemoApi(): Api {
       notify(o.shopOwnerId, "Return requested", "The buyer wants to return an order. The payout waits until it is sorted out.", `/sell/orders/${o.id}`);
       save();
     },
-    async leaveReview(oid, stars) {
+    async leaveReview(oid, stars, body) {
       const o = s.orders.find((x) => x.id === oid && x.buyerId === me().id);
       if (!o || !["delivered", "completed"].includes(o.status)) throw new Error("You can review once the order arrives");
       if (o.review) throw new Error("You already reviewed this order.");
       o.review = { stars };
+      s.reviews = [{ shopId: o.shop.id, buyerId: o.buyerId, stars, body: (body ?? "").trim().slice(0, 500), item: o.product?.title ?? "An item", at: now().toISOString() }, ...(s.reviews ?? [])];
       if (stars === 5) trust(o.shopOwnerId, "five_star_review");
       save();
     },
@@ -1374,6 +1389,119 @@ export function createDemoApi(): Api {
         onChange();
       }, 1500);
       return () => window.clearInterval(t);
+    },
+    watchThread(_cid, onChange) {
+      // The demo has no server to listen to, so it checks every second (the sample shop replies and types).
+      const t = window.setInterval(onChange, 1000);
+      return () => window.clearInterval(t);
+    },
+    watchFriendChat(_chatId, onChange) {
+      const t = window.setInterval(onChange, 1500);
+      return () => window.clearInterval(t);
+    },
+    sendTyping() { /* nobody to tell in the demo */ },
+    watchAuctions(productIds, onChange) {
+      if (!productIds.length) return () => {};
+      const t = window.setInterval(onChange, 1000);
+      return () => window.clearInterval(t);
+    },
+    async search(q, f, offset = 0) {
+      await mediaReady;
+      await wait(120);
+      const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+      const items = s.posts.filter(inFeed).filter((po) => {
+        const p = s.products.find((x) => x.id === po.productId)!;
+        const sh = shopOf(po.shopId);
+        const text = `${p.title} ${p.description ?? ""} ${po.caption} ${sh.name} ${sh.handle} ${p.sizes.join(" ")}`.toLowerCase();
+        return words.every((w) => text.includes(w))
+          && (!f.category || sh.category === f.category)
+          && (!f.size || p.sizes.some((z) => z.toLowerCase() === f.size!.toLowerCase()))
+          && (f.minCents == null || p.priceCents >= f.minCents)
+          && (f.maxCents == null || p.priceCents <= f.maxCents)
+          && (!f.province || provinceOf(sh.id) === f.province);
+      });
+      const price = (po: DPost) => s.products.find((x) => x.id === po.productId)!.priceCents;
+      const sorted = items.sort((a, b) => f.sort === "low" ? price(a) - price(b) : f.sort === "high" ? price(b) - price(a)
+        : f.sort === "new" ? b.createdAt.localeCompare(a.createdAt) : rank(b) - rank(a));
+      return sorted.slice(offset, offset + 20).map(toFeed);
+    },
+    async searchSizes() {
+      await mediaReady;
+      const n = new Map<string, number>();
+      s.posts.filter(inFeed).forEach((po) => s.products.find((x) => x.id === po.productId)?.sizes.forEach((z) => n.set(z.toUpperCase(), (n.get(z.toUpperCase()) ?? 0) + 1)));
+      return [...n.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([z]) => z).slice(0, 30);
+    },
+    async shopReviews(shopId) {
+      const rs = (s.reviews ?? []).filter((r) => r.shopId === shopId && !s.suspensions?.[r.buyerId]);
+      const stars = { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 } as ShopReviews["stars"];
+      rs.forEach((r) => { stars[String(r.stars) as keyof typeof stars]++; });
+      return {
+        count: rs.length, average: rs.length ? Math.round((rs.reduce((n, r) => n + r.stars, 0) / rs.length) * 10) / 10 : null, stars,
+        recent: rs.filter((r) => r.body.trim()).sort((a, b) => b.at.localeCompare(a.at)).slice(0, 20).map((r) => ({ stars: r.stars, body: r.body, item: r.item, month: r.at.slice(0, 7) })),
+      };
+    },
+    async recordViews(postIds) {
+      const u = s.currentUserId;
+      if (!u) return;
+      const t = now(), day = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+      const seen = (s.seen = s.seen ?? []);
+      let added = false;
+      for (const pid of postIds.slice(0, 30)) {
+        const po = s.posts.find((x) => x.id === pid);
+        if (!po || shopOf(po.shopId).ownerId === u || seen.some((x) => x.postId === pid && x.userId === u && x.day === day)) continue;
+        seen.push({ postId: pid, userId: u, day }); added = true;
+      }
+      if (added) save();
+    },
+    async sellerStats(days) {
+      await wait(150);
+      const sh = s.shops.find((x) => x.ownerId === me().id);
+      if (!sh) throw new Error("You don't have a shop yet.");
+      const start = now(); start.setHours(0, 0, 0, 0); start.setDate(start.getDate() - (days - 1));
+      const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const dayOf = (iso: string) => ymd(new Date(iso));
+      const since = start.toISOString(), sinceDay = ymd(start);
+      const myPosts = new Set(s.posts.filter((p) => p.shopId === sh.id).map((p) => p.id));
+      const postProduct = (pid: string) => s.posts.find((p) => p.id === pid)?.productId;
+      const seen = (s.seen ?? []).filter((x) => myPosts.has(x.postId) && x.day >= sinceDay);
+      const sold = s.orders.filter((o) => o.shop.id === sh.id && o.createdAt >= since && !["pending_payment", "cancelled", "refunded"].includes(o.status));
+      const itemOfOrder = (o: DOrder) => { const p = s.products.find((x) => x.id === o.product.id); return p?.fromProductId ?? o.product.id; };
+      const reacts = (s.reactions ?? []).filter((r) => myPosts.has(r.postId) && r.at >= since);
+      const series = Array.from({ length: days }, (_, i) => {
+        const d = new Date(start); d.setDate(start.getDate() + i);
+        const day = ymd(d);
+        return { day, views: seen.filter((x) => x.day === day).length, salesCents: sold.filter((o) => dayOf(o.createdAt) === day).reduce((n, o) => n + o.totals.itemPrice, 0) };
+      });
+      const top = s.products.filter((p) => p.shopId === sh.id && !p.fromProductId && p.status !== "removed").map((p) => {
+        const mine = sold.filter((o) => itemOfOrder(o) === p.id);
+        return { productId: p.id, title: p.title, views: seen.filter((x) => postProduct(x.postId) === p.id).length, orders: mine.length, salesCents: mine.reduce((n, o) => n + o.totals.itemPrice, 0) };
+      }).filter((t) => t.views || t.orders).sort((a, b) => b.salesCents * 1000 + b.views - (a.salesCents * 1000 + a.views)).slice(0, 5);
+      return {
+        days, views: seen.length, viewers: new Set(seen.map((x) => x.userId)).size,
+        likes: reacts.filter((r) => r.kind === "like").length, reposts: reacts.filter((r) => r.kind === "repost").length,
+        newFollowers: 0, followers: s.follows.filter((f) => f.shopId === sh.id).length,
+        orders: sold.length, salesCents: sold.reduce((n, o) => n + o.totals.itemPrice, 0), buyers: new Set(sold.map((o) => o.buyerId)).size,
+        returns: s.orders.filter((o) => o.shop.id === sh.id && o.createdAt >= since && ["return_requested", "return_in_transit", "refunded"].includes(o.status)).length,
+        liveShows: (s.liveShows ?? []).filter((x) => x.shopId === sh.id && x.startedAt && x.startedAt >= since).length,
+        series, top,
+      };
+    },
+    async acceptInvite(handle) {
+      const u = me();
+      const inviter = s.users.find((x) => x.handle === handle.trim().toLowerCase());
+      const fresh = !u.createdAt || Date.now() - new Date(u.createdAt).getTime() < 86400e3;
+      if (!inviter || inviter.id === u.id || s.invitedBy?.[u.id] || !fresh || s.orders.some((o) => o.buyerId === u.id) || s.suspensions?.[inviter.id]) return false;
+      s.invitedBy = { ...(s.invitedBy ?? {}), [u.id]: inviter.id };
+      const pf = (s.peopleFollows = s.peopleFollows ?? []);
+      const at = now().toISOString();
+      for (const [a, b] of [[u.id, inviter.id], [inviter.id, u.id]]) if (!pf.some((x) => x.followerId === a && x.followeeId === b)) pf.push({ followerId: a, followeeId: b, at });
+      notify(inviter.id, `${u.displayName || "Someone"} joined from your invite`, "You follow each other now, so you can chat and share finds.", u.handle ? `/u/${u.handle}` : null);
+      save();
+      return true;
+    },
+    async myInvites() {
+      const u = me();
+      return Object.values(s.invitedBy ?? {}).filter((x) => x === u.id).length;
     },
     async productItem(productId) {
       await mediaReady;

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { api, authMethod } from "../../api";
+import { api, authMethod, type ShopReviews } from "../../api";
 import { useLoad, useSession } from "../../session";
 import { Icon } from "../../components/Icon";
 import { safePath, useGoBack, BackButton, Blank, Wordmark, ErrorNote, Field, Loading, R, Segmented, Sheet, TierPill, timeAgo, useAction } from "../../components/ui";
@@ -171,6 +171,48 @@ export function Inbox() {
 }
 
 /** Public shop page, laid out like the profile: header, then Posts, Likes and Reposts. */
+/** Five stars, filled to the nearest half. */
+function StarRow({ value, size = 14 }: { value: number; size?: number }) {
+  return (
+    <span className="star-row" aria-hidden="true" style={{ fontSize: size }}>
+      {[1, 2, 3, 4, 5].map((n) => <span key={n} className={value >= n - 0.25 ? "on" : value >= n - 0.75 ? "half" : ""}>★</span>)}
+    </span>
+  );
+}
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const monthName = (ym: string) => { const [y, m] = ym.split("-").map(Number); return `${MONTHS[(m || 1) - 1]} ${y}`; };
+
+/** A shop's reviews: the average, how the stars spread, and what buyers said. Who wrote each one stays private. */
+function ReviewsSheet({ reviews, shopName, onClose }: { reviews: ShopReviews; shopName: string; onClose: () => void }) {
+  const max = Math.max(1, ...Object.values(reviews.stars));
+  return (
+    <Sheet title="Reviews" onClose={onClose}>
+      <div className="rev-head">
+        <div className="rev-avg"><b className="num">{reviews.average?.toFixed(1)}</b><StarRow value={reviews.average ?? 0} size={16} />
+          <span className="small muted">{reviews.count} {reviews.count === 1 ? "review" : "reviews"}</span></div>
+        <div className="rev-bars">
+          {(["5", "4", "3", "2", "1"] as const).map((k) => (
+            <div key={k} className="rev-bar"><span className="num">{k}</span><i><em style={{ width: `${(reviews.stars[k] / max) * 100}%` }} /></i><span className="num muted">{reviews.stars[k]}</span></div>
+          ))}
+        </div>
+      </div>
+      {reviews.recent.length === 0 ? <p className="small muted">No written reviews yet. Buyers can rate {shopName} once their order arrives.</p> : (
+        <div className="rev-list">
+          {reviews.recent.map((r, i) => (
+            <div key={i} className="rev">
+              <div className="row" style={{ justifyContent: "space-between" }}><StarRow value={r.stars} /><span className="small muted">{monthName(r.month)}</span></div>
+              <p>{r.body}</p>
+              <span className="small muted">Verified buyer · {r.item}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      <p className="small muted" style={{ marginTop: 14 }}>Only buyers who received an order can leave a review. We don't show who wrote it.</p>
+    </Sheet>
+  );
+}
+
 export function ShopPage() {
   const { handle = "" } = useParams();
   const [data, error] = useLoad(() => api.shop(handle), [handle]);
@@ -186,6 +228,8 @@ export function ShopPage() {
   const [avatars] = useLoad(() => (data ? api.shopAvatars([data.shop.id]) : Promise.resolve({} as Record<string, string>)), [data?.shop.id]);
   const swipeShopTabs = useTabSwipe(["posts", "likes", "reposts"] as const, tab, setTab);
   const [reacted] = useLoad(() => (data && tab !== "posts" ? api.reactedPosts(tab === "likes" ? "like" : "repost", data.shop.id) : Promise.resolve([])), [data?.shop.id, tab]);
+  const [reviews] = useLoad(() => (data ? api.shopReviews(data.shop.id) : Promise.resolve(null)), [data?.shop.id]);
+  const [showReviews, setShowReviews] = useState(false);
   if (error) return <div className="screen"><ErrorNote error={error} /></div>;
   if (data === undefined) return <div className="screen"><Loading /></div>;
   if (!data) return <div className="screen"><BackButton /><Blank icon="store" title="Shop not found" line="It may have closed or changed its name." /></div>;
@@ -214,6 +258,12 @@ export function ShopPage() {
         <span>@{shop.handle}</span>
         {shop.founding && <span className="standing green"><Icon name="check" size={12} strokeWidth={2.6} />Founding seller</span>}
       </div>
+      {reviews && reviews.count > 0 && (
+        <button className="prating" onClick={() => setShowReviews(true)} aria-label={`Rated ${reviews.average} out of 5 from ${reviews.count} ${reviews.count === 1 ? "review" : "reviews"}. See reviews`}>
+          <StarRow value={reviews.average ?? 0} /><b className="num">{reviews.average?.toFixed(1)}</b>
+          <span>{reviews.count} {reviews.count === 1 ? "review" : "reviews"}</span><Icon name="chevron" size={14} />
+        </button>
+      )}
       {shop.bio && <p className="pbio">{shop.bio}</p>}
       {replyText(replyMin) && <p className="pnote muted" style={{ marginTop: 4 }}><Icon name="chat" size={12} /> {replyText(replyMin)}</p>}
       {mine ? (
@@ -231,6 +281,7 @@ export function ShopPage() {
           <button className="btn grow" style={{ minHeight: 40 }} onClick={() => messageShop(shop.id)}><Icon name="chat" size={16} />Message</button>
         </div>
       )}
+      {showReviews && reviews && <ReviewsSheet reviews={reviews} shopName={shop.name} onClose={() => setShowReviews(false)} />}
       {more && <MoreSheet kind="shop" targetId={shop.id} shopId={shop.id} shopHandle={shop.handle} onClose={() => setMore(false)} mine={mine} />}
 
       <div className="ptabs" role="tablist" aria-label="Shop">

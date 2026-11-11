@@ -6,6 +6,8 @@ const PATHS: Record<string, string> = {
   plus: "M12 5v14M5 12h14",
   eye: "M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z",
   minus: "M5 12h14",
+  sliders: "M4 7h10M18 7h2M4 17h4M12 17h8M16 5v4M10 15v4",
+  chart: "M4 20V10M10 20V4M16 20v-7M22 20H2",
   bell: "M6 9a6 6 0 0 1 12 0c0 6 3 7 3 7H3s3-1 3-7M10 20a2 2 0 0 0 4 0",
   user: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0",
   wallet: "M3 7a2 2 0 0 1 2-2h13v4M3 7v11a2 2 0 0 0 2 2h15V9H5a2 2 0 0 1-2-2zM16 14.5h.01",

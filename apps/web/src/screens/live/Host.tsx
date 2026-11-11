@@ -23,7 +23,7 @@ export function HostLive() {
   const open = show?.status === "live" || show?.status === "scheduled";
   const room = useLiveRoom(id, "host", !!show?.mine && open);
   const auctionId = show?.auction?.product.id;
-  const [auctions] = useAuctions(auctionId ? [auctionId] : [], 1000);
+  const [auctions] = useAuctions(auctionId ? [auctionId] : []);
   const now = useNow();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

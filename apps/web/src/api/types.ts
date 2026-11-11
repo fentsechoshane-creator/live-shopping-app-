@@ -81,6 +81,20 @@ export interface LiveShow {
   mine: boolean;
 }
 export interface LiveChatMessage { id: string; who: string; isSeller: boolean; body: string; at: string }
+/** A shop's reviews for its page. Who wrote each one stays hidden. */
+export interface ShopReviews {
+  count: number; average: number | null; stars: Record<"1" | "2" | "3" | "4" | "5", number>;
+  recent: { stars: number; body: string; item: string; month: string }[];
+}
+export type SearchSort = "best" | "new" | "low" | "high";
+export interface SearchFilters { category?: Category | null; size?: string | null; minCents?: number | null; maxCents?: number | null; province?: Province | null; sort?: SearchSort }
+/** A seller's numbers for the last 7, 30 or 90 days. Views count once per signed in person per post per day. */
+export interface SellerStats {
+  days: number; views: number; viewers: number; likes: number; reposts: number; newFollowers: number; followers: number;
+  orders: number; salesCents: Cents; buyers: number; returns: number; liveShows: number;
+  series: { day: string; views: number; salesCents: Cents }[];
+  top: { productId: string; title: string; views: number; orders: number; salesCents: Cents }[];
+}
 export interface LiveSummary { minutes: number; peakViewers: number; orders: number; salesCents: Cents; auctions: number; auctionsWon: number; cancelled?: boolean }
 export type ReportReason = "counterfeit" | "not_as_shown" | "offensive" | "scam" | "spam" | "other";
 export type ReportTarget = "post" | "shop" | "comment" | "message" | "user";
@@ -573,6 +587,24 @@ export interface Api {
   liveToken(showId: string, role: "host" | "viewer"): Promise<{ url: string; token: string } | null>;
   /** Calls back whenever the show or its chat changes. Returns a function that stops watching. */
   watchLive(showId: string, onChange: () => void): () => void;
+  /** Calls back when a message arrives in this chat (or the other side is typing). Returns a function that stops watching. */
+  watchThread(conversationId: string, onChange: () => void): () => void;
+  watchFriendChat(chatId: string, onChange: () => void): () => void;
+  /** Tells the other side "typing…" for a few seconds. */
+  sendTyping(conversationId: string): void;
+  /** Calls back when any of these auctions gets a bid or ends. */
+  watchAuctions(productIds: string[], onChange: () => void): () => void;
+  /** Search everything for sale, with filters. */
+  search(q: string, filters: SearchFilters, offset?: number): Promise<FeedItem[]>;
+  /** Sizes on sale right now, most common first. */
+  searchSizes(): Promise<string[]>;
+  shopReviews(shopId: string): Promise<ShopReviews>;
+  /** Counts posts as seen (signed in only; once a day each). */
+  recordViews(postIds: string[]): Promise<void>;
+  sellerStats(days: 7 | 30 | 90): Promise<SellerStats>;
+  /** A new account opened an invite link. True if it linked them to the inviter. */
+  acceptInvite(handle: string): Promise<boolean>;
+  myInvites(): Promise<number>;
   /** Seller: a special price for one item or a bundle, sent as a message. */
   makeOffer(conversationId: string, productIds: string[], priceCents: Cents, hours: number): Promise<void>;
   /** The buyer offers a price on one Buy now item; the seller accepts, counters or declines. */

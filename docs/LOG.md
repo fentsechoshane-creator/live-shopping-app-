@@ -63,7 +63,7 @@ Checked 7 Nov 2026 with the live health check. "Practical completion" here means
 
 ## Next up
 
-- **Deploy the finished app (needs Ofentse's "okay deploy"):** migrations 0038, 0039 and 0040, then functions checkout, delivery, order-action, seller-bank, run-due and live-token, then push main (branch `flat-prices` holds the work). The app on main must not go live before the server, or prices and payouts won't match. [Claude]
+- **Deploy the finished app (needs Ofentse's "okay deploy"):** migrations 0038, 0039, 0040 and 0041, then functions checkout, delivery, order-action, seller-bank, run-due and live-token, then push main (branch `flat-prices` holds the work). The app on main must not go live before the server, or prices and payouts won't match. [Claude]
 - **Bob Go sandbox:** key and sandbox mode are in and work. Ofentse adds the "Tracking updated" webhook in Bob Go (URL in docs/SETUP.md section 4: `.../functions/v1/bobgo-webhook`). Then test a full sandbox booking from a real order. Later: read "Shipment submission status" and "Shipment health status" to alert sellers when a booking fails or a parcel is stuck. [Ofentse, Claude]
 - **Mux Robots:** check videos when they're ready (hold flagged posts), suggest covers and listing details. [Claude]
 - **LiveKit for live video:** make a LiveKit Cloud project (livekit.io, free Build plan to test), then add `LIVEKIT_URL`, `LIVEKIT_API_KEY` and `LIVEKIT_API_SECRET` in Supabase > Edge Functions > Secrets (docs/SETUP.md section 5). Until then live shows open with a "Live video isn't set up yet" note. Then test a real show with two phones. [Ofentse, then Claude]
@@ -78,7 +78,7 @@ Checked 7 Nov 2026 with the live health check. "Practical completion" here means
 - **Links open the app:** put the Apple Team ID in `public/.well-known/apple-app-site-association` and the Play signing SHA256 in `assetlinks.json`; turn on Associated Domains and Push in Xcode. [Lehloma]
 - Developer accounts, Google's 12 tester 14 day closed test, reviewer test account. [Ofentse]
 - Apple and Firebase keys for push (the sender is built), PUDO and Courier Guy accounts for real lockers and tracking. [Lehloma]
-- Then: shop reviews on shop pages, search filters (size, price, area), video cover and trim, seller stats, invite a friend, live selling.
+- Then: video cover and trim. Decide whether inviting a friend earns money (built without a reward for now). [Ofentse]
 
 ## Known issues and risks
 
@@ -91,8 +91,8 @@ Debug as we go: anyone who finds or fixes a problem updates this list. Highest r
 | 3 | Server functions type check needs Deno. | Low | Works here with `npx deno@2.1.4`; all pass as of 2026-11-01. |
 | 4 | Only tested in Chrome's engine. Safari (iPhone) not automated. | Medium | Test on Ofentse's iPhone every round; add WebKit to the tests on a machine that has it. |
 | 5 | iPhone videos are often HEVC (.mov): fine on iPhone, may not play on Android or Chrome until Mux converts them. | Medium | Add Mux keys; all uploads then play everywhere. [Lehloma] |
-| 6 | Chats refresh every 3 seconds instead of live updates; typing indicator only works in the demo. | Low now, cost at scale | Supabase Realtime for messages and typing. |
-| 7 | "Liked", "Reposted", "Following reposts" and chat cards only find items in the first 50 of the feed (live). The For You feed itself now loads more as you scroll. | Low now | Server function that returns posts by id. |
+| 6 | Fixed in 0041 (not live yet): chats, typing and auction bids now arrive through Supabase Realtime, with a slow check as backup. | Low | Check on two phones after deploy. |
+| 7 | Fixed in 0041 (not live yet): Liked, Reposted and Following reposts look posts up by id (`feed_posts`), so nothing past the first 50 is missed. | Low | Done. |
 | 8 | Bundles: a return refunds the whole bundle (no partial returns yet). | Medium for sellers | Decide the rule, then build partial returns. [CONFIRM] |
 | 9 | Rude word filter may block innocent Afrikaans words ("naai" also means sew, "moer" a nut). | Low | Review the list with a native speaker. [CONFIRM] |
 | 10 | Saved replies are stored on the phone, not the account. | Low | Move to the database later. |
@@ -106,6 +106,18 @@ Debug as we go: anyone who finds or fixes a problem updates this list. Highest r
 Fixed in this round: Safari double back on the edge swipe (now only in the installed app), deleting an account now also deletes the person's photos and videos, React Router warnings.
 
 ## Log
+
+### 2026-11-11: Extras: live chats, reviews, search filters, seller stats, invite a friend
+
+Asked by Ofentse ("let's do those nice to haves and the 1%"). **Not live yet** (branch `flat-prices`, needs migration 0041 and the run-due function).
+
+- **Live updates (Supabase Realtime):** chat messages and read receipts arrive straight away; "typing…" works for real (a 4 second broadcast, nothing stored); auction bids update the moment anyone bids (a public `auction_ticks` row with only the item and time, since bids are private), plus one check just after the clock runs out. Slow checks every 10 to 15 seconds cover a dropped connection.
+- **Posts by id:** Liked, Reposted and Following reposts no longer miss posts beyond the first 50 of the feed. The "who shows" rule now lives in one place (`public_posts`).
+- **Search with filters (Explore):** the server searches everything for sale (every word has to match). Filters: sort (best, newest, price both ways), size (from what's listed), price (quick ranges or your own), ships from (province of the seller's pickup address; city and street stay private). Applied filters show as chips you can tap off. "Show more" loads the next 20.
+- **Shop reviews:** stars, count and "4.7, 3 reviews" under the shop name; tap for the spread of stars and the written reviews. Who wrote it stays hidden (the 5 Nov privacy fix): "Verified buyer", the item and the month. Suspended buyers' reviews don't count.
+- **Seller stats (Me, Stats):** 7, 30 or 90 days: sales, orders, views and people, buyers, followers, views and sales by day (tap a bar), likes, reposts, returns, live shows, top 5 items. A view is one signed in person watching a post for 2 seconds, once a day; your own views and guests don't count. Views older than 120 days are cleared by run-due.
+- **Invite a friend (menu):** share `myhaul.co.za/?invite=<username>`. A brand new account (under a day old, no orders) that opens it is linked once to the inviter; they follow each other and the inviter is told. **No money for inviting** [CONFIRM with Ofentse]: a sign up reward gets farmed, the same reason the welcome credit was dropped.
+- Tests: database block (posts by id, search words, price, size, the % sign, reviews hide the buyer, views once a day and not your own, stats, invites once only and only new accounts, ticks hold nothing private), e2e (stats, invite, filters, no results, reviews sheet). All pass: core 61, functions 20, database, e2e.
 
 ### 2026-11-11: Live selling
 

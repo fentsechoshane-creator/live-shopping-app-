@@ -2,7 +2,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { validateListing } from "@app/core";
 import type {
-  ListingSuggestion, Conversation, OpenReport, SharedPost,
+  ListingSuggestion, SellerStats, Conversation, OpenReport, SharedPost,
   MyProfile, ShopPublic,
   Api, BankInput, Category, CheckoutInput, FeedItem, ListingInput, MyShop, Notification, Order, Payout, PendingReview, SellerCharge,
   ProductPublic, User, TeamPerson, TeamPersonDetail, Reward, LiveShow, LiveChatMessage, LiveSummary,
@@ -109,6 +109,23 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
     shop: { id: r.shop_id, name: r.shop_name, handle: r.shop_handle, category: r.category, trustScore: r.trust_score, tier: r.tier },
     video: { muxPlaybackId: r.playback_id, url: videoUrl(r.storage_path), kind: isImage(r.storage_path) ? "image" : "video" },
   });
+
+  /** Posts the public can see, by id (migration 0041). */
+  const postsById = async (ids: string[]): Promise<Map<string, FeedItem>> => {
+    const uniq = [...new Set(ids)];
+    if (!uniq.length) return new Map();
+    const rows = (check(await sb.rpc("feed_posts", { p_ids: uniq })) as any[]) ?? [];
+    return new Map(rows.map((r) => [r.post_id as string, feedItem(r)]));
+  };
+
+  // ===== Chats that update straight away (Supabase Realtime, migration 0041) =====
+  // "typing…" travels as a broadcast on the chat's channel and lasts 4 seconds. Nothing is stored.
+  const typingUntil = new Map<string, number>();
+  const chatChannels = new Map<string, any>();
+  let lastTypingSent = 0;
+  let myId: string | null = null;
+  sb.auth.getUser().then(({ data }) => { myId = data.user?.id ?? null; });
+  sb.auth.onAuthStateChange((_e, sess) => { myId = sess?.user?.id ?? null; });
 
   // ===== Live selling helpers =====
   const liveShops = async (ids: string[]): Promise<Record<string, ShopPublic>> => {
@@ -304,10 +321,9 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
       } else who = await uid();
       const rows = check(await sb.from("post_reactions").select("post_id").eq("user_id", who).eq("kind", kind)
         .order("created_at", { ascending: false })) as any[];
-      const order = rows.map((r) => r.post_id as string);
-      // Version 1: match against the live feed, which is fine while the catalogue is small. Move to a server function at scale.
-      const live = (check(await sb.rpc("feed", { p_limit: 50, p_offset: 0 })) as any[]).map(feedItem);
-      return order.map((id) => live.find((it) => it.postId === id)).filter((x): x is FeedItem => !!x);
+      const order = rows.map((r) => r.post_id as string).slice(0, 200);
+      const live = await postsById(order);
+      return order.map((id) => live.get(id)).filter((x): x is FeedItem => !!x);
     },
     async followingReposts() {
       const follows = check(await sb.from("follows").select("shops(owner_id, handle)").eq("user_id", await uid())) as any[];
@@ -315,10 +331,10 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
       if (!owners.size) return [];
       const rows = check(await sb.from("post_reactions").select("post_id, user_id").eq("kind", "repost").in("user_id", [...owners.keys()])
         .order("created_at", { ascending: false }).limit(50)) as any[];
-      const live = (check(await sb.rpc("feed", { p_limit: 50, p_offset: 0 })) as any[]).map(feedItem);
+      const live = await postsById(rows.map((r) => r.post_id));
       const out: FeedItem[] = [];
       for (const r of rows) {
-        const it = live.find((x) => x.postId === r.post_id);
+        const it = live.get(r.post_id);
         if (it) out.push({ ...it, repostedBy: owners.get(r.user_id) });
       }
       return out;
@@ -541,7 +557,7 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
       const prices = offerIds.length ? Object.fromEntries(((await sb.from("products").select("id, price_cents").in("id", offerIds)).data ?? []).map((p: any) => [p.id, p.price_cents])) : {};
       const images = await Promise.all(rows.map(async (r) => (r.image_path ? (await sb.storage.from("private").createSignedUrl(r.image_path, 3600)).data?.signedUrl ?? null : null)));
       await sb.from("messages").update({ read_at: new Date().toISOString() }).eq("conversation_id", conversationId).neq("sender_id", me).is("read_at", null);
-      return { conversation, messages: rows.map((r, i) => ({ id: r.id, body: r.body, createdAt: r.created_at, mine: r.sender_id === me, readAt: r.read_at, productId: r.product_id,
+      return { conversation, typing: (typingUntil.get(conversationId) ?? 0) > Date.now(), messages: rows.map((r, i) => ({ id: r.id, body: r.body, createdAt: r.created_at, mine: r.sender_id === me, readAt: r.read_at, productId: r.product_id,
         imageUrl: images[i],
         offer: r.offers ? { id: r.offers.id, productIds: r.offers.product_ids, priceCents: r.offers.price_cents, expiresAt: r.offers.expires_at, status: r.offers.status, madeBy: r.offers.made_by ?? "seller",
           listedCents: r.offers.product_ids.reduce((n: number, id: string) => n + (prices[id] ?? 0), 0) } : null })) };
@@ -618,6 +634,73 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
         .subscribe();
       const t = window.setInterval(onChange, 8000);
       return () => { window.clearInterval(t); sb.removeChannel(ch); };
+    },
+    watchThread(conversationId, onChange) {
+      const ch = sb.channel(`chat-${conversationId}`, { config: { broadcast: { self: false } } })
+        .on("postgres_changes", { event: "*", schema: "public", table: "messages", filter: `conversation_id=eq.${conversationId}` }, () => {
+          typingUntil.delete(conversationId); onChange();
+        })
+        .on("broadcast", { event: "typing" }, (msg: any) => {
+          if (msg?.payload?.from && msg.payload.from === myId) return;
+          typingUntil.set(conversationId, Date.now() + 4000);
+          onChange();
+          window.setTimeout(onChange, 4100);
+        })
+        .subscribe();
+      chatChannels.set(conversationId, ch);
+      // Offers changing and a dropped connection are covered by a slow check.
+      const t = window.setInterval(onChange, 15000);
+      return () => { window.clearInterval(t); chatChannels.delete(conversationId); sb.removeChannel(ch); };
+    },
+    watchFriendChat(chatId, onChange) {
+      const ch = sb.channel(`friends-${chatId}`)
+        .on("postgres_changes", { event: "*", schema: "public", table: "friend_messages", filter: `chat_id=eq.${chatId}` }, () => onChange())
+        .subscribe();
+      const t = window.setInterval(onChange, 15000);
+      return () => { window.clearInterval(t); sb.removeChannel(ch); };
+    },
+    sendTyping(conversationId) {
+      if (Date.now() - lastTypingSent < 2500) return;
+      lastTypingSent = Date.now();
+      chatChannels.get(conversationId)?.send({ type: "broadcast", event: "typing", payload: { from: myId } }).catch(() => {});
+    },
+    watchAuctions(productIds, onChange) {
+      const ids = [...new Set(productIds)].slice(0, 100);
+      if (!ids.length) return () => {};
+      const ch = sb.channel(`auctions-${ids.join(",").slice(0, 60)}-${Math.random().toString(36).slice(2, 8)}`)
+        .on("postgres_changes", { event: "*", schema: "public", table: "auction_ticks", filter: `product_id=in.(${ids.join(",")})` }, () => onChange())
+        .subscribe();
+      const t = window.setInterval(onChange, 10000);
+      return () => { window.clearInterval(t); sb.removeChannel(ch); };
+    },
+    async search(q, f, offset = 0) {
+      const rows = check(await sb.rpc("search_items", {
+        p_q: q.trim(), p_category: f.category ?? null, p_size: f.size ?? null, p_min: f.minCents ?? null, p_max: f.maxCents ?? null,
+        p_province: f.province ?? null, p_sort: f.sort ?? "best", p_limit: 20, p_offset: offset,
+      })) as any[];
+      return (rows ?? []).map(feedItem);
+    },
+    async searchSizes() {
+      return ((check(await sb.rpc("search_sizes")) as string[] | null) ?? []);
+    },
+    async shopReviews(shopId) {
+      const r = check(await sb.rpc("shop_reviews", { p_shop: shopId })) as any;
+      return { count: Number(r?.count ?? 0), average: r?.average != null ? Number(r.average) : null,
+        stars: r?.stars ?? { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 }, recent: r?.recent ?? [] };
+    },
+    async recordViews(postIds) {
+      if (!myId || !postIds.length) return;
+      await sb.rpc("record_views", { p_posts: postIds.slice(0, 30) }); // best effort: a missed view is fine
+    },
+    async sellerStats(days) {
+      const r = check(await sb.rpc("seller_stats", { p_days: days })) as any;
+      return { ...r, series: r.series ?? [], top: r.top ?? [] } as SellerStats;
+    },
+    async acceptInvite(handle) {
+      return !!check(await sb.rpc("accept_invite", { p_handle: handle }));
+    },
+    async myInvites() {
+      return Number(check(await sb.rpc("my_invites")) ?? 0);
     },
     async productItem(productId) {
       const p = (await sb.from("products").select(`${PRODUCT_COLS}, shops(id, name, handle, category)`).eq("id", productId).maybeSingle()).data as any;

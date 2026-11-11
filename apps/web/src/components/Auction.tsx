@@ -17,8 +17,8 @@ export function useNow(active = true) {
   return now;
 }
 
-/** Live auction details for a list of items, refreshed every few seconds. */
-export function useAuctions(ids: string[], every = 5000) {
+/** Live auction details for a list of items. Updates the moment someone bids (Realtime), and again just after the clock runs out. */
+export function useAuctions(ids: string[]) {
   const key = ids.join(",");
   const [info, setInfo] = useState<Record<string, AuctionInfo>>({});
   useEffect(() => {
@@ -26,9 +26,16 @@ export function useAuctions(ids: string[], every = 5000) {
     let live = true;
     const load = () => api.auctionInfo(ids).then((r) => live && setInfo((cur) => ({ ...cur, ...r }))).catch(() => {});
     load();
-    const t = window.setInterval(load, every);
-    return () => { live = false; window.clearInterval(t); };
-  }, [key, every]); // eslint-disable-line react-hooks/exhaustive-deps
+    const stop = api.watchAuctions(ids, load);
+    return () => { live = false; stop(); };
+  }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+  // When the soonest open auction ends, check once more so "Sold" or "You won" shows without waiting.
+  const nextEnd = Object.values(info).filter((a) => a.state === "open" && a.endsAt).map((a) => new Date(a.endsAt!).getTime()).sort((a, b) => a - b)[0];
+  useEffect(() => {
+    if (!nextEnd) return;
+    const t = window.setTimeout(() => api.auctionInfo(ids).then((r) => setInfo((cur) => ({ ...cur, ...r }))).catch(() => {}), Math.max(0, nextEnd - Date.now()) + 1500);
+    return () => window.clearTimeout(t);
+  }, [nextEnd, key]); // eslint-disable-line react-hooks/exhaustive-deps
   return [info, (r: AuctionInfo) => setInfo((cur) => ({ ...cur, [r.productId]: r }))] as const;
 }
 

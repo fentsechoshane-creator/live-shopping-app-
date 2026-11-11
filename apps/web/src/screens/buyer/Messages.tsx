@@ -100,7 +100,7 @@ export function Thread() {
   const [replies, setReplies] = useState<string[]>([]);
   useEffect(() => { if (c?.iAmSeller) setReplies(loadReplies(c.shopId)); }, [c?.iAmSeller, c?.shopId]);
 
-  useEffect(() => { const t = window.setInterval(reload, 3000); return () => window.clearInterval(t); }, [reload]); // new messages
+  useEffect(() => api.watchThread(id, reload), [id, reload]); // new messages and "typing…" arrive straight away
   // Keep the newest message in view. Offer cards, photos and the quick replies settle a moment after the first
   // paint, so scroll again once they have (the newest offer's buttons used to end up behind the quick replies).
   useEffect(() => {
@@ -209,7 +209,7 @@ export function Thread() {
         )}
         <form className="compose glassy" onSubmit={(e) => { e.preventDefault(); if (text.trim()) send(); }}>
           <button type="button" className="plus" onClick={() => setPlus(true)} aria-label="Add"><Icon name="plus" size={20} strokeWidth={2.4} /></button>
-          <input value={text} onChange={(e) => setText(e.target.value)} maxLength={1000} placeholder={about ? "Ask about this item" : "Message"} aria-label="Message" />
+          <input value={text} onChange={(e) => { setText(e.target.value); if (e.target.value) api.sendTyping(id); }} maxLength={1000} placeholder={about ? "Ask about this item" : "Message"} aria-label="Message" />
           <button className="send" disabled={!text.trim() || busy} aria-label="Send"><Icon name="send" size={18} /></button>
         </form>
         <input ref={photoRef} type="file" accept="image/*" hidden aria-label="Send a photo" onChange={(e) => { const f = e.target.files?.[0]; if (f) send("", f); e.target.value = ""; }} />

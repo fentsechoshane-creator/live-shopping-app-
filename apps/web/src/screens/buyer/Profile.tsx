@@ -22,6 +22,20 @@ type Tab = "posts" | "likes" | "reposts";
  * One profile page, laid out like a TikTok profile. The header stays put; the Seller | Buyer
  * tabs only change the numbers, the short line under them, the small buttons and the grid.
  */
+/** A one line look at the last 7 days, opening the full stats. */
+function StatsCard() {
+  const nav = useNavigate();
+  const [st] = useLoad(() => api.sellerStats(7).catch(() => null), []);
+  return (
+    <button className="stats-card" onClick={() => nav("/sell/stats")}>
+      <span className="ic"><Icon name="chart" size={18} /></span>
+      <span className="grow"><b>Stats</b>
+        <span className="s">{st ? `Last 7 days: ${st.views} ${st.views === 1 ? "view" : "views"}, ${st.orders} ${st.orders === 1 ? "sale" : "sales"}, ${R(st.salesCents)}` : "Views, sales and your top items"}</span></span>
+      <Icon name="chevron" size={16} />
+    </button>
+  );
+}
+
 export function Profile() {
   const { user, setMenuOpen, following, toast, refreshProfile } = useSession();
   const [params, setParams] = useSearchParams();
@@ -115,6 +129,7 @@ export function Profile() {
           <button className="pill-btn" onClick={() => nav("/sell/payouts")}><Icon name="payout" size={14} />Payouts</button>
         </>}
       </div>
+      {hasShop && <StatsCard />}
 
       <div className="ptabs" role="tablist" aria-label="Profile">
         <button role="tab" aria-selected={tab === "posts"} onClick={() => setTab("posts")}>Posts</button>

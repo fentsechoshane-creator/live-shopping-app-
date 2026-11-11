@@ -48,7 +48,7 @@ export function WatchLive() {
   const live = show?.status === "live";
   const room = useLiveRoom(id, "viewer", live && !show?.mine);
   const auctionId = show?.auction?.product.id;
-  const [auctions, setAuction] = useAuctions(auctionId ? [auctionId] : [], 1000);
+  const [auctions, setAuction] = useAuctions(auctionId ? [auctionId] : []);
   const now = useNow();
   const [buying, setBuying] = useState<{ item: FeedItem; price?: number } | null>(null);
   const [bidding, setBidding] = useState(false);

@@ -28,6 +28,8 @@ import { TeamApp } from "./screens/team/Team";
 import { Thread } from "./screens/buyer/Messages";
 import { BlockedAccounts, DeliverySettings, DeleteAccountSheet, Privacy, Terms, CONTACT } from "./screens/Settings";
 import { APP_VERSION, BUILT_AT } from "./lib/report";
+import { SellerStatsScreen } from "./screens/seller/Stats";
+import { InviteCatcher, InviteScreen } from "./screens/buyer/Invite";
 
 function RequireUser({ children }: { children: ReactNode }) {
   const { user, ready } = useSession();
@@ -138,6 +140,7 @@ function SideMenu() {
         <div className="menu-h">Shopping</div>
         <div className="group">
           <MenuRow icon="bag" t="My orders" s="Track, return or rate an order" onClick={() => go("/orders")} />
+          <MenuRow icon="gift" t="Invite a friend" s="Share your link; you follow each other when they join" onClick={() => go("/invite")} />
           <MenuRow icon="help" t="Returns and help" s="7 day returns on Buy now, buyer protection" onClick={() => go("/help")} />
           <MenuRow icon="chat" t="Contact us" s={`${CONTACT}, we reply within 2 working days`} onClick={() => { window.location.href = `mailto:${CONTACT}?subject=${encodeURIComponent("myHaul help")}`; }} />
         </div>
@@ -270,6 +273,8 @@ export function App() {
           <Route path="/sell/orders" element={guard(<SellerOrders />)} />
           <Route path="/sell/orders/:id" element={guard(<SellerOrderDetail />)} />
           <Route path="/sell/payouts" element={guard(<Payouts />)} />
+          <Route path="/sell/stats" element={guard(<SellerStatsScreen />)} />
+          <Route path="/invite" element={guard(<InviteScreen />)} />
           <Route path="/admin" element={<Navigate to="/team" replace />} />
           <Route path="/messages/:id" element={guard(<Thread />)} />
           <Route path="/chats/:id" element={guard(<FriendThread />)} />
@@ -284,6 +289,7 @@ export function App() {
         </ErrorBoundary>
         {!fullScreen && <Tabs />}
         <SideMenu />
+        <InviteCatcher />
         {user && !welcome && !fullScreen && !loc.pathname.startsWith("/mock-pay") && <RewardSurprise />}
         <SignInSheet />
         {welcome && <Welcome onDone={() => setWelcome(false)} />}

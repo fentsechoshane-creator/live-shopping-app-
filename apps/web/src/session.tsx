@@ -176,5 +176,6 @@ export function useLoad<T>(fn: () => Promise<T>, deps: unknown[] = []): [T | und
     return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...deps, n]);
-  return [data, error, () => setN((x) => x + 1)];
+  const reload = useCallback(() => setN((x) => x + 1), []); // stable, so it can be handed to watchers
+  return [data, error, reload];
 }

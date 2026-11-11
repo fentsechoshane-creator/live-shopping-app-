@@ -1400,3 +1400,97 @@ select team_remove_seller_charge((select id from seller_charges where kind = 'ch
 do $$ begin assert not exists (select 1 from seller_charges where kind = 'chargeback'), 'removed'; end $$;
 reset role;
 select 'team charges tests passed' as result;
+
+-- ===== Extras (migration 0041): posts by id, search, shop reviews, views and stats, invites, auction ticks =====
+-- Test setup: a live post from Other shop (owner e) with sizes, so there's something to find.
+set session_replication_role = replica;
+update profiles set trust_score = 60 where id = '00000000-0000-0000-0000-00000000000e';
+update shops set status = 'open' where handle = 'other.shop';
+insert into products (id, shop_id, title, description, price_cents, sizes, status, stock)
+  values ('50000000-0000-0000-0000-000000000041', (select id from shops where handle = 'other.shop'), 'Wide leg denim', 'Light wash', 42000, '{M,L}', 'live', 2);
+insert into media (id, owner_id, kind, storage_path, status)
+  values ('50000000-0000-0000-0000-000000000042', '00000000-0000-0000-0000-00000000000e', 'video', '00000000-0000-0000-0000-00000000000e/denim.mp4', 'ready');
+insert into posts (shop_id, product_id, media_id, caption)
+  values ((select id from shops where handle = 'other.shop'), '50000000-0000-0000-0000-000000000041', '50000000-0000-0000-0000-000000000042', 'Denim for days');
+set session_replication_role = default;
+-- Posts by id and search show exactly what the feed shows.
+select pg_temp.act_as_anon();
+do $$ declare f record; begin
+  select * into f from feed(50, 0) limit 1;
+  assert f.post_id is not null, 'there is a post to test with';
+  assert (select count(*) from feed_posts(array(select post_id from feed(50, 0)))) = (select count(*) from feed(50, 0)), 'posts by id match the feed';
+  assert (select count(*) from feed_posts(array['00000000-0000-0000-0000-000000000999'::uuid])) = 0, 'unknown ids return nothing';
+  assert (select count(*) from search_items('')) = (select count(*) from feed(50, 0)), 'empty search shows everything';
+  assert exists (select 1 from search_items(split_part(f.title, ' ', 1)) where post_id = f.post_id), 'a word from the title finds it';
+  assert not exists (select 1 from search_items(f.title || ' zzqx')), 'every word has to match';
+  assert not exists (select 1 from search_items('', null, null, null, f.price_cents - 1) where post_id = f.post_id), 'max price filters';
+  assert exists (select 1 from search_items('', null, null, f.price_cents, f.price_cents) where post_id = f.post_id), 'exact price range';
+  assert not exists (select 1 from search_items('%')), 'a % is a letter, not a wildcard';
+  assert (select count(*) from search_items('', 'no_such_category')) = 0, 'category filters';
+  assert exists (select 1 from search_items('denim', null, 'm') where title = 'Wide leg denim'), 'size filter, any case';
+  assert not exists (select 1 from search_items('denim', null, 'XS')), 'size not stocked';
+  assert 'M' = any (search_sizes()), 'sizes list';
+end $$;
+reset role;
+-- Shop reviews: stars and words, never who wrote them.
+create temp table review_shop as select shop_id from reviews limit 1;
+grant select on review_shop to anon;
+select pg_temp.act_as_anon();
+do $$ declare r jsonb; begin
+  r := shop_reviews((select shop_id from review_shop));
+  assert (r->>'count')::int >= 1 and (r->>'average')::numeric between 1 and 5, 'summary';
+  assert r::text not like '%buyer%' and r::text not like '%00000000-0000%', 'no buyer in reviews';
+end $$;
+reset role;
+-- Views: once per person per post per day; the owner doesn't count; guests aren't counted.
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000d');
+select record_views(array(select post_id from feed(50, 0) where shop_id not in (select id from shops where owner_id = '00000000-0000-0000-0000-00000000000d')));
+select record_views(array(select post_id from feed(50, 0)));
+select pg_temp.expect_error($$select * from post_seen$$, 'permission denied');
+select pg_temp.expect_error($$select seller_stats(30)$$, 'don''t have a shop');
+reset role;
+do $$ begin
+  assert (select count(*) from post_seen where user_id = '00000000-0000-0000-0000-00000000000d') =
+         (select count(*) from feed(50, 0) f join shops s on s.id = f.shop_id where s.owner_id <> '00000000-0000-0000-0000-00000000000d'), 'counted once each, not own';
+end $$;
+select pg_temp.act_as_anon();
+select pg_temp.expect_error($$select record_views(array[gen_random_uuid()])$$, 'permission denied');
+reset role;
+select pg_temp.act_as((select s.owner_id from post_seen ps join posts po on po.id = ps.post_id join shops s on s.id = po.shop_id limit 1));
+do $$ declare st jsonb := seller_stats(7); begin
+  assert (st->>'views')::int >= 1 and (st->>'viewers')::int >= 1, 'views in stats';
+  assert jsonb_array_length(st->'series') = 7, 'a row per day';
+  assert (st->>'days')::int = 7, 'days';
+  assert (seller_stats(13)->>'days')::int = 30, 'odd periods fall back to 30';
+end $$;
+reset role;
+-- Invites: a brand new account links to the inviter once; you follow each other and the inviter is told.
+insert into auth.users (id, email) values ('00000000-0000-0000-0000-00000000041a', 'invited@test.co.za'), ('00000000-0000-0000-0000-00000000041b', 'invited2@test.co.za');
+update profiles set handle = 'inviter.one', display_name = 'Inviter' where id = '00000000-0000-0000-0000-00000000000d' and handle is null;
+select pg_temp.act_as('00000000-0000-0000-0000-00000000041a');
+do $$ declare h text := (select handle from profiles where id = '00000000-0000-0000-0000-00000000000d'); begin
+  assert accept_invite(h), 'invite accepted';
+  assert not accept_invite(h), 'only once';
+  assert not accept_invite('nobody.here'), 'unknown handle';
+end $$;
+reset role;
+do $$ begin
+  assert (select invited_by from profiles where id = '00000000-0000-0000-0000-00000000041a') = '00000000-0000-0000-0000-00000000000d', 'linked';
+  assert (select count(*) from people_follows where '00000000-0000-0000-0000-00000000041a' in (follower_id, followee_id)) = 2, 'follow each other';
+  assert exists (select 1 from notifications where user_id = '00000000-0000-0000-0000-00000000000d' and kind = 'invite'), 'inviter told';
+end $$;
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000d');
+do $$ begin assert my_invites() = 1, 'invite count'; end $$;
+select pg_temp.act_as('00000000-0000-0000-0000-00000000041b');
+do $$ begin assert not accept_invite((select handle from profiles where id = '00000000-0000-0000-0000-00000000041b')), 'not yourself'; end $$;
+reset role;
+update profiles set created_at = now() - interval '3 days' where id = '00000000-0000-0000-0000-00000000041b';
+select pg_temp.act_as('00000000-0000-0000-0000-00000000041b');
+do $$ begin assert not accept_invite((select handle from profiles where id = '00000000-0000-0000-0000-00000000000d')), 'old accounts can''t be claimed'; end $$;
+reset role;
+-- Auction ticks: every bid bumps a public row with no bidder in it.
+do $$ begin
+  assert (select count(*) from auction_ticks) >= 1, 'bids bumped the tick';
+  assert not exists (select 1 from information_schema.columns where table_name = 'auction_ticks' and column_name not in ('product_id', 'at')), 'tick holds no private detail';
+end $$;
+select 'extras tests passed' as result;

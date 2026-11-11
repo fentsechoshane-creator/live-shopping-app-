@@ -225,7 +225,7 @@ export function FriendThread() {
   const endRef = useRef<HTMLDivElement>(null);
   const goBack = useGoBack("/inbox?tab=messages");
 
-  useEffect(() => { const t = window.setInterval(reload, 3000); return () => window.clearInterval(t); }, [reload]);
+  useEffect(() => api.watchFriendChat(id, reload), [id, reload]); // new messages arrive straight away
   const unread = data?.messages.filter((m) => !m.mine && !m.readAt).length ?? 0;
   useEffect(() => { if (unread) api.readFriendChat(id).then(() => window.dispatchEvent(new Event("inbox-read"))).catch(() => {}); }, [id, unread]);
   useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [data?.messages.length]);
