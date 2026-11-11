@@ -230,8 +230,8 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
       const rows = check(await sb.rpc("auctions_info", { p_products: [...new Set(ids)].slice(0, 50) })) as any[];
       return Object.fromEntries(rows.map((r) => [r.productId, r]));
     },
-    async placeBid(productId, amountCents) {
-      return check(await sb.rpc("place_bid", { p_product: productId, p_amount: amountCents })) as any;
+    async placeBid(productId, amountCents, opts) {
+      return check(await sb.rpc("place_bid", { p_product: productId, p_amount: amountCents, p_max: !!opts?.max })) as any;
     },
     async settleAuction(productId) {
       await sb.rpc("settle_auction", { p_product: productId });

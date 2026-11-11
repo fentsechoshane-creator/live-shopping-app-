@@ -42,3 +42,43 @@ export function maskHandle(handle: string | null | undefined): string {
   if (!handle) return "Bidder";
   return handle.length <= 2 ? `${handle[0]}*` : `${handle[0]}***${handle[handle.length - 1]}`;
 }
+
+/** Someone's max bid: we bid for them, one step at a time, only when they're outbid, up to this. Nobody else sees it. */
+export interface MaxBid { bidderId: string; maxCents: number; setAt: string }
+export interface PlacedBid { bidderId: string; amountCents: number }
+
+/**
+ * The bids the app places for people with a max, after the top bid changes. Same steps as max_bid_replies in
+ * migration 0039; keep them in step.
+ * - A challenger whose max beats the next step takes the lead at the lowest amount that does it.
+ * - Two people with a max: the higher max wins, at one step over the other max (or at its own max if that's less).
+ *   On an equal max, whoever set theirs first wins.
+ * - Someone outbid on their max shows a bid at their max, so the bid list makes sense.
+ */
+export function maxBidReplies(top: PlacedBid, maxes: MaxBid[]): PlacedBid[] {
+  const out: PlacedBid[] = [];
+  let t = top;
+  // Each round knocks out at least one max, so this always ends; 100 is a safety limit.
+  for (let i = 0; i < 100; i++) {
+    const need = t.amountCents + bidStep(t.amountCents);
+    const ch = maxes
+      .filter((m) => m.bidderId !== t.bidderId && m.maxCents >= need)
+      .sort((a, b) => b.maxCents - a.maxCents || a.setAt.localeCompare(b.setAt))[0];
+    if (!ch) break;
+    const mine = maxes.find((m) => m.bidderId === t.bidderId);
+    const leaderMax = Math.max(t.amountCents, mine?.maxCents ?? 0);
+    const leaderHolds = leaderMax > ch.maxCents || (leaderMax === ch.maxCents && !!mine && mine.setAt <= ch.setAt);
+    if (leaderHolds) {
+      // The leader's max holds.
+      if (leaderMax > ch.maxCents) out.push({ bidderId: ch.bidderId, amountCents: ch.maxCents });
+      out.push({ bidderId: t.bidderId, amountCents: Math.min(leaderMax, ch.maxCents + bidStep(ch.maxCents)) });
+    } else {
+      // The challenger takes over. Show the old leader's max first, if they had one above their bid.
+      // (On an equal max the old leader's max isn't shown: two bids of the same amount would look like a tie.)
+      if (leaderMax > t.amountCents && leaderMax < ch.maxCents) out.push({ bidderId: t.bidderId, amountCents: leaderMax });
+      out.push({ bidderId: ch.bidderId, amountCents: Math.min(ch.maxCents, leaderMax + bidStep(leaderMax)) });
+    }
+    t = out[out.length - 1];
+  }
+  return out;
+}

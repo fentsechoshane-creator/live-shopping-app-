@@ -1,7 +1,7 @@
 // Demo adapter: the whole app runs in the browser with sample data, using the same rules as the server.
 // Used when no Supabase keys are set. Sign in with any email or phone and the code 123456.
 import {
-  bidStep, maskHandle, canTransition, isRude, orderTotals, payoutDate, releasableAt, returnReasonsFor, shipBy, tierFor, TRUST_POINTS, validateListing,
+  bidStep, maxBidReplies, maskHandle, canTransition, isRude, orderTotals, payoutDate, releasableAt, returnReasonsFor, shipBy, tierFor, TRUST_POINTS, validateListing,
   RETURN_POSTAGE_PAYER, ACCOUNT_FEATURE_KEYS, canForceOn, featureOffMessage, type AccountFeature, type OrderStatus, type TrustEventKind, bookedByUs, deliveryFee, PARCEL_SIZES, orderParcelSize, DELIVERY_PERKS, validateEdit, refundFee, formatRand, type PayoutSchedule } from "@app/core";
 import { handleProblem } from "../lib/handle";
 import type {
@@ -43,6 +43,7 @@ interface State {
   interests?: Record<string, Category[]>;
   errors?: AppError[];
   bids?: { id: string; productId: string; round: number; bidderId: string; amountCents: number; at: string }[];
+  maxBids?: { productId: string; round: number; bidderId: string; maxCents: number; setAt: string }[];
   suspensions?: Record<string, { reason: string; at: string }>;
   packingStrikes?: { shopId: string; orderId: string; note: string; at: string }[];
   rewards?: (Reward & { userId: string; earnedOrderId: string | null; usedOrderId: string | null })[];
@@ -392,6 +393,7 @@ export function createDemoApi(): Api {
       minNextCents: top ? top.amountCents + bidStep(top.amountCents) : p.priceCents,
       reserveSet: p.reserveCents != null, reserveMet: p.reserveCents == null || (top?.amountCents ?? 0) >= p.reserveCents,
       leaderIsMe: !!top && top.bidderId === viewer, myTopCents: bs.filter((b) => b.bidderId === viewer)[0]?.amountCents ?? null,
+      myMaxCents: (s.maxBids ?? []).find((m) => m.productId === p.id && m.round === (p.auctionRound ?? 0) && m.bidderId === viewer)?.maxCents ?? null,
       winnerIsMe: !!viewer && p.auctionWinner === viewer, priceCents: p.auctionPriceCents ?? null, payBy: p.auctionPayBy ?? null,
       recent: bs.slice(0, 5).map((b) => ({ who: b.bidderId === viewer ? "You" : maskHandle(handleOf(b.bidderId)), amountCents: b.amountCents, at: b.at })),
     };
@@ -829,7 +831,7 @@ export function createDemoApi(): Api {
       for (const pid of ids) { const p = s.products.find((x) => x.id === pid && x.mode === "auction"); if (p) { settleAuction(p); out[pid] = auctionInfoFor(p); } }
       return out;
     },
-    async placeBid(productId, amountCents) {
+    async placeBid(productId, amountCents, opts) {
       notSuspended(); notOff("bid");
       await wait(200);
       const u = me();
@@ -842,14 +844,36 @@ export function createDemoApi(): Api {
       if (!u.handle || !u.adult) throw new Error("Finish setting up your account to bid.");
       if (u.trust < 40) throw new Error("Your account is under review, so you can't bid right now.");
       if (blockedBetween(u.id, sh.ownerId)) throw new Error("You can't bid on this shop.");
+      // Same rules and steps as place_bid in migration 0039.
+      const round = p.auctionRound ?? 0;
       const top = roundBids(p)[0];
       const min = top ? top.amountCents + bidStep(top.amountCents) : p.priceCents;
-      if (amountCents < min) throw new Error(`The lowest bid now is R${min / 100}.`);
+      const maxes = (s.maxBids ?? []).filter((m) => m.productId === p.id && m.round === round);
+      const mine = maxes.find((m) => m.bidderId === u.id);
+      if (opts?.max) {
+        if (mine && amountCents <= mine.maxCents) throw new Error(`Your max is already R${mine.maxCents / 100}. Set a higher one.`);
+        if (top?.bidderId === u.id) { if (amountCents <= top.amountCents) throw new Error(`You're already on top at R${top.amountCents / 100}. Set a max above that.`); }
+        else if (amountCents < min) throw new Error(`The lowest bid now is R${min / 100}.`);
+      } else if (amountCents < min) throw new Error(`The lowest bid now is R${min / 100}.`);
       if (amountCents > Math.max(min * 5, 100000)) throw new Error("That's far above the current bid. Check the amount.");
-      s.bids = [...(s.bids ?? []), { id: id(), productId: p.id, round: p.auctionRound ?? 0, bidderId: u.id, amountCents, at: new Date().toISOString() }];
-      if (new Date(p.auctionEndsAt).getTime() - Date.now() < 2 * 60e3) p.auctionEndsAt = new Date(Date.now() + 2 * 60e3).toISOString();
-      if (top && top.bidderId !== u.id) notify(top.bidderId, "You've been outbid", `${p.title} is now at R${amountCents / 100}. Bid again before it ends.`, `/i/${p.id}`);
-      notify(sh.ownerId, `New bid: R${amountCents / 100}`, p.title, `/i/${p.id}`);
+      const stamp = () => new Date(Date.now() + (s.bids?.length ?? 0)).toISOString();
+      const add = (bidderId: string, cents: number) => { s.bids = [...(s.bids ?? []), { id: id(), productId: p.id, round, bidderId, amountCents: cents, at: stamp() }]; };
+      if (opts?.max) {
+        s.maxBids = [...(s.maxBids ?? []).filter((m) => !(m.productId === p.id && m.round === round && m.bidderId === u.id)),
+          { productId: p.id, round, bidderId: u.id, maxCents: amountCents, setAt: new Date().toISOString() }];
+        if (!top || top.bidderId !== u.id) add(u.id, min);
+      } else add(u.id, amountCents);
+      const before = roundBids(p)[0];
+      const replies = maxBidReplies({ bidderId: before.bidderId, amountCents: before.amountCents },
+        (s.maxBids ?? []).filter((m) => m.productId === p.id && m.round === round).map((m) => ({ bidderId: m.bidderId, maxCents: m.maxCents, setAt: m.setAt })));
+      for (const r of replies) add(r.bidderId, r.amountCents);
+      const now2 = roundBids(p)[0];
+      if (now2.id !== top?.id) {
+        if (new Date(p.auctionEndsAt).getTime() - Date.now() < 2 * 60e3) p.auctionEndsAt = new Date(Date.now() + 2 * 60e3).toISOString();
+        const told = new Set([top?.bidderId, ...replies.map((r) => r.bidderId)].filter((x): x is string => !!x && x !== now2.bidderId && x !== u.id));
+        for (const who of told) notify(who, "You've been outbid", `${p.title} is now at R${now2.amountCents / 100}. Bid again before it ends.`, `/i/${p.id}`);
+        notify(sh.ownerId, `New bid: R${now2.amountCents / 100}`, p.title, `/i/${p.id}`);
+      }
       save();
       return auctionInfoFor(p);
     },

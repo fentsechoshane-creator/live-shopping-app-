@@ -112,7 +112,6 @@ export function FeedList({ items, start = 0, onNearEnd }: { items: FeedItem[]; s
   // Auctions: live bid, time left and the bid sheet.
   const [auctions, setAuction] = useAuctions(items.filter((it) => it.product.mode === "auction").map((it) => it.product.id));
   const [bidding, setBidding] = useState<FeedItem | null>(null);
-  const [customBid, setCustomBid] = useState(false);
   const [index, setIndex] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
   const { withUser, user, toast } = useSession();
@@ -127,7 +126,7 @@ export function FeedList({ items, start = 0, onNearEnd }: { items: FeedItem[]; s
       throw e;
     }
   };
-  const customFor = (it: FeedItem) => withUser(() => { setCustomBid(true); setBidding(it); }, "Sign in to bid");
+  const customFor = (it: FeedItem) => withUser(() => setBidding(it), "Sign in to bid");
 
   useEffect(() => {
     const el = ref.current;
@@ -159,7 +158,7 @@ export function FeedList({ items, start = 0, onNearEnd }: { items: FeedItem[]; s
 
   const go = (d: number) => ref.current?.scrollTo({ top: (index + d) * ref.current.clientHeight, behavior: "smooth" });
   const startBuy = (it: FeedItem) => it.product.mode === "auction"
-    ? withUser(() => { setBrowse(null); setCustomBid(false); setBidding(it); }, "Sign in to bid")
+    ? withUser(() => { setBrowse(null); setBidding(it); }, "Sign in to bid")
     : withUser(() => { setBrowse(null); setBuy(it); }, "Sign in to buy");
 
   return (
@@ -186,7 +185,7 @@ export function FeedList({ items, start = 0, onNearEnd }: { items: FeedItem[]; s
       {offering && <MakeOfferSheet item={{ productId: offering.product.id, shopId: offering.shop.id, title: offering.product.title, priceCents: offering.product.priceCents }}
         onClose={() => setOffering(null)} onSent={(conv) => { setOffering(null); toast("Offer sent. The seller has 24 hours to reply."); navTo(`/messages/${conv}`); }} />}
       {buy && <CheckoutSheet item={buy} onClose={() => setBuy(null)} auctionPrice={buy.product.mode === "auction" ? auctions[buy.product.id]?.priceCents ?? null : null} />}
-      {bidding && <AuctionSheet item={bidding} info={auctions[bidding.product.id]} onInfo={setAuction} onClose={() => setBidding(null)} focusCustom={customBid}
+      {bidding && <AuctionSheet item={bidding} info={auctions[bidding.product.id]} onInfo={setAuction} onClose={() => setBidding(null)}
         onPay={() => { const it = bidding; setBidding(null); setBuy(it); }} />}
       {commenting && <CommentsSheet postId={commenting.postId} postOwnerShopHandle={commenting.shop.handle} onClose={() => setCommenting(null)}
         onCount={(n) => setCommentCounts((c) => ({ ...c, [commenting.postId]: n }))} />}
@@ -339,8 +338,11 @@ function VideoCard({ item, auction, avatar, counts, comments, onBrowse, onBuy, o
         </div>
         <div className="actions">
           {mine ? <OwnerBar item={shown} auction={tagged ? undefined : auction} /> : !tagged && p.mode === "auction" && auction && auctionButton(auction, now).kind === "bid" ? (
-            <HoldToBid glass label={`Hold to bid ${R(auction.minNextCents)}`} price={R(auction.minNextCents)} onConfirm={() => onQuickBid(auction.minNextCents)}
-              onTap={onCustomBid} onNeedUser={needUser} />
+            <div className="bid-row">
+              <button className="vround vglass" onClick={onCustomBid} aria-label="Pick your own amount"><Icon name="plus" /></button>
+              <HoldToBid glass label={`Hold to bid ${R(auction.minNextCents)}`} price={R(auction.minNextCents)} onConfirm={() => onQuickBid(auction.minNextCents)}
+                onTap={onCustomBid} onNeedUser={needUser} />
+            </div>
           ) : <BuyButton item={shown} auction={tagged ? undefined : auction} onClick={() => onBuy(shown)} />}
           {!mine && <button className="vround vglass" onClick={onMessage} aria-label={`Message @${item.shop.handle}`}><Icon name="chat" /></button>}
           <button className="vround vglass" onClick={share} aria-label="Share"><Icon name="share" /></button>

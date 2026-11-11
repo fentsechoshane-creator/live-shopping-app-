@@ -538,6 +538,49 @@ select pg_temp.act_as('00000000-0000-0000-0000-0000000000f1');
 select place_bid((select id from products where title = 'Vintage leather jacket'), 22000);
 reset role;
 do $$ begin assert (select auction_ends_at from products where title = 'Vintage leather jacket') > now() + interval '100 seconds', 'late bid extends the end'; end $$;
+-- Max bids: many maxes on one item, settled fairly in one go.
+reset role;
+insert into auth.users (id, email) values ('00000000-0000-0000-0000-0000000000f3', 'bidder3@test.co.za');
+select pg_temp.act_as_service();
+insert into products (shop_id, title, price_cents, sizes, status, stock, mode, auction_ends_at, auction_state)
+  values ((select id from shops where handle = 'thrift.with.lebo'), 'Max bid denim', 70000, '{}', 'live', 1, 'auction', now() + interval '1 day', 'open');
+reset role;
+select pg_temp.act_as('00000000-0000-0000-0000-0000000000f1');
+select place_bid((select id from products where title = 'Max bid denim'), 90000, true);
+do $$ declare i jsonb := auction_info((select id from products where title = 'Max bid denim')); begin
+  assert (i->>'currentCents')::int = 70000 and (i->>'myMaxCents')::int = 90000 and (i->>'leaderIsMe')::boolean, 'a max bids only the lowest amount';
+end $$;
+reset role;
+select pg_temp.act_as('00000000-0000-0000-0000-0000000000f2');
+select place_bid((select id from products where title = 'Max bid denim'), 72000);
+do $$ declare i jsonb := auction_info((select id from products where title = 'Max bid denim')); begin
+  assert (i->>'currentCents')::int = 74000 and not (i->>'leaderIsMe')::boolean, 'the max answers one step higher';
+  assert i->>'myMaxCents' is null, 'no max of my own';
+end $$;
+do $$ begin assert (select count(*) from max_bids) = 0, 'other people''s maxes are secret'; end $$;
+reset role;
+select pg_temp.act_as('00000000-0000-0000-0000-0000000000f3');
+select complete_account('Bidder Three', 'bidder.three', true, true);
+select place_bid((select id from products where title = 'Max bid denim'), 120000, true);
+do $$ declare i jsonb := auction_info((select id from products where title = 'Max bid denim')); begin
+  assert (i->>'currentCents')::int = 92000 and (i->>'leaderIsMe')::boolean, 'the higher max leads at one step over the other max';
+  assert (i->'recent'->1->>'amountCents')::int = 90000, 'the beaten max shows as a bid at that max';
+end $$;
+reset role;
+do $$ begin assert exists (select 1 from notifications where user_id = '00000000-0000-0000-0000-0000000000f1' and title = 'You''ve been outbid' and body like '%R920%'), 'the beaten max is told'; end $$;
+select pg_temp.act_as('00000000-0000-0000-0000-0000000000f1');
+select pg_temp.expect_error($$select place_bid((select id from products where title = 'Max bid denim'), 80000, true)$$, 'Your max is already R900');
+-- An equal max set later loses to the one set first, at that max.
+select place_bid((select id from products where title = 'Max bid denim'), 120000, true);
+do $$ declare i jsonb := auction_info((select id from products where title = 'Max bid denim')); begin
+  assert (i->>'currentCents')::int = 120000 and not (i->>'leaderIsMe')::boolean, 'equal max: first one set wins';
+end $$;
+reset role;
+do $$ begin assert (select count(*) from bids where product_id = (select id from products where title = 'Max bid denim')) <= 8, 'settled in a few bids, not a flood'; end $$;
+select pg_temp.act_as('00000000-0000-0000-0000-0000000000f3');
+do $$ begin assert (auction_info((select id from products where title = 'Max bid denim'))->>'leaderIsMe')::boolean, 'the first max is on top'; end $$;
+select pg_temp.expect_error($$select run_max_bids((select id from products where title = 'Max bid denim'), 0)$$, 'permission denied');
+reset role;
 -- Ends below the reserve: not sold, back to the seller's drafts.
 select pg_temp.act_as_service();
 update products set auction_ends_at = now() - interval '1 second' where title = 'Vintage leather jacket';

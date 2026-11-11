@@ -3,7 +3,7 @@ import { quotedDeliveryFee, refundFee, paymentKind, PAYOUT_SCHEDULES, CHARGE_QUO
   deliveryFee, deliveryPerk, PARCEL_SIZE_IDS,
   rand, formatRand, protectionFee, orderTotals, sellerFee, releasableAt, payoutDate, nextFriday, addWorkingDays,
   reserveFor, scoreFrom, tierFor, canUse, canForceOn, packingVideoProblems, validateListing, canTransition, returnReasonsFor, shipBy,
-  liveStock, goLiveBlockers, MIN_LIVE_STOCK, isRude, looksOffApp, bidStep, nextMinBid, reserveProblem, timeLeft, maskHandle,
+  liveStock, goLiveBlockers, MIN_LIVE_STOCK, isRude, looksOffApp, bidStep, maxBidReplies, nextMinBid, reserveProblem, timeLeft, maskHandle,
 } from "../src/index.ts";
 
 describe("money", () => {
@@ -380,5 +380,53 @@ describe("what sellers owe and refund fees (8 Nov 2026)", () => {
   });
   it("offers three payout schedules", () => {
     expect(Object.keys(PAYOUT_SCHEDULES)).toEqual(["IMMEDIATE", "WEEKLY", "MONTHLY"]);
+  });
+});
+
+describe("max bids", () => {
+  const at = (s: number) => `2026-11-11T12:00:0${s}Z`;
+  it("does nothing when nobody has a max above the next step", () => {
+    expect(maxBidReplies({ bidderId: "a", amountCents: 72_000 }, [{ bidderId: "b", maxCents: 73_000, setAt: at(1) }])).toEqual([]);
+  });
+  it("bids just enough for a challenger with a higher max", () => {
+    expect(maxBidReplies({ bidderId: "a", amountCents: 72_000 }, [{ bidderId: "b", maxCents: 90_000, setAt: at(1) }]))
+      .toEqual([{ bidderId: "b", amountCents: 74_000 }]);
+  });
+  it("keeps the leader on top when their max is higher, one step over the other max", () => {
+    expect(maxBidReplies({ bidderId: "b", amountCents: 74_000 }, [
+      { bidderId: "a", maxCents: 80_000, setAt: at(2) }, { bidderId: "b", maxCents: 100_000, setAt: at(1) },
+    ])).toEqual([{ bidderId: "a", amountCents: 80_000 }, { bidderId: "b", amountCents: 82_000 }]);
+  });
+  it("never bids over someone's max", () => {
+    const r = maxBidReplies({ bidderId: "b", amountCents: 74_000 }, [
+      { bidderId: "a", maxCents: 80_000, setAt: at(2) }, { bidderId: "b", maxCents: 81_000, setAt: at(1) },
+    ]);
+    expect(r).toEqual([{ bidderId: "a", amountCents: 80_000 }, { bidderId: "b", amountCents: 81_000 }]);
+  });
+  it("hands the lead to a higher max, showing the old leader's max first", () => {
+    expect(maxBidReplies({ bidderId: "a", amountCents: 74_000 }, [
+      { bidderId: "a", maxCents: 80_000, setAt: at(1) }, { bidderId: "b", maxCents: 120_000, setAt: at(2) },
+    ])).toEqual([{ bidderId: "a", amountCents: 80_000 }, { bidderId: "b", amountCents: 82_000 }]);
+  });
+  it("on an equal max, whoever set it first wins", () => {
+    expect(maxBidReplies({ bidderId: "a", amountCents: 74_000 }, [
+      { bidderId: "a", maxCents: 90_000, setAt: at(2) }, { bidderId: "b", maxCents: 90_000, setAt: at(1) },
+    ])).toEqual([{ bidderId: "b", amountCents: 90_000 }]);
+    expect(maxBidReplies({ bidderId: "a", amountCents: 74_000 }, [
+      { bidderId: "a", maxCents: 90_000, setAt: at(1) }, { bidderId: "b", maxCents: 90_000, setAt: at(2) },
+    ])).toEqual([{ bidderId: "a", amountCents: 90_000 }]);
+  });
+  it("the R800, R900, R1,200 example: R1,200 leads at R950", () => {
+    const r = maxBidReplies({ bidderId: "z", amountCents: 70_000 }, [
+      { bidderId: "a", maxCents: 80_000, setAt: at(1) }, { bidderId: "b", maxCents: 90_000, setAt: at(2) }, { bidderId: "c", maxCents: 120_000, setAt: at(3) },
+    ]);
+    expect(r[r.length - 1]).toEqual({ bidderId: "c", amountCents: 92_000 });
+  });
+  it("settles three maxes and stops", () => {
+    const r = maxBidReplies({ bidderId: "z", amountCents: 50_000 }, [
+      { bidderId: "a", maxCents: 60_000, setAt: at(1) }, { bidderId: "b", maxCents: 70_000, setAt: at(2) }, { bidderId: "c", maxCents: 65_000, setAt: at(3) },
+    ]);
+    expect(r[r.length - 1]).toEqual({ bidderId: "b", amountCents: 67_000 });
+    expect(r.every((x, i) => i === 0 || x.amountCents > r[i - 1].amountCents)).toBe(true);
   });
 });

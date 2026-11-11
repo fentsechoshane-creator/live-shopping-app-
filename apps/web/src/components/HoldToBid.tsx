@@ -14,7 +14,9 @@ type Phase = "idle" | "holding" | "sending" | "done";
  * happens. When the ring closes the phone gives a firm tap and the bid goes in, without leaving the screen.
  * Works with a finger, a mouse, or holding Space or Enter on a keyboard.
  */
-export function HoldToBid({ label, price, onConfirm, onTap, disabled, block, glass, onNeedUser }: {
+export function HoldToBid({ label, price, verb = "Bid", onConfirm, onTap, disabled, block, glass, onNeedUser }: {
+  /** The word in the countdown: "Bid R720 in 3", or "Max R900 in 3". */
+  verb?: string;
   /** Full words for screen readers, like "Hold to bid R720". */
   label: string;
   /** The amount shown on the button, like "R720". */
@@ -107,7 +109,7 @@ export function HoldToBid({ label, price, onConfirm, onTap, disabled, block, gla
         <span className="hold-face">
           <span className={cls("price")}><i className="hold-dot" />{price}</span>
           <span className={cls("hold")}><Icon name="clock" size={16} />Hold to bid</span>
-          <span className={cls("holding")}>Bid {price} in <b className="hold-count">{[3, 2, 1].map((n) => <i key={n} className={left === n ? "on" : left === n - 1 ? "was" : ""}>{n}</i>)}</b></span>
+          <span className={cls("holding")}>{verb} {price} in <b className="hold-count">{[3, 2, 1].map((n) => <i key={n} className={left === n ? "on" : left === n - 1 ? "was" : ""}>{n}</i>)}</b></span>
           <span className={cls("sending")}>Placing bid…</span>
           <span className={cls("done")}><Icon name="check" size={17} strokeWidth={3} />Bid placed</span>
         </span>

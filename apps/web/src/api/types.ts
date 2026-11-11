@@ -157,6 +157,8 @@ export interface AuctionInfo {
   reserveMet: boolean;
   leaderIsMe: boolean;
   myTopCents: Cents | null;
+  /** Your max bid on this item, if you set one. Only you see it. */
+  myMaxCents?: Cents | null;
   winnerIsMe: boolean;
   priceCents: Cents | null;
   payBy: string | null;
@@ -463,7 +465,8 @@ export interface Api {
   savePushToken(token: string, platform: string): Promise<void>;
   /** Auctions, by product id. */
   auctionInfo(productIds: string[]): Promise<Record<string, AuctionInfo>>;
-  placeBid(productId: string, amountCents: Cents): Promise<AuctionInfo>;
+  /** Bid an exact amount, or with max: true set (or raise) your max and let us bid for you. */
+  placeBid(productId: string, amountCents: Cents, opts?: { max?: boolean }): Promise<AuctionInfo>;
   /** Close an auction whose time is up (safe to call any time). */
   settleAuction(productId: string): Promise<void>;
   /** Delivery details from the last order, to fill in checkout. */

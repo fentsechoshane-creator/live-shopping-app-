@@ -107,6 +107,16 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-11: Custom bid sheet (option A) and Max bid
+
+Asked by Ofentse, from a Whatnot screenshot and three mock ups (picked option A and the round +). **Not live yet** (branch `flat-prices`, needs migration 0039 too).
+
+- **On the video:** a round + glass button sits beside the amber bid button and opens the bid sheet. (A quick tap on the bid button still opens it too.)
+- **Bid sheet:** big rounded amount with minus and plus (one bid step each: R10 under R500, R20 under R2,000, then R50), quick buttons (lowest, +R50, +R100), tap the amount to type it (too low snaps up to the lowest bid), and a Max bid switch. Hold to bid as before ("Max R1,200 in 3" when setting a max).
+- **Max bid (migration 0039, `maxBidReplies` in packages/core):** you set the most you'll pay; we bid for you only when you're outbid, at the lowest amount that puts you back on top. Fair with many maxes: the item is locked while a bid is handled, all maxes are weighed together, ranked by amount then by who set it first; the top max leads at one step over the next max; lower maxes show one bid at their max then drop out. Nobody sees another person's max (our team can). A max can only go up. Everyone outbid is told once.
+- Tests: 7 core tests, a database block (three maxes, secrecy, equal maxes, "only goes up", the helper is not callable), and e2e (stepper, typing, set a max while on top).
+- **Open:** the anti sniping rule (a bid in the last 2 minutes resets the clock to 2 minutes) is waiting on Ofentse; eBay uses 1 minute, Whatnot live shows use seconds.
+
 ### 2026-11-11: Slimmer buttons, hold to bid as a live sign
 
 Asked by Ofentse: the bid button was too fat with the price in it, and so were paired buttons like the refund ones. **Not live yet** (branch `flat-prices`, waiting for "okay deploy").

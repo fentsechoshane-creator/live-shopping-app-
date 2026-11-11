@@ -41,20 +41,20 @@ export function auctionButton(a: AuctionInfo | undefined, now: number): { label:
 }
 
 /**
- * Bid on a timed auction. Shows the current bid, time left, reserve and recent bids, and offers quick amounts.
- * A bid is a promise to buy: the winner pays within 2 hours.
+ * Bid on a timed auction. Shows the current bid, time left, reserve and recent bids. Pick an amount with minus and plus
+ * (one bid step each), quick adds, or tap the amount to type it. Max bid lets us bid for you, only when you're outbid,
+ * up to your max (see maxBidReplies in packages/core). A bid is a promise to buy: the winner pays within 2 hours.
  */
-export function AuctionSheet({ item, info, onInfo, onClose, onPay, focusCustom }: {
+export function AuctionSheet({ item, info, onInfo, onClose, onPay }: {
   item: FeedItem; info?: AuctionInfo; onInfo: (a: AuctionInfo) => void; onClose: () => void; onPay: () => void;
-  /** Opened from Custom on the video: start in the amount box. */
-  focusCustom?: boolean;
 }) {
   const now = useNow();
   const [error, setError] = useState<string | null>(null);
   const amountBox = useRef<HTMLInputElement>(null);
   const { toast } = useSession();
-  const [custom, setCustom] = useState("");
-  const [pick, setPick] = useState<number | null>(null);
+  const [picked, setPicked] = useState<number | null>(null);
+  const [typing, setTyping] = useState<string | null>(null);
+  const [maxOn, setMaxOn] = useState(false);
   const ends = info?.endsAt ? new Date(info.endsAt).getTime() : 0;
   const left = ends - now;
   const open = info?.state === "open" && left > 0;
@@ -63,24 +63,28 @@ export function AuctionSheet({ item, info, onInfo, onClose, onPay, focusCustom }
     if (info?.state === "open" && left <= 0) api.settleAuction(item.product.id).then(() => api.auctionInfo([item.product.id])).then((r) => r[item.product.id] && onInfo(r[item.product.id])).catch(() => {});
   }, [info?.state, left <= 0]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // From Custom: go to the amount box once the sheet has slid up (the sheet takes focus first when it opens).
-  useEffect(() => {
-    if (!focusCustom || !open) return;
-    const t = window.setTimeout(() => amountBox.current?.focus(), 320);
-    return () => window.clearTimeout(t);
-  }, [focusCustom, open]);
+  useEffect(() => { if (typing !== null) amountBox.current?.focus(); }, [typing !== null]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const min = info?.minNextCents ?? item.product.priceCents;
-  const quick = [min, min + bidStep(min), min + 3 * bidStep(min)];
-  const amount = custom ? Math.round(Number(custom) * 100) : pick ?? min;
+  const current = info?.currentCents ?? null;
+  const myMax = info?.myMaxCents ?? null;
+  // The lowest you can enter: the next bid, or for a max, above where you already are.
+  const floor = maxOn
+    ? Math.max(min, info?.leaderIsMe && current != null ? current + bidStep(current) : 0, myMax != null ? myMax + bidStep(myMax) : 0)
+    : min;
+  const amount = Math.max(floor, picked ?? floor);
+  const set = (cents: number) => setPicked(Math.max(floor, Math.round(cents / 1000) * 1000));
+  const commitTyping = () => { if (typing !== null) { const n = Number(typing); if (n > 0) set(n * 100); setTyping(null); } };
   // Called by the hold button once the ring closes. Throwing resets the button so they can try again.
   const bid = async () => {
     setError(null);
     try {
-      const r = await api.placeBid(item.product.id, amount);
+      const r = await api.placeBid(item.product.id, amount, maxOn ? { max: true } : undefined);
       onInfo(r);
-      setCustom(""); setPick(null);
-      toast(`You're the top bidder at ${R(amount)}`);
+      setPicked(null); setMaxOn(false);
+      toast(r.leaderIsMe
+        ? (maxOn ? `Max set to ${R(amount)}. You're on top at ${R(r.currentCents ?? amount)}` : `You're the top bidder at ${R(amount)}`)
+        : `Another bidder's max matches or beats yours. It's now ${R(r.currentCents ?? amount)}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "That bid didn't go through. Try again.");
       throw e;
@@ -99,8 +103,8 @@ export function AuctionSheet({ item, info, onInfo, onClose, onPay, focusCustom }
       ) : open ? (
         <>
           <ErrorNote error={error} />
-          <HoldToBid block label={`Hold to bid ${R(amount)}`} price={R(amount)} onConfirm={bid} disabled={amount < min} />
-          <p className="small muted" style={{ textAlign: "center", margin: "8px 0 0" }}>Hold until the ring closes. A bid is a promise to buy: if you win, pay within 2 hours.</p>
+          <HoldToBid block label={maxOn ? `Hold to set max ${R(amount)}` : `Hold to bid ${R(amount)}`} price={R(amount)} verb={maxOn ? "Max" : "Bid"} onConfirm={bid} disabled={typing !== null} />
+          <p className="small muted" style={{ textAlign: "center", margin: "8px 0 0" }}>A bid is a promise to buy. If you win, pay within 2 hours.</p>
         </>
       ) : undefined}>
       {!info && <div className="muted">Loading the auction…</div>}
@@ -127,12 +131,37 @@ export function AuctionSheet({ item, info, onInfo, onClose, onPay, focusCustom }
 
           {open && (
             <>
-              <div className="quick-bids" role="group" aria-label="Quick bids">
-                {quick.map((q) => <button key={q} aria-pressed={!custom && (pick ?? min) === q} onClick={() => { setCustom(""); setPick(q); }}>{R(q)}</button>)}
+              <div className="bid-stepper">
+                <button className="step-btn" onClick={() => set(amount - bidStep(amount - 1))} disabled={amount <= floor} aria-label={`Lower by ${R(bidStep(amount - 1))}`}>
+                  <Icon name="minus" size={22} strokeWidth={2.4} />
+                </button>
+                <div className="step-amt">
+                  {typing === null ? (
+                    <button className="amt" onClick={() => setTyping(String(amount / 100))} aria-label={`Your bid, ${R(amount)}. Tap to type an amount`}>{R(amount)}</button>
+                  ) : (
+                    <label className="amt typing">R<input ref={amountBox} value={typing} inputMode="numeric" enterKeyHint="done" aria-label="Type your bid in rand"
+                      onChange={(e) => setTyping(e.target.value.replace(/[^\d]/g, "").slice(0, 6))} onBlur={commitTyping}
+                      onKeyDown={(e) => { if (e.key === "Enter") commitTyping(); }} size={Math.max(2, typing.length)} /></label>
+                  )}
+                  <div className="small muted">{amount === floor ? (maxOn ? "The lowest max you can set" : "The lowest you can bid") : `${R(floor)} or more, in steps of ${R(bidStep(amount))}`}</div>
+                </div>
+                <button className="step-btn up" onClick={() => set(amount + bidStep(amount))} aria-label={`Raise by ${R(bidStep(amount))}`}>
+                  <Icon name="plus" size={22} strokeWidth={2.4} />
+                </button>
               </div>
-              <div className="field" style={{ marginBottom: 6 }}>
-                <label htmlFor="bid-amount">Or your own amount (R{min / 100} or more)</label>
-                <input id="bid-amount" value={custom} onChange={(e) => setCustom(e.target.value.replace(/[^\d]/g, ""))} inputMode="numeric" placeholder={String(min / 100)} enterKeyHint="done" ref={amountBox} />
+              <div className="quick-bids" role="group" aria-label="Quick amounts">
+                <button onClick={() => setPicked(null)} aria-pressed={amount === floor}>{R(floor)}</button>
+                <button onClick={() => set(amount + 5000)}>+R50</button>
+                <button onClick={() => set(amount + 10000)}>+R100</button>
+              </div>
+              <div className="max-card">
+                <div>
+                  <div className="t">Max bid</div>
+                  <div className="small muted">{maxOn
+                    ? `We bid for you only when someone outbids you, one step at a time, up to ${R(amount)}. Nobody sees your max.`
+                    : myMax != null ? `Your max is ${R(myMax)}. Turn this on to raise it.` : `Off: you bid exactly ${R(amount)}.`}</div>
+                </div>
+                <button className="switch" role="switch" aria-checked={maxOn} aria-label="Max bid" onClick={() => { setMaxOn(!maxOn); setPicked(null); }} />
               </div>
             </>
           )}

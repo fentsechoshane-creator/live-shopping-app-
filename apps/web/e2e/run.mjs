@@ -273,19 +273,42 @@ try {
   await page.getByText("You're the top bidder at R720").waitFor();
   await jacket.getByRole("button", { name: "Bid placed" }).waitFor();
   check(true, "holding for 3 seconds places the bid without leaving the video");
-  // A quick tap on the same button: pick your own amount, in the bid sheet over the video.
-  await jacket.getByRole("button", { name: /^Hold to bid R740/ }).click();
+  // The + beside it: pick your own amount, in the bid sheet over the video.
+  await jacket.getByRole("button", { name: "Pick your own amount" }).click();
   const bidSheet = page.getByRole("dialog", { name: /Vintage 90s denim jacket/ });
   await bidSheet.getByText("Reserve not met yet").waitFor();
   await bidSheet.getByText("l***m").first().waitFor(); // other bidders are masked
-  await page.waitForTimeout(600);
-  await check(await bidSheet.getByLabel(/Or your own amount/).evaluate((el) => el === document.activeElement), "a tap starts in the amount box");
+  await bidSheet.getByRole("button", { name: /^Your bid, R740/ }).waitFor();
+  await check(bidSheet.getByRole("button", { name: /^Lower by/ }).isDisabled(), "can't go under the lowest bid");
+  await bidSheet.getByRole("button", { name: "Raise by R20" }).click();
+  await bidSheet.getByRole("button", { name: /^Your bid, R760/ }).waitFor();
+  await bidSheet.getByRole("button", { name: "+R100" }).click();
+  await bidSheet.getByRole("button", { name: /^Your bid, R860/ }).waitFor();
+  check(true, "minus and plus move one bid step, quick adds work");
+  await page.waitForTimeout(400);
   await shot("auction-sheet");
-  await bidSheet.getByLabel(/Or your own amount/).fill("725");
-  await check(bidSheet.getByRole("button", { name: /^Hold to bid R725/ }).isDisabled(), "a bid under the step can't be placed");
-  await bidSheet.getByLabel(/Or your own amount/).fill("900");
+  // Tap the amount to type it. Too low goes back up to the lowest bid.
+  await bidSheet.getByRole("button", { name: /^Your bid, R860/ }).click();
+  await bidSheet.getByLabel("Type your bid in rand").fill("725");
+  await bidSheet.getByLabel("Type your bid in rand").press("Enter");
+  await bidSheet.getByRole("button", { name: /^Your bid, R740/ }).waitFor();
+  check(true, "a typed amount under the lowest bid becomes the lowest bid");
+  await bidSheet.getByRole("button", { name: /^Your bid, R740/ }).click();
+  await bidSheet.getByLabel("Type your bid in rand").fill("900");
+  await bidSheet.getByLabel("Type your bid in rand").press("Enter");
   await hold(bidSheet.getByRole("button", { name: /^Hold to bid R900/ }), 3400);
   await page.getByText("You're the top bidder at R900").waitFor();
+  // Max bid: on top already, so the max has to be above R900. We only bid for you when someone outbids you.
+  await bidSheet.getByRole("switch", { name: "Max bid" }).click();
+  await bidSheet.getByText(/Nobody sees your max/).waitFor();
+  await bidSheet.getByRole("button", { name: /^Your bid, R920/ }).click();
+  await bidSheet.getByLabel("Type your bid in rand").fill("1200");
+  await bidSheet.getByLabel("Type your bid in rand").press("Enter");
+  await shot("max-bid");
+  await hold(bidSheet.getByRole("button", { name: /^Hold to set max R1,200/ }), 3400);
+  await page.getByText("Max set to R1,200. You're on top at R900").waitFor();
+  await bidSheet.getByText("Your max is R1,200. Turn this on to raise it.").waitFor();
+  check(true, "setting a max while on top doesn't raise your own bid");
   await bidSheet.getByText("Reserve met").waitFor();
   await page.keyboard.press("Escape");
   // Time's up (moved forward in the demo data): the top bidder wins and pays the winning bid.
