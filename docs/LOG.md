@@ -107,6 +107,13 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-12: "You won" screen (green banner)
+
+Asked by Ofentse: tapping the won update should open a screen first, with the video on the left and the details and payment on the right. Showed three mocks; Ofentse picked option C, the green banner.
+- `/i/<item>` for the auction winner now opens `WonScreen` (screens/buyer/Won.tsx): green banner with the video tile on the left (tap to watch it full screen) and "You won", the item, shop, size and winning price on the right. Under it: time left to pay (counts down, amber), bids, the seller (opens the shop), the three steps (Won, Pay, Ships), and one green Pay button that opens checkout at the winning bid.
+- After paying it says Paid and points to the order. If the 2 hours pass, it says the win was cancelled. Everyone else still gets the full screen video for that link.
+- No database change. Ships with the tiles work (needs migration 0044, then main).
+
 ### 2026-11-12: TikTok style tiles, sorted posts, red sold out, a swipe lesson that never blocks
 
 Asked by Ofentse: tiles like TikTok with the price on top (colour says the kind of price) and views bottom right; posts weren't sorted; sold out should be more red; the "Swipe up" lesson must end when you tap anything else, and be gone if you leave and come back.

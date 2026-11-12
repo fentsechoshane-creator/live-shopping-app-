@@ -372,11 +372,15 @@ try {
   await page.goto(`${BASE}/inbox?tab=updates`);
   await page.getByText("You won: Vintage 90s denim jacket, rare wash").waitFor();
   await page.getByRole("link", { name: /You won/ }).click();
-  await page.getByRole("button", { name: "Pay R900" }).first().click();
-  const wonSheet = page.getByRole("dialog", { name: /Vintage 90s denim jacket/ });
-  await wonSheet.getByText("You won").waitFor();
+  // The "You won" screen: green banner with the video on the left, the details on the right, then Pay.
+  await page.locator(".won-banner").getByText("You won").waitFor();
+  await page.getByText("Time left to pay").waitFor();
+  await page.waitForTimeout(400);
   await shot("auction-won");
-  await wonSheet.getByRole("button", { name: "Pay R900" }).click();
+  await page.getByRole("button", { name: /Watch the video of/ }).click();
+  await page.getByRole("dialog", { name: "Videos" }).waitFor();
+  await page.getByRole("button", { name: "Close videos" }).click();
+  await page.getByRole("button", { name: "Pay R900" }).click();
   const payWin = page.getByRole("dialog", { name: "Checkout" });
   await payWin.getByText("your winning bid").waitFor();
   await payWin.getByRole("button", { name: /Free collection/ }).click();

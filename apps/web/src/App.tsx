@@ -7,6 +7,7 @@ import { Welcome, hasSeenWelcome } from "./components/Welcome";
 import { AccountSetup } from "./components/AccountSetup";
 import { Avatar } from "./components/Avatar";
 import { Viewer } from "./components/PostGrid";
+import { WonScreen } from "./screens/buyer/Won";
 import { api } from "./api";
 import { useLoad, useSession } from "./session";
 import { Icon } from "./components/Icon";
@@ -51,8 +52,13 @@ function ItemLink() {
   const [item, error] = useLoad(() => api.productItem(id), [id]);
   // Auctions open on their own (a won auction is no longer listed in the shop, but the winner needs to pay).
   const single = item && item.product.mode === "auction";
+  // The winner gets the "You won" screen first: the video on the left, the details and Pay on the right.
+  const [bump, setBump] = useState(0);
+  const [info, infoError] = useLoad(() => (single ? api.auctionInfo([id]).then((r) => r[id] ?? null) : Promise.resolve(null)), [id, !!single, bump]);
   useEffect(() => { if (item && !single) nav(`/s/${item.shop.handle}?item=${id}`, { replace: true }); }, [item]); // eslint-disable-line react-hooks/exhaustive-deps
   if (error || item === null) return <div className="screen"><BackButton /><Blank icon="bag" title="No longer available" line="This item was sold or taken down." action="See what's selling" onAction={() => nav("/explore")} /></div>;
+  if (single && info === undefined && !infoError) return <div className="screen"><Loading /></div>;
+  if (single && info?.winnerIsMe && (info.state === "won" || info.state === "paid")) return <WonScreen item={item} info={info} onPaid={() => setBump((n) => n + 1)} />;
   if (single) return <Viewer items={[item]} start={0} onClose={() => (window.history.length > 1 ? nav(-1) : nav("/"))} />;
   return <div className="screen"><Loading /></div>;
 }

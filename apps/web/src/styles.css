@@ -1726,3 +1726,24 @@ body:has(.live-screen) .toast { top: calc(env(safe-area-inset-top, 0px) + 96px);
 /* Item pictures: the real cover fills the box. */
 .art-fill { position: absolute; inset: 0; overflow: hidden; }
 .art-fill img, .art-fill video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+
+/* "You won" screen (green banner, picked by Ofentse 12 Nov): video left, details right, Pay at the bottom. */
+.won { padding-bottom: calc(var(--tab-space) + 110px); }
+.won-banner { display: flex; gap: 14px; align-items: center; margin-top: 10px; padding: 14px; border-radius: 22px; color: #fff;
+  background: linear-gradient(150deg, #1d7a34, var(--green)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25); }
+.won-video { position: relative; flex: none; width: 112px; aspect-ratio: 3 / 4; border-radius: 14px; overflow: hidden; border: 0; padding: 0; background: rgba(0, 0, 0, 0.2); }
+.won-video > :first-child { position: absolute; inset: 0; width: 100%; height: 100%; }
+.won-play { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; color: #fff;
+  background: rgba(255, 255, 255, 0.28); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.6); }
+.won-play svg { fill: #fff; margin-left: 2px; }
+.won-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.won-pill { align-self: flex-start; padding: 3px 10px; border-radius: 999px; font-size: 12.5px; font-weight: 700; background: rgba(255, 255, 255, 0.22); }
+.won-title { font-size: 18px; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
+.won-sub { font-size: 13.5px; opacity: 0.88; }
+.won-price { font-size: 30px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; margin-top: 2px; }
+.won-timer { color: var(--amber-text); font-weight: 700; }
+.won-steps { margin-top: 14px; background: var(--surface); border-radius: 16px; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+.won-step { display: flex; align-items: center; gap: 12px; font-size: 15px; }
+.won-dot { width: 22px; height: 22px; border-radius: 50%; flex: none; display: grid; place-items: center; font-size: 12px; font-weight: 800; background: var(--surface-2); color: var(--ink-3); }
+.won-dot.on { background: var(--green); color: var(--green-ink); }
+.won-foot { position: fixed; left: 0; right: 0; bottom: var(--tab-space); padding: 12px 16px 10px; background: linear-gradient(transparent, var(--bg) 28%); max-width: 520px; margin: 0 auto; }
