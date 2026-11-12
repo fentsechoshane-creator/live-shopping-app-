@@ -21,7 +21,7 @@ Checked 7 Nov 2026 with the live health check. "Practical completion" here means
 | Sign in emails | Supabase's built in email only sends to the team, a few an hour [CONFIRM if a sender was added]. Needs Resend or another sender before real people can join |
 | Team dashboard | Done and live |
 | Phone apps | Built (Capacitor). Store accounts, D-U-N-S, Mac for the iPhone build and push keys still to do |
-| Legal and company | Company registered. Company details in Terms and Privacy, Information Officer registration, help@myhaul.co.za still open |
+| Legal and company | Company registered. Company details in Terms and Privacy. Information Officer registered (Shupulu Choshane, named in the Privacy Policy). help@myhaul.co.za still open |
 | Live selling | Built and tested in demo (shows, chat, Buy now, quick auctions, planned shows, reminders). Not live: needs migration 0040, the live-token function and a LiveKit Cloud project |
 
 ## Run the current version
@@ -106,6 +106,11 @@ Debug as we go: anyone who finds or fixes a problem updates this list. Highest r
 Fixed in this round: Safari double back on the edge swipe (now only in the installed app), deleting an account now also deletes the person's photos and videos, React Router warnings.
 
 ## Log
+
+### 2026-11-12: Auction tiles show the current bid; Information Officer named
+
+- Ofentse picked "current bid" for auction tiles. Tiles now show the current bid (or the winning bid once it ends), the starting price only when there are no bids. One batched `auctionInfo` call per grid (`useAuctionPrices` in PostGrid.tsx). No database change.
+- Ofentse is now the registered Information Officer. The Privacy Policy names "Shupulu Choshane" (Ofentse asked to use Shupulu). The Terms director line now says "Shupulu Choshane" too (it had "Ofentse" as the middle name, the registered one is Ofentso). SECURITY.md, STORE.md and Current state updated.
 
 ### 2026-11-12: "You won" screen (green banner)
 

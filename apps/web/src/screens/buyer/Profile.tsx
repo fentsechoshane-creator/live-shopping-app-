@@ -8,7 +8,7 @@ import { RewardChip } from "../../components/Rewards";
 import { ProductArt } from "../../components/Scene";
 import { Blank, ErrorNote, Field, Loading, R, Sheet, dateText, swatch, useAction } from "../../components/ui";
 import { CertUpload } from "../seller/Selling";
-import { GridTile, PostGrid, useProductViews } from "../../components/PostGrid";
+import { GridTile, PostGrid, useAuctionPrices, useProductViews } from "../../components/PostGrid";
 import { shareOrCopy } from "../../native";
 import { useTabSwipe } from "../../components/gestures";
 import { Avatar } from "../../components/Avatar";
@@ -169,6 +169,7 @@ function SellerGrid({ shop, error, sold, reload }: { shop: MyShop | null | undef
   const [open, setOpen] = useState(false);
   const nav = useNavigate();
   const views = useProductViews(shop?.products.map((p) => p.id) ?? []);
+  const bids = useAuctionPrices(shop?.products ?? []);
   if (error) return <ErrorNote error={error} />;
   if (shop === undefined) return <Loading />;
   if (!shop || shop.status === "onboarding") {
@@ -224,7 +225,7 @@ function SellerGrid({ shop, error, sold, reload }: { shop: MyShop | null | undef
       ) : (
         <div className="grid3">
           {shop.products.map((p) => (
-            <GridTile key={p.id} product={p} views={views[p.id]} onClick={() => setEditing(p)} label={`Edit ${p.title}`}
+            <GridTile key={p.id} product={p} views={views[p.id]} bidCents={bids[p.id]} onClick={() => setEditing(p)} label={`Edit ${p.title}`}
               chip={p.status === "draft" ? (p.proofStatus === "pending" ? "Checking" : "Draft") : undefined}>
               <ProductArt productId={p.id} fallback={swatch(p.id)} />
             </GridTile>

@@ -98,7 +98,7 @@ Based on the OWASP Top 10 (2025), the OWASP API Security Top 10, Supabase's prod
 | 8.4 | Supabase security advisor warnings | Run after every database change. | [~] run once 0017 and 0018 are live |
 | 8.7 | Server functions never type checked | Deno now runs here too (`npx deno@2.1.4` works), all functions pass `deno check` and the shared tests. | [x] |
 | 8.5 | Keys leaked by a team member | Keys only in Supabase and Netlify settings, never in chat or git. Rotate if anyone leaves. | [x] rule |
-| 8.6 | POPIA (South African privacy law) | Privacy page, delete account, data kept to a minimum. Information Officer to register. | [~] [Ofentse] |
+| 8.6 | POPIA (South African privacy law) | Privacy page, delete account, data kept to a minimum. Information Officer: Shupulu Choshane, registered (12 Nov 2026). | [~] [Ofentse] |
 
 ## 9. Beyond the code: how marketplaces actually get attacked
 

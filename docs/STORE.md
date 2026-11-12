@@ -178,7 +178,7 @@ Payments during review: TradeSafe's sandbox must be switched on for the review b
 - [ ] Apple Developer and Google Play accounts as myHaul (Pty) Ltd [Ofentse]
 - [ ] Make Ofentse a team member on live; apply the live check fixes (migration 0027) [Ofentse, Claude]
 - [ ] Live click through with two real accounts [Ofentse, Lehloma]
-- [ ] House number of the registered office in `terms.html` (search for CONFIRM); lawyer confirms the Terms; Information Officer registered [Ofentse]
+- [ ] House number of the registered office in `terms.html` (search for CONFIRM); lawyer confirms the Terms [Ofentse]. Information Officer registered: done (Shupulu Choshane, 12 Nov)
 - [ ] TradeSafe sandbox keys for review, live keys for launch [Lehloma]
 - [ ] Mux keys, Resend for sign in emails [Lehloma]
 - [ ] Push keys: Apple APNs key and Firebase service account; `aps-environment` set to production in the release build [Lehloma]
