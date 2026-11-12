@@ -273,6 +273,9 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
     async placeBid(productId, amountCents, opts) {
       return check(await sb.rpc("place_bid", { p_product: productId, p_amount: amountCents, p_max: !!opts?.max })) as any;
     },
+    async nudgeMaxBids(productId) {
+      await sb.rpc("nudge_max_bids", { p_product: productId });
+    },
     async settleAuction(productId) {
       await sb.rpc("settle_auction", { p_product: productId });
     },

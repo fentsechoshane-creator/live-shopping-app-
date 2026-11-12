@@ -2,7 +2,7 @@
 // Used when no Supabase keys are set. Sign in with any email or phone and the code 123456.
 import { passwordProblem } from "../lib/password";
 import {
-  bidStep, maxBidReplies, AUCTION_EXTEND_SECONDS, liveStock, MIN_LIVE_STOCK, GOOD_ORDERS_FOR_AUCTIONS, LIVE_AUCTION_EXTEND_SECONDS, maskHandle, canTransition, isRude, orderTotals, payoutDate, releasableAt, returnReasonsFor, shipBy, tierFor, TRUST_POINTS, validateListing,
+  bidStep, maxBidReplies, AUCTION_EXTEND_SECONDS, MAX_BID_REPLY_SECONDS, liveStock, MIN_LIVE_STOCK, GOOD_ORDERS_FOR_AUCTIONS, LIVE_AUCTION_EXTEND_SECONDS, maskHandle, canTransition, isRude, orderTotals, payoutDate, releasableAt, returnReasonsFor, shipBy, tierFor, TRUST_POINTS, validateListing,
   RETURN_POSTAGE_PAYER, ACCOUNT_FEATURE_KEYS, canForceOn, featureOffMessage, type AccountFeature, type OrderStatus, type TrustEventKind, bookedByUs, deliveryFee, PARCEL_SIZES, orderParcelSize, DELIVERY_PERKS, validateEdit, refundFee, formatRand, type PayoutSchedule } from "@app/core";
 import { handleProblem } from "../lib/handle";
 import type {
@@ -20,7 +20,7 @@ interface DProduct extends ProductPublic { shopId: string; proofStatus: ReviewSt
   auctionEndsAt?: string | null; reserveCents?: number | null; auctionState?: AuctionInfo["state"]; auctionRound?: number;
   auctionWinner?: string | null; auctionPriceCents?: number | null; auctionPayBy?: string | null;
   /** Live auctions (0040): the show, the listing a unit was taken from, and no clock resets. */
-  liveShowId?: string | null; fromProductId?: string | null; suddenDeath?: boolean }
+  liveShowId?: string | null; fromProductId?: string | null; suddenDeath?: boolean; maxReplyAt?: string | null }
 interface DShow { id: string; shopId: string; title: string; status: LiveShow["status"]; startsAt: string; startedAt: string | null; endedAt: string | null;
   pinnedProductId: string | null; auctionProductId: string | null; peakViewers: number }
 interface DPost { id: string; shopId: string; productId: string; caption: string; video: FeedItem["video"]; createdAt: string; photos?: string[]; edit?: FeedItem["edit"] }
@@ -428,6 +428,7 @@ export function createDemoApi(): Api {
   }
   function settleAuction(p: DProduct) {
     if (p.mode !== "auction") return;
+    answerMaxBids(p); // a max that was due to answer goes first
     const owner = shopOf(p.shopId).ownerId;
     if (p.auctionState === "open" && p.auctionEndsAt && Date.now() >= new Date(p.auctionEndsAt).getTime()) {
       const top = roundBids(p)[0];
@@ -450,12 +451,42 @@ export function createDemoApi(): Api {
       save();
     }
   }
+  // Max bids answer 5 seconds after they're beaten (0043). Same steps as answer_max_bids.
+  const extendAfterBid = (p: DProduct) => {
+    const win = (p.liveShowId ? LIVE_AUCTION_EXTEND_SECONDS : AUCTION_EXTEND_SECONDS) * 1000;
+    if (!(p.liveShowId && p.suddenDeath) && p.auctionEndsAt && new Date(p.auctionEndsAt).getTime() - Date.now() < win) p.auctionEndsAt = new Date(Date.now() + win).toISOString();
+  };
+  const addBid = (p: DProduct, bidderId: string, cents: number) => {
+    s.bids = [...(s.bids ?? []), { id: id(), productId: p.id, round: p.auctionRound ?? 0, bidderId, amountCents: cents, at: new Date(Date.now() + (s.bids?.length ?? 0)).toISOString() }];
+  };
+  const maxesFor = (p: DProduct) => (s.maxBids ?? []).filter((m) => m.productId === p.id && m.round === (p.auctionRound ?? 0));
+  const maxWillAnswer = (p: DProduct) => {
+    const top = roundBids(p)[0];
+    return !!top && maxesFor(p).some((m) => m.bidderId !== top.bidderId && m.maxCents >= top.amountCents + bidStep(top.amountCents));
+  };
+  function answerMaxBids(p: DProduct, now = false) {
+    if (p.auctionState !== "open" || (!p.maxReplyAt && !now)) return;
+    if (!now && new Date(p.maxReplyAt!).getTime() > Date.now() && Date.now() < new Date(p.auctionEndsAt!).getTime()) return;
+    p.maxReplyAt = null;
+    const before = roundBids(p)[0];
+    if (!before) return;
+    const replies = maxBidReplies({ bidderId: before.bidderId, amountCents: before.amountCents }, maxesFor(p).map((m) => ({ bidderId: m.bidderId, maxCents: m.maxCents, setAt: m.setAt })));
+    for (const r of replies) addBid(p, r.bidderId, r.amountCents);
+    const after = roundBids(p)[0];
+    if (after.id === before.id) return;
+    extendAfterBid(p);
+    const told = new Set([before.bidderId, ...replies.map((r) => r.bidderId)].filter((x) => x !== after.bidderId));
+    for (const who of told) notify(who, "You've been outbid", `${p.title} is now at R${after.amountCents / 100}. Bid again before it ends.`, `/i/${p.id}`);
+    notify(shopOf(p.shopId).ownerId, `New bid: R${after.amountCents / 100}`, p.title, `/i/${p.id}`);
+    save();
+  }
+
   function auctionInfoFor(p: DProduct): AuctionInfo {
     const viewer = s.currentUserId;
     const bs = roundBids(p);
     const top = bs[0];
     return {
-      productId: p.id, state: p.auctionState ?? null, endsAt: p.auctionEndsAt ?? null, startCents: p.priceCents,
+      productId: p.id, state: p.auctionState ?? null, endsAt: p.auctionEndsAt ?? null, startCents: p.priceCents, maxReplyAt: p.maxReplyAt ?? null,
       currentCents: top?.amountCents ?? null, bidCount: bs.length,
       minNextCents: top ? top.amountCents + bidStep(top.amountCents) : p.priceCents,
       reserveSet: p.reserveCents != null, reserveMet: p.reserveCents == null || (top?.amountCents ?? 0) >= p.reserveCents,
@@ -970,28 +1001,35 @@ export function createDemoApi(): Api {
         else if (amountCents < min) throw new Error(`The lowest bid now is R${min / 100}.`);
       } else if (amountCents < min) throw new Error(`The lowest bid now is R${min / 100}.`);
       if (amountCents > Math.max(min * 5, 100000)) throw new Error("That's far above the current bid. Check the amount.");
-      const stamp = () => new Date(Date.now() + (s.bids?.length ?? 0)).toISOString();
-      const add = (bidderId: string, cents: number) => { s.bids = [...(s.bids ?? []), { id: id(), productId: p.id, round, bidderId, amountCents: cents, at: stamp() }]; };
+      const add = (bidderId: string, cents: number) => addBid(p, bidderId, cents);
       if (opts?.max) {
         s.maxBids = [...(s.maxBids ?? []).filter((m) => !(m.productId === p.id && m.round === round && m.bidderId === u.id)),
           { productId: p.id, round, bidderId: u.id, maxCents: amountCents, setAt: new Date().toISOString() }];
         if (!top || top.bidderId !== u.id) add(u.id, min);
       } else add(u.id, amountCents);
-      const before = roundBids(p)[0];
-      const replies = maxBidReplies({ bidderId: before.bidderId, amountCents: before.amountCents },
-        (s.maxBids ?? []).filter((m) => m.productId === p.id && m.round === round).map((m) => ({ bidderId: m.bidderId, maxCents: m.maxCents, setAt: m.setAt })));
-      for (const r of replies) add(r.bidderId, r.amountCents);
       const now2 = roundBids(p)[0];
       if (now2.id !== top?.id) {
         // Live auctions: the last 10 seconds reset to 10, unless sudden death. Others: 60 seconds (0039, 0040).
-        const win = (p.liveShowId ? LIVE_AUCTION_EXTEND_SECONDS : AUCTION_EXTEND_SECONDS) * 1000;
-        if (!(p.liveShowId && p.suddenDeath) && new Date(p.auctionEndsAt).getTime() - Date.now() < win) p.auctionEndsAt = new Date(Date.now() + win).toISOString();
-        const told = new Set([top?.bidderId, ...replies.map((r) => r.bidderId)].filter((x): x is string => !!x && x !== now2.bidderId && x !== u.id));
-        for (const who of told) notify(who, "You've been outbid", `${p.title} is now at R${now2.amountCents / 100}. Bid again before it ends.`, `/i/${p.id}`);
+        extendAfterBid(p);
+        // The one just beaten is told, unless their max is about to answer.
+        const theirMax = maxesFor(p).find((m) => m.bidderId === top?.bidderId);
+        if (top && top.bidderId !== u.id && !(theirMax && theirMax.maxCents >= now2.amountCents + bidStep(now2.amountCents)))
+          notify(top.bidderId, "You've been outbid", `${p.title} is now at R${now2.amountCents / 100}. Bid again before it ends.`, `/i/${p.id}`);
         notify(sh.ownerId, `New bid: R${now2.amountCents / 100}`, p.title, `/i/${p.id}`);
+      }
+      // Max bids answer 5 seconds later, or now if the clock is about to run out and won't reset (0043).
+      if (maxWillAnswer(p)) {
+        if (new Date(p.auctionEndsAt!).getTime() - Date.now() > 6000) {
+          const at = Date.now() + MAX_BID_REPLY_SECONDS * 1000;
+          p.maxReplyAt = new Date(p.maxReplyAt ? Math.min(at, new Date(p.maxReplyAt).getTime()) : at).toISOString();
+        } else answerMaxBids(p, true);
       }
       save();
       return auctionInfoFor(p);
+    },
+    async nudgeMaxBids(productId) {
+      const p = s.products.find((x) => x.id === productId);
+      if (p) answerMaxBids(p);
     },
     async settleAuction(productId) {
       const p = s.products.find((x) => x.id === productId);

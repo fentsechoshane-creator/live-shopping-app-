@@ -29,6 +29,25 @@ export function useAuctions(ids: string[]) {
     const stop = api.watchAuctions(ids, load);
     return () => { live = false; stop(); };
   }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+  // A max bid answers about 5 seconds after it's beaten. When that's due, nudge the server, which answers it
+  // (doing nothing if someone else already did), and the new price arrives through the live update.
+  const nextReply = Object.values(info).filter((a) => a.state === "open" && a.maxReplyAt).map((a) => ({ id: a.productId, at: new Date(a.maxReplyAt!).getTime() })).sort((a, b) => a.at - b.at)[0];
+  useEffect(() => {
+    if (!nextReply) return;
+    const t = window.setTimeout(() => {
+      api.nudgeMaxBids(nextReply.id).catch(() => {}).then(() => api.auctionInfo([nextReply.id])).then((r) => r && setInfo((cur) => ({ ...cur, ...r }))).catch(() => {});
+    }, Math.max(0, nextReply.at - Date.now()) + 150);
+    return () => window.clearTimeout(t);
+  }, [nextReply?.id, nextReply?.at]); // eslint-disable-line react-hooks/exhaustive-deps
+  // You were on top and now you're not: say so straight away (the notice also lands in your inbox).
+  const { toast } = useSession();
+  const wasTop = useRef<Record<string, boolean>>({});
+  useEffect(() => {
+    for (const a of Object.values(info)) {
+      if (wasTop.current[a.productId] && !a.leaderIsMe && a.state === "open") toast(`You've been outbid. It's now R${(a.currentCents ?? 0) / 100}.`);
+      wasTop.current[a.productId] = !!a.leaderIsMe;
+    }
+  }, [info]); // eslint-disable-line react-hooks/exhaustive-deps
   // When the soonest open auction ends, check once more so "Sold" or "You won" shows without waiting.
   const nextEnd = Object.values(info).filter((a) => a.state === "open" && a.endsAt).map((a) => new Date(a.endsAt!).getTime()).sort((a, b) => a - b)[0];
   useEffect(() => {
@@ -133,7 +152,9 @@ export function AuctionSheet({ item, info, onInfo, onClose, onPay }: {
             {info.reserveSet && <span className={`pill ${info.reserveMet ? "green" : "amber"}`}>{info.reserveMet ? "Reserve met" : "Reserve not met yet"}</span>}
             {!info.reserveSet && <span className="pill">No reserve</span>}
             {info.leaderIsMe && open && <span className="pill green">You're the top bidder</span>}
-            {!info.leaderIsMe && info.myTopCents && open && <span className="pill amber">You've been outbid</span>}
+            {!info.leaderIsMe && open && info.maxReplyAt && info.myMaxCents != null && info.currentCents != null && info.myMaxCents >= info.currentCents + bidStep(info.currentCents)
+              ? <span className="pill green">Your max is answering</span>
+              : !info.leaderIsMe && info.myTopCents && open && <span className="pill amber">You've been outbid</span>}
             {info.state === "won" && info.winnerIsMe && <span className="pill green">You won</span>}
           </div>
 

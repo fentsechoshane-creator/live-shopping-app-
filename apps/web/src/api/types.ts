@@ -195,6 +195,8 @@ export interface AuctionInfo {
   myTopCents: Cents | null;
   /** Your max bid on this item, if you set one. Only you see it. */
   myMaxCents?: Cents | null;
+  /** When a max bid will answer the current top bid (about 5 seconds after it was placed). */
+  maxReplyAt?: string | null;
   winnerIsMe: boolean;
   priceCents: Cents | null;
   payBy: string | null;
@@ -508,6 +510,8 @@ export interface Api {
   placeBid(productId: string, amountCents: Cents, opts?: { max?: boolean }): Promise<AuctionInfo>;
   /** Close an auction whose time is up (safe to call any time). */
   settleAuction(productId: string): Promise<void>;
+  /** Asks the server to answer a max bid that's due. Does nothing early. */
+  nudgeMaxBids(productId: string): Promise<void>;
   /** Delivery details from the last order, to fill in checkout. */
   savedDelivery(): Promise<SavedDelivery | null>;
   /** Unused Instant EFT delivery stamps (5 give half price delivery). */
