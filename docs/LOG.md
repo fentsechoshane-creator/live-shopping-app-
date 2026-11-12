@@ -12,7 +12,7 @@ Checked 7 Nov 2026 with the live health check. "Practical completion" here means
 
 | Area | Status |
 | --- | --- |
-| Business rules, database, security rules, server functions | Done and tested. Live database up to 0042 (11 Nov) |
+| Business rules, database, security rules, server functions | Done and tested. Live database up to 0043 (12 Nov) |
 | Buyer side (feed, Explore, checkout, orders, returns, cancelling, friends, sharing, Inbox) | Done and live |
 | Seller side (sign up, checks, Create with camera and editor, orders, shipping, payouts) | Done. Editing or taking down a listing after posting is built, not live yet |
 | Payments (TradeSafe escrow) | Working in TradeSafe's developer sandbox (real test payments with Ozow). Needs the production account and keys |
@@ -114,7 +114,7 @@ Ofentse: "the instant max bid update seems unnatural and doesn't give the biddin
 - **Fairness:** a max never loses to the clock. If there are 6 seconds or less left and the clock won't reset (sudden death live auctions), the max answers straight away. Normal auctions reset to 60 seconds and live ones to 10, so the pause always fits. A max that was due is answered before the auction is settled.
 - **How:** migration 0043 keeps the pending answer on the item (`max_reply_at`). Any phone watching the auction calls `nudge_max_bids` when it's due (it does nothing early), and placing a bid or settling does it too, so it happens even if the bidders close the app. Several maxes still settle against each other in one go once the pause is up. `MAX_BID_REPLY_SECONDS = 5` in packages/core.
 - Tests: database (on top until the max answers, nudging early does nothing, the max holder isn't told, the bidder is told, settling answers what's due, only the server can force an answer). Demo follows the same steps.
-- **Not live yet:** needs migration 0043, then main.
+- **Live:** migration 0043 applied 12 Nov, main pushed.
 
 ### 2026-11-11: Sign in and Sign up tabs with passwords; real thumbnails
 
