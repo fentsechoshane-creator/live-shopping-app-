@@ -605,6 +605,8 @@ export interface Api {
   watchAuctions(productIds: string[], onChange: () => void): () => void;
   /** Cover pictures for a list of items: a Mux still, a photo, or a video file to show the first frame of. */
   productThumbs(productIds: string[]): Promise<Record<string, Thumb>>;
+  /** Lifetime views for each item, for the counts on grid tiles. Items with no post are left out. */
+  productViews(productIds: string[]): Promise<Record<string, number>>;
   /** Search everything for sale, with filters. */
   search(q: string, filters: SearchFilters, offset?: number): Promise<FeedItem[]>;
   /** Sizes on sale right now, most common first. */

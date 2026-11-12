@@ -107,6 +107,18 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-12: TikTok style tiles, sorted posts, red sold out, a swipe lesson that never blocks
+
+Asked by Ofentse: tiles like TikTok with the price on top (colour says the kind of price) and views bottom right; posts weren't sorted; sold out should be more red; the "Swipe up" lesson must end when you tap anything else, and be gone if you leave and come back.
+- Grid tiles (profile, shop pages, likes, reposts): price pill top left. Green = Buy now, amber with a clock = auction (starting price), white = made to order, red "Sold out" with a red tint over the picture. Lifetime views bottom right with a play mark (950, 1.2K, 25K). Draft and Checking chips moved to the top right. The video length on tiles is gone (TikTok doesn't show it, and two play marks would confuse).
+- Views: migration 0044 fills `posts.views` (there since the first schema, never used) from the view log and keeps it going up in `record_views`, so counts survive the 120 day log clean up. `product_views(ids)` is public. Same rule as stats: signed in, 2 seconds, once a day, owners don't count. Demo shows made up counts on sample items.
+- Sorting: your own shop grid is newest first (it came back in database order). Demo shop pages sort newest first too.
+- Sold out: Buy button on the feed and the live show card turns solid red "Sold out"; red text in the live card and shared cards.
+- Swipe lesson: no longer blocks anything. The first touch, scroll or key anywhere ends it for good and still goes through (a tap presses the button under it, a swipe moves the feed). Leaving the page ends it too.
+- Post screen: the Live tab waits for the account's switches before showing (it could flash up). The e2e check that Live is hidden was out of date (live selling is on), now it checks Live shows.
+- **Not live yet:** needs migration 0044, then main.
+- Open: auction tiles show the starting price, not the current bid [CONFIRM if you want the current bid]. Made to order is white because the design only has green, orange and red [CONFIRM].
+
 ### 2026-11-12: Max bids answer after 5 seconds (feed auctions only)
 
 Ofentse: "the instant max bid update seems unnatural and doesn't give the bidding war effect". Now when someone bids against a max, they're on top for about 5 seconds, then the max answers and they get "You've been outbid" (on screen and in their inbox). The max holder isn't told they were outbid in between; their bid sheet shows "Your max is answering".

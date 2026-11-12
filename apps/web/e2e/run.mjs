@@ -655,8 +655,8 @@ try {
   await page.getByRole("heading", { name: "What are you selling?" }).waitFor(); // the photo is already in, so Create starts at step 1
   await page.getByRole("button", { name: "Back" }).click();
   await page.locator(".wz-preview img").waitFor(); // back to the first page with the photo, and the switch is back
-  // Live selling stays hidden until it's built (Apple rejects "coming soon" features).
-  await check(page.getByRole("tab", { name: "Live" }).count().then((n) => n === 0), "no Live mode until it's built");
+  // Live selling is built (LiveKit), so its mode shows next to Camera and Create.
+  await page.getByRole("tab", { name: "Live" }).waitFor();
 
   await page.goto(BASE);
   await page.getByRole("region", { name: /Vintage denim jacket, size M/ }).waitFor();

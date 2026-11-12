@@ -673,7 +673,7 @@ export function createDemoApi(): Api {
       await mediaReady;
       const sh = s.shops.find((x) => x.handle === handle && x.status === "open");
       if (!sh) return null;
-      return { shop: publicShop(sh), items: s.posts.filter((p) => p.shopId === sh.id && visible(p)).map(toFeed) };
+      return { shop: publicShop(sh), items: s.posts.filter((p) => p.shopId === sh.id && visible(p)).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(toFeed) };
     },
     async checkout(input: CheckoutInput) {
       notSuspended(); notOff("buy");
@@ -1479,6 +1479,17 @@ export function createDemoApi(): Api {
       const t = window.setInterval(onChange, 1000);
       return () => window.clearInterval(t);
     },
+    async productViews(ids) {
+      // Sample items get a made up count so the tiles look real; views recorded in the demo add on top.
+      const out: Record<string, number> = {};
+      for (const pid of ids) {
+        const posts = s.posts.filter((x) => x.productId === pid);
+        if (!posts.length) continue;
+        const seed = posts[0].id.startsWith("po-") ? [...pid].reduce((n, c) => (n * 31 + c.charCodeAt(0)) % 9973, 7) * 3 : 0;
+        out[pid] = seed + (s.seen ?? []).filter((x) => posts.some((po) => po.id === x.postId)).length;
+      }
+      return out;
+    },
     async productThumbs(ids) {
       // Sample items draw their own pictures; listings made in the demo use their own photo or video.
       const out: Record<string, Thumb> = {};
@@ -1729,7 +1740,7 @@ export function createDemoApi(): Api {
       return {
         id: sh.id, name: sh.name, handle: sh.handle, category: sh.category, status: sh.status, foundingUntil: sh.foundingUntil,
         trustScore: me().trust, goodOrders: goodOrders(sh.id), checks: { ...sh.checks, payoutSchedule: s.payoutSchedules?.[sh.id] ?? "WEEKLY" },
-        products: s.products.filter((p) => p.shopId === sh.id && p.status !== "removed").map((p) => ({ ...p, posted: s.posts.some((po) => po.productId === p.id) })),
+        products: s.products.filter((p) => p.shopId === sh.id && p.status !== "removed").reverse().map((p) => ({ ...p, posted: s.posts.some((po) => po.productId === p.id) })),
       };
     },
     async startShop(name, handle, category) {

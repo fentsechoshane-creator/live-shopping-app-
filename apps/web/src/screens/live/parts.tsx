@@ -68,9 +68,9 @@ export function PinnedCard({ item, onBuy, action }: { item: FeedItem; onBuy?: ()
       <span className="live-thumb"><ProductArt productId={p.id} video={item.video} fallback={item.video.demo?.bg ?? "#555"} /></span>
       <div className="live-card-text">
         <b>{p.title}</b>
-        <span>{R(p.priceCents)} · {p.stock > 0 ? `${p.stock} left` : "Sold out"}</span>
+        <span>{R(p.priceCents)} · {p.stock > 0 ? `${p.stock} left` : <span className="sold-text">Sold out</span>}</span>
       </div>
-      {action ?? (onBuy && <button className="btn green" onClick={onBuy} disabled={p.stock < 1}>Buy now</button>)}
+      {action ?? (onBuy && <button className={`btn ${p.stock < 1 ? "soldout" : "green"}`} onClick={onBuy} disabled={p.stock < 1}>{p.stock < 1 ? "Sold out" : "Buy now"}</button>)}
     </div>
   );
 }

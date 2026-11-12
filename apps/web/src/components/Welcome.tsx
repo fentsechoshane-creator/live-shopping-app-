@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { Wordmark } from "./ui";
 import type { Category } from "../api";
 import { Icon } from "./Icon";
@@ -48,7 +49,7 @@ function SlideArt({ art }: { art: (typeof SLIDES)[number]["art"] }) {
 }
 
 /** First open: three short screens, pick what you like (so For You isn't random on day one), then a TikTok style
- * "swipe up" lesson over the feed. Swiping it away lands on the first video the ranking picked for you. */
+ * "swipe up" lesson over the feed. It sits on top without blocking anything: the first touch anywhere ends it. */
 export function Welcome({ onDone }: { onDone: () => void }) {
   const [step, setStep] = useState(0);
   const { interests, setInterests } = useSession();
@@ -61,19 +62,33 @@ export function Welcome({ onDone }: { onDone: () => void }) {
   // Saving the interests here re-ranks the feed behind the lesson, so the first video is already the right one.
   const toCoach = () => { setInterests(picked); setStep(COACH); };
   const swipe = useSwipe({ onLeft: () => step < PICK && setStep(step + 1), onRight: () => step > 0 && step <= PICK && setStep(step - 1) });
-  const coachSwipe = useSwipe({ onUp: finish, threshold: 40 });
   const toggle = (c: Category) => setPicked((p) => (p.includes(c) ? p.filter((x) => x !== c) : [...p, c]));
-  // Laptops and keyboards: scroll or press down to do the same.
+  // The lesson never blocks the app. Any touch, scroll or key ends it for good, and the touch still goes through:
+  // a swipe moves the feed, a tap presses the button under it. Going to another page ends it too, so it's gone when you come back.
+  const loc = useLocation();
+  const startPath = useRef(loc.pathname);
+  const atCoach = step === COACH;
   useEffect(() => {
-    if (step !== COACH) return;
-    const key = (e: KeyboardEvent) => { if (["ArrowDown", "ArrowUp", " ", "Enter", "PageDown"].includes(e.key)) { e.preventDefault(); finish(); } };
-    window.addEventListener("keydown", key);
-    return () => window.removeEventListener("keydown", key);
-  }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (atCoach && loc.pathname !== startPath.current) finish();
+  }, [atCoach, loc.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!atCoach) return;
+    const end = () => finish();
+    const opts = { capture: true, passive: true } as const;
+    window.addEventListener("pointerdown", end, opts);
+    window.addEventListener("touchstart", end, opts);
+    window.addEventListener("wheel", end, opts);
+    window.addEventListener("keydown", end, opts);
+    return () => {
+      window.removeEventListener("pointerdown", end, opts);
+      window.removeEventListener("touchstart", end, opts);
+      window.removeEventListener("wheel", end, opts);
+      window.removeEventListener("keydown", end, opts);
+    };
+  }, [atCoach]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (step === COACH) return (
-    <div className="coach" role="dialog" aria-modal="true" aria-label="How to watch" {...coachSwipe}
-      onWheel={(e) => { if (Math.abs(e.deltaY) > 20) finish(); }}>
+  if (atCoach) return (
+    <div className="coach" role="dialog" aria-label="How to watch">
       <div className="coach-hand" aria-hidden="true">
         <span className="coach-trail" />
         <svg className="coach-finger" viewBox="0 0 24 24" width="44" height="44">
@@ -82,7 +97,6 @@ export function Welcome({ onDone }: { onDone: () => void }) {
         </svg>
       </div>
       <span className="coach-label vglass">Swipe up</span>
-      <button className="visually-hidden" onClick={finish}>Start watching</button>
     </div>
   );
 

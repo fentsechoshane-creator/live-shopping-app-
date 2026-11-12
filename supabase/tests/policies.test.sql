@@ -1493,6 +1493,17 @@ do $$ begin
   assert (select count(*) from post_seen where user_id = '00000000-0000-0000-0000-00000000000d') =
          (select count(*) from feed(50, 0) f join shops s on s.id = f.shop_id where s.owner_id <> '00000000-0000-0000-0000-00000000000d'), 'counted once each, not own';
 end $$;
+-- Tile counts (0044): the post's lifetime count matches the log, a second view the same day adds nothing, anyone can read it.
+do $$ declare po uuid := (select post_id from post_seen where user_id = '00000000-0000-0000-0000-00000000000d' limit 1); begin
+  assert (select views from posts where id = po) = (select count(*) from post_seen where post_id = po), 'views kept on the post';
+end $$;
+create temp table viewed_item as select po.product_id from post_seen ps join posts po on po.id = ps.post_id where ps.user_id = '00000000-0000-0000-0000-00000000000d' limit 1;
+grant select on viewed_item to anon;
+select pg_temp.act_as_anon();
+do $$ begin
+  assert (select views from product_views(array[(select product_id from viewed_item)])) >= 1, 'product views are public';
+end $$;
+reset role;
 select pg_temp.act_as_anon();
 select pg_temp.expect_error($$select record_views(array[gen_random_uuid()])$$, 'permission denied');
 reset role;

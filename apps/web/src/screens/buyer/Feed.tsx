@@ -230,7 +230,7 @@ function BuyButton({ item, onClick, block, auction }: { item: FeedItem; onClick:
   const held = !!p.heldFor && p.heldFor !== user?.id && !!p.heldUntil && new Date(p.heldUntil) > new Date();
   if (held && !sold) return <button className={`btn ${block ? "block big" : ""}`} disabled><Icon name="lock" size={18} />On hold</button>;
   return (
-    <button className={`btn green ${block ? "block big" : ""}`} onClick={onClick} disabled={sold}>
+    <button className={`btn ${sold ? "soldout" : "green"} ${block ? "block big" : ""}`} onClick={onClick} disabled={sold}>
       <Icon name="bag" size={18} />{sold ? "Sold out" : p.mode === "order_now" ? "Order now" : "Buy now"}
     </button>
   );

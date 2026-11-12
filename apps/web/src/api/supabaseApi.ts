@@ -702,6 +702,12 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
       }
       return out;
     },
+    async productViews(ids) {
+      const uniq = [...new Set(ids)].filter((x) => /^[0-9a-f-]{36}$/.test(x)).slice(0, 200);
+      if (!uniq.length) return {};
+      const rows = (check(await sb.rpc("product_views", { p_ids: uniq })) as any[]) ?? [];
+      return Object.fromEntries(rows.map((r) => [r.product_id as string, Number(r.views) || 0]));
+    },
     async search(q, f, offset = 0) {
       const rows = check(await sb.rpc("search_items", {
         p_q: q.trim(), p_category: f.category ?? null, p_size: f.size ?? null, p_min: f.minCents ?? null, p_max: f.maxCents ?? null,
@@ -807,6 +813,7 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
           rulesAccepted: !!c.rules_accepted_at, payoutSchedule: c.payout_schedule ?? "WEEKLY",
         },
         products: (s.products ?? []).filter((p: any) => p.status !== "removed")
+          .sort((a: any, b: any) => String(b.created_at).localeCompare(String(a.created_at))) // newest first, like TikTok
           .map((p: any) => ({ ...toProduct(p), proofStatus: p.proof_status, posted: posted.has(p.id) })),
       };
       return shop;

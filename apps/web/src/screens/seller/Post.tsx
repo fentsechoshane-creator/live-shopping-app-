@@ -22,7 +22,8 @@ export function Post() {
   const [params, setParams] = useSearchParams();
   // Live shows once it's released to everyone, or early for an account our team switched it on for.
   const [features] = useLoad(() => api.myFeatures(), []);
-  const liveOn = features?.live === "on" || (FEATURES.live && features?.live !== "off");
+  // Wait for this account's switches, so a Live tab that is switched off never flashes up.
+  const liveOn = !!features && (features.live === "on" || (FEATURES.live && features.live !== "off"));
   const MODES = (liveOn ? ["camera", "create", "live"] : ["camera", "create"]) as Mode[];
   const mode: Mode = MODES.find((m) => m === params.get("mode")) ?? "camera";
   const setMode = (m: Mode) => { setSub(false); setParams(m === "camera" ? {} : { mode: m }, { replace: true }); };

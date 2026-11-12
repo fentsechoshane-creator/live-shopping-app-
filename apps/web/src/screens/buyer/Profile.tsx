@@ -8,7 +8,7 @@ import { RewardChip } from "../../components/Rewards";
 import { ProductArt } from "../../components/Scene";
 import { Blank, ErrorNote, Field, Loading, R, Sheet, dateText, swatch, useAction } from "../../components/ui";
 import { CertUpload } from "../seller/Selling";
-import { PostGrid } from "../../components/PostGrid";
+import { GridTile, PostGrid, useProductViews } from "../../components/PostGrid";
 import { shareOrCopy } from "../../native";
 import { useTabSwipe } from "../../components/gestures";
 import { Avatar } from "../../components/Avatar";
@@ -168,6 +168,7 @@ function SellerGrid({ shop, error, sold, reload }: { shop: MyShop | null | undef
   const [editing, setEditing] = useState<MyShop["products"][number] | null>(null);
   const [open, setOpen] = useState(false);
   const nav = useNavigate();
+  const views = useProductViews(shop?.products.map((p) => p.id) ?? []);
   if (error) return <ErrorNote error={error} />;
   if (shop === undefined) return <Loading />;
   if (!shop || shop.status === "onboarding") {
@@ -223,11 +224,10 @@ function SellerGrid({ shop, error, sold, reload }: { shop: MyShop | null | undef
       ) : (
         <div className="grid3">
           {shop.products.map((p) => (
-            <button key={p.id} onClick={() => setEditing(p)} className="g3" aria-label={`Edit ${p.title}, ${R(p.priceCents)}`}>
+            <GridTile key={p.id} product={p} views={views[p.id]} onClick={() => setEditing(p)} label={`Edit ${p.title}`}
+              chip={p.status === "draft" ? (p.proofStatus === "pending" ? "Checking" : "Draft") : undefined}>
               <ProductArt productId={p.id} fallback={swatch(p.id)} />
-              {p.status !== "live" && <span className="g3chip">{p.status === "draft" && p.proofStatus === "pending" ? "Checking" : p.status === "sold_out" ? "Sold out" : "Draft"}</span>}
-              <span className="g3foot">{R(p.priceCents)}</span>
-            </button>
+            </GridTile>
           ))}
         </div>
       )}
