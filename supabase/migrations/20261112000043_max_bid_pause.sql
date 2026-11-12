@@ -1,5 +1,5 @@
--- Max bids answer after a short pause (Ofentse, 12 Nov 2026): "the instant max bid update seems unnatural and doesn't
--- give the bidding war effect". The person who just bid sees they're on top, then 5 seconds later the max answers and
+-- Max bids answer after a short pause on feed auctions (Ofentse, 12 Nov 2026): "the instant max bid update seems
+-- unnatural and doesn't give the bidding war effect". Live show auctions stay instant ("live needs to be instant"). The person who just bid sees they're on top, then 5 seconds later the max answers and
 -- they get "You've been outbid". Fairness: a max never loses to the clock. If an auction has 6 seconds or less left
 -- and the bid won't reset the clock (sudden death live auctions), the max answers straight away; normal auctions reset
 -- to 60 seconds and live ones to 10, so the pause always fits. A max that was due is also answered before an auction is
@@ -138,11 +138,11 @@ begin
     end loop;
     perform notify(seller, 'auction', 'New bid: R' || (nt.amount_cents / 100), p.title, '/i/' || p.id);
   end if;
-  -- Max bids answer after 5 seconds, like a person bidding back, so the bidder sees they were on top and then
-  -- gets "You've been outbid". If the clock has 6 seconds or less left and won't reset, they answer now instead.
+  -- Feed auctions: max bids answer after 5 seconds, like a person bidding back, so the bidder sees they were on top and
+  -- then gets "You've been outbid". Live show auctions, and any auction with 6 seconds or less left, answer now.
   if exists (select 1 from max_bids m where m.product_id = p.id and m.round = p.auction_round and m.bidder_id <> nt.bidder_id
                and m.max_cents >= nt.amount_cents + bid_step(nt.amount_cents)) then
-    if (select auction_ends_at from products where id = p.id) - now() > interval '6 seconds' then
+    if p.live_show_id is null and (select auction_ends_at from products where id = p.id) - now() > interval '6 seconds' then
       perform set_config('app.auction_internal', '1', true);
       update products set max_reply_at = least(coalesce(max_reply_at, 'infinity'::timestamptz), now() + make_interval(secs => max_reply_seconds()))
         where id = p.id;

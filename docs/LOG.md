@@ -107,9 +107,10 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
-### 2026-11-12: Max bids answer after 5 seconds
+### 2026-11-12: Max bids answer after 5 seconds (feed auctions only)
 
 Ofentse: "the instant max bid update seems unnatural and doesn't give the bidding war effect". Now when someone bids against a max, they're on top for about 5 seconds, then the max answers and they get "You've been outbid" (on screen and in their inbox). The max holder isn't told they were outbid in between; their bid sheet shows "Your max is answering".
+- **Live show auctions stay instant** (Ofentse: "live needs to be instant"): the pause is only for feed auctions.
 - **Fairness:** a max never loses to the clock. If there are 6 seconds or less left and the clock won't reset (sudden death live auctions), the max answers straight away. Normal auctions reset to 60 seconds and live ones to 10, so the pause always fits. A max that was due is answered before the auction is settled.
 - **How:** migration 0043 keeps the pending answer on the item (`max_reply_at`). Any phone watching the auction calls `nudge_max_bids` when it's due (it does nothing early), and placing a bid or settling does it too, so it happens even if the bidders close the app. Several maxes still settle against each other in one go once the pause is up. `MAX_BID_REPLY_SECONDS = 5` in packages/core.
 - Tests: database (on top until the max answers, nudging early does nothing, the max holder isn't told, the bidder is told, settling answers what's due, only the server can force an answer). Demo follows the same steps.

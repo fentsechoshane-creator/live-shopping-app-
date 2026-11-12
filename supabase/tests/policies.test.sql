@@ -606,6 +606,21 @@ do $$ begin assert (auction_info((select id from products where title = 'Max bid
 select pg_temp.expect_error($$select run_max_bids((select id from products where title = 'Max bid denim'), 0)$$, 'permission denied');
 select pg_temp.expect_error($$select answer_max_bids((select id from products where title = 'Max bid denim'), true)$$, 'permission denied');
 reset role;
+-- Live show auctions answer straight away (no pause).
+select pg_temp.act_as_service();
+insert into live_shows (id, shop_id, title, status, started_at) values ('60000000-0000-0000-0000-000000000043', (select id from shops where handle = 'thrift.with.lebo'), 'Max test show', 'ended', now());
+insert into products (shop_id, title, price_cents, sizes, status, stock, mode, auction_ends_at, auction_state, live_show_id)
+  values ((select id from shops where handle = 'thrift.with.lebo'), 'Live max tee', 10000, '{}', 'live', 1, 'auction', now() + interval '1 minute', 'open', '60000000-0000-0000-0000-000000000043');
+reset role;
+select pg_temp.act_as('00000000-0000-0000-0000-0000000000f1');
+select place_bid((select id from products where title = 'Live max tee'), 30000, true);
+reset role;
+select pg_temp.act_as('00000000-0000-0000-0000-0000000000f2');
+select place_bid((select id from products where title = 'Live max tee'), 12000);
+do $$ declare i jsonb := auction_info((select id from products where title = 'Live max tee')); begin
+  assert not (i->>'leaderIsMe')::boolean and i->>'maxReplyAt' is null, 'live: the max answers straight away';
+end $$;
+reset role;
 -- Ends below the reserve: not sold, back to the seller's drafts.
 select pg_temp.act_as_service();
 update products set auction_ends_at = now() - interval '1 second' where title = 'Vintage leather jacket';

@@ -1017,9 +1017,9 @@ export function createDemoApi(): Api {
           notify(top.bidderId, "You've been outbid", `${p.title} is now at R${now2.amountCents / 100}. Bid again before it ends.`, `/i/${p.id}`);
         notify(sh.ownerId, `New bid: R${now2.amountCents / 100}`, p.title, `/i/${p.id}`);
       }
-      // Max bids answer 5 seconds later, or now if the clock is about to run out and won't reset (0043).
+      // Feed auctions: max bids answer 5 seconds later. Live show auctions, or 6 seconds or less left: now (0043).
       if (maxWillAnswer(p)) {
-        if (new Date(p.auctionEndsAt!).getTime() - Date.now() > 6000) {
+        if (!p.liveShowId && new Date(p.auctionEndsAt!).getTime() - Date.now() > 6000) {
           const at = Date.now() + MAX_BID_REPLY_SECONDS * 1000;
           p.maxReplyAt = new Date(p.maxReplyAt ? Math.min(at, new Date(p.maxReplyAt).getTime()) : at).toISOString();
         } else answerMaxBids(p, true);
