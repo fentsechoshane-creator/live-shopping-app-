@@ -254,7 +254,7 @@ try {
   await page.getByRole("button", { name: "Pay now" }).click();
   await page.waitForURL(/\/orders\//);
   await page.getByText("Paid, money held safely").waitFor();
-  await page.getByText("Order placed.").waitFor();
+  await page.getByText("Order placed 🎉").waitFor();
   await page.getByRole("button", { name: /Message Lebo/ }).waitFor();
   await shot("order-paid");
 
@@ -389,7 +389,7 @@ try {
   await page.waitForURL(/mock-pay/);
   await page.getByRole("button", { name: "Pay now" }).click();
   await page.waitForURL(/\/orders\//);
-  await page.getByText("Order placed.").waitFor();
+  await page.getByText("Order placed 🎉").waitFor();
 
   // The reward came off the auction (R900 is over R200), so the wallet button is gone (no "R0").
   await page.goto(BASE);
@@ -1104,7 +1104,7 @@ try {
     await page.waitForURL(/mock-pay/);
     await page.getByRole("button", { name: "Pay now" }).click();
     await page.waitForURL(/\/orders\//);
-    await page.getByText("Order placed.").waitFor();
+    await page.getByText("Order placed 🎉").waitFor();
   };
   await buyTee();
   await page.getByRole("button", { name: "Cancel order" }).click();

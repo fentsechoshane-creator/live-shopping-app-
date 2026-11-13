@@ -1,5 +1,6 @@
 // Pieces shared by the watch and host screens: live chat, the pinned item and the quick live auction.
 import { useEffect, useRef, useState } from "react";
+import { QUICK_EMOJI } from "../../lib/emoji";
 import { timeLeft } from "@app/core";
 import { api, type AuctionInfo, type FeedItem, type LiveChatMessage } from "../../api";
 import { useSession } from "../../session";
@@ -30,11 +31,11 @@ export function LiveChat({ showId, messages, onSent, canHide }: {
   const [busy, setBusy] = useState(false);
   const list = useRef<HTMLDivElement>(null);
   useEffect(() => { list.current?.scrollTo({ top: list.current.scrollHeight, behavior: "smooth" }); }, [messages.length]);
-  const send = async () => {
-    const b = text.trim();
+  const send = async (quick?: string) => {
+    const b = (quick ?? text).trim();
     if (!b || busy) return;
     setBusy(true);
-    try { await api.sayLive(showId, b); setText(""); onSent(); }
+    try { await api.sayLive(showId, b); if (!quick) setText(""); onSent(); }
     catch (e) { toast(e instanceof Error ? e.message : "That didn't send. Try again."); }
     finally { setBusy(false); }
   };
@@ -51,6 +52,13 @@ export function LiveChat({ showId, messages, onSent, canHide }: {
           </div>
         ))}
       </div>
+      {!text && (
+        <div className="live-emoji" role="group" aria-label="Quick reactions">
+          {QUICK_EMOJI.map((e) => (
+            <button key={e} type="button" onClick={() => (user ? send(e) : withUser(undefined, "Sign in to chat"))} disabled={busy} aria-label={`Send ${e}`}>{e}</button>
+          ))}
+        </div>
+      )}
       <form className="live-say vglass" onSubmit={(e) => { e.preventDefault(); if (!user) return withUser(undefined, "Sign in to chat"); send(); }}>
         <input value={text} onChange={(e) => setText(e.target.value.slice(0, 200))} placeholder={user ? "Say something" : "Sign in to chat"}
           aria-label="Say something" enterKeyHint="send" onFocus={() => { if (!user) withUser(undefined, "Sign in to chat"); }} />

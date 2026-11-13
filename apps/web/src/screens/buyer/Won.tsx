@@ -39,7 +39,7 @@ export function WonScreen({ item, info, onPaid }: { item: FeedItem; info: Auctio
           <span className="won-play"><Icon name="play" size={20} /></span>
         </button>
         <div className="won-text">
-          <span className="won-pill">{paid ? "Paid" : "You won"}</span>
+          <span className="won-pill">{paid ? "Paid ✅" : "You won 🎉"}</span>
           <b className="won-title">{p.title}</b>
           <span className="won-sub">{sub}</span>
           <span className="won-price num">{R(price)}</span>

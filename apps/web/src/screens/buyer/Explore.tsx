@@ -7,6 +7,7 @@ import { RewardChip } from "../../components/Rewards";
 import { ProductArt } from "../../components/Scene";
 import { Blank, ErrorNote, Field, Loading, R, Sheet, swatch } from "../../components/ui";
 import { useMyShopId } from "../../lib/mine";
+import { CATEGORY_EMOJI } from "../../lib/emoji";
 
 const CATS: { id: Category | "all"; label: string }[] = [
   { id: "all", label: "All" }, { id: "clothes", label: "Thrift" }, { id: "designer", label: "Designer" },
@@ -85,7 +86,7 @@ export function Explore() {
         <RewardChip className="dark" />
       </div>
       <div className="chips scroll" style={{ margin: "14px -16px 4px" }} role="group" aria-label="Category">
-        {CATS.map((c) => <button key={c.id} className="chip" aria-pressed={cat === c.id} onClick={() => setCat(c.id)}>{c.label}</button>)}
+        {CATS.map((c) => <button key={c.id} className="chip" aria-pressed={cat === c.id} onClick={() => setCat(c.id)}>{c.id !== "all" && <span className="emo" aria-hidden="true">{CATEGORY_EMOJI[c.id]}</span>}{c.label}</button>)}
       </div>
       {chips.length > 0 && (
         <div className="chips scroll applied" style={{ margin: "6px -16px 0" }} aria-label="Filters on">

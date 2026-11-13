@@ -6,6 +6,7 @@ import { useSession } from "../../session";
 import { Choice, ErrorNote, Field, Loading, Progress, useAction, useGoBack } from "../../components/ui";
 import { Icon } from "../../components/Icon";
 import { forgetMyShop } from "../../lib/mine";
+import { CATEGORY_EMOJI } from "../../lib/emoji";
 
 const CATEGORIES: { id: Category; title: string; sub: string }[] = [
   { id: "clothes", title: "Clothes and thrift", sub: "Pre loved and new fashion" },
@@ -62,7 +63,7 @@ function StepCategory({ value, onPick }: { value: Category | null; onPick: (c: C
     <>
       <h1>What will you sell?</h1>
       <p className="muted">Pick your main category.</p>
-      {CATEGORIES.map((c) => <Choice key={c.id} on={value === c.id} onClick={() => onPick(c.id)} title={c.title} sub={c.sub} />)}
+      {CATEGORIES.map((c) => <Choice key={c.id} on={value === c.id} onClick={() => onPick(c.id)} title={`${CATEGORY_EMOJI[c.id]} ${c.title}`} sub={c.sub} />)}
     </>
   );
 }

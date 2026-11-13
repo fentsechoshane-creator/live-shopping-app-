@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { QUICK_EMOJI } from "../../lib/emoji";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { isRude, looksOffApp, ORDER_STATUS_TEXT, MIN_PRICE } from "@app/core";
 import { api, type Conversation, type FeedItem, type MyShop, type Offer, type Order } from "../../api";
@@ -194,6 +195,7 @@ export function Thread() {
         )}
         {!text && (
           <div className="quick" role="group" aria-label={c.iAmSeller ? "Saved replies" : "Quick questions"}>
+            {QUICK_EMOJI.slice(0, 4).map((e) => <button key={e} type="button" className="emo-chip" onClick={() => send(e)} aria-label={`Send ${e}`}>{e}</button>)}
             {!c.iAmSeller && (about ?? lastProduct) && (
               <button type="button" className="offer-chip" onClick={() => api.productItem((about ?? lastProduct)!).then((it) => {
                 if (!it || it.product.status !== "live") return toast("This item isn't available any more.");

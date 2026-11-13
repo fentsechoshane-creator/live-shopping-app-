@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
+import { CATEGORY_EMOJI } from "../lib/emoji";
 import { Wordmark } from "./ui";
 import type { Category } from "../api";
 import { Icon } from "./Icon";
@@ -121,7 +122,7 @@ export function Welcome({ onDone }: { onDone: () => void }) {
           <div className="interest-grid" role="group" aria-label="Interests">
             {INTERESTS.map((c) => (
               <button key={c.id} type="button" className="interest vglass" aria-pressed={picked.includes(c.id)} onClick={() => toggle(c.id)}>
-                <b>{c.label}</b><span>{c.sub}</span>
+                <b><span className="emo" aria-hidden="true">{CATEGORY_EMOJI[c.id]}</span>{c.label}</b><span>{c.sub}</span>
                 {picked.includes(c.id) && <span className="tick"><Icon name="check" size={14} strokeWidth={3} /></span>}
               </button>
             ))}

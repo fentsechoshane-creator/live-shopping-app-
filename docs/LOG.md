@@ -108,6 +108,14 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-13: Device emojis
+
+Asked by Ofentse: use the phone's own emojis, they look cleaner. Picked: chat and comments, category chips, and celebration moments.
+- `lib/emoji.ts` holds the set. Categories: 👗 Thrift, 👜 Designer, 💄 Hair and beauty, 🧁 Bakes, on the Explore chips, the welcome picks and the seller's shop type choice.
+- Quick reactions ❤️ 🔥 😍 😂 👏 🙌: a row above the live chat box (one tap sends it), and the first four at the start of the quick replies in messages (one tap sends it).
+- Celebrations: "You won 🎉" and "Paid ✅" on the won screen, "Order placed 🎉" on the order, "Payment received 🎉" toast.
+- Not changed: the drawn icons for like, share and buttons (they'd look different on every phone). No database change.
+
 ### 2026-11-13: myhaul.co.za moved to Cloudflare DNS
 
 Asked by Ofentse: use the real domain. Done in the browser:

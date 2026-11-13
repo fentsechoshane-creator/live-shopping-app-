@@ -69,7 +69,7 @@ export function OrderList({ orders }: { orders: Order[] | undefined }) {
 export function Orders() {
   const [orders, error, reload] = useLoad(() => api.myOrders(), []);
   const { toast } = useSession();
-  useWatchPayments(orders, () => { toast("Payment received. Your order is placed."); reload(); });
+  useWatchPayments(orders, () => { toast("Payment received 🎉 Your order is placed."); reload(); });
   return (
     <div className="screen">
       <BackButton />
@@ -92,7 +92,7 @@ export function OrderDetail() {
   const [stars, setStars] = useState(0);
   const [comment, setComment] = useState("");
   const messageShop = useMessageShop();
-  useWatchPayments(o ? [o] : null, () => { toast("Payment received. Your order is placed."); reload(); });
+  useWatchPayments(o ? [o] : null, () => { toast("Payment received 🎉 Your order is placed."); reload(); });
   // Right after paying is when "tell me when it ships" makes sense, so that's when we ask about notifications.
   useEffect(() => { if (o?.status === "paid") askForNotifications(); }, [o?.status]);
 
@@ -112,7 +112,7 @@ export function OrderDetail() {
       <ErrorNote error={actErr} />
 
       {o.status === "paid" && (
-        <div className="note green-note" style={{ marginTop: 12 }}><b>Order placed.</b> Your money is held safely. We'll let you know when it ships.</div>
+        <div className="note green-note" style={{ marginTop: 12 }}><b>Order placed 🎉</b> Your money is held safely. We'll let you know when it ships.</div>
       )}
       <CancelledNote o={o} side="buyer" />
 
