@@ -12,13 +12,15 @@ import { ageFrom, BirthdayPicker } from "./AccountSetup";
 import { Icon } from "./Icon";
 import { ErrorNote, Field, FieldWith, Segmented, useAction } from "./ui";
 
-type Tab = "in" | "up";
+export type Tab = "in" | "up";
 const SEEN = "myhaul-has-account";
 const seenBefore = () => { try { return localStorage.getItem(SEEN) === "1"; } catch { return false; } };
 const markSeen = () => { try { localStorage.setItem(SEEN, "1"); } catch { /* private mode */ } };
 
-export function AuthForm({ onDone, start }: { onDone: () => void; start?: Tab }) {
+export function AuthForm({ onDone, start, onTab }: { onDone: () => void; start?: Tab; onTab?: (tab: Tab) => void }) {
   const [tab, setTab] = useState<Tab>(start ?? (seenBefore() ? "in" : "up"));
+  // Lets the sheet title follow the tab: "Sign up to buy" on Sign up, "Sign in to buy" on Sign in.
+  useEffect(() => { onTab?.(tab); }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div className="auth">
       <Segmented<Tab> label="Sign in or sign up" value={tab} onChange={setTab} options={[{ value: "in", label: "Sign in" }, { value: "up", label: "Sign up" }]} />

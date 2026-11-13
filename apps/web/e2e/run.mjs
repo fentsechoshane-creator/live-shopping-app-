@@ -179,7 +179,7 @@ try {
 
   // Signed out Buy now: sign in over the feed, then checkout opens by itself. No lost place.
   await page.getByRole("region", { name: /Oversized tee/ }).getByRole("button", { name: "Buy now" }).click();
-  const signSheet = page.getByRole("dialog", { name: "Sign in to buy" });
+  const signSheet = page.getByRole("dialog", { name: /Sign (in|up) to buy/ });
   // A first visit opens on Sign up. Everything is checked on this one page before the account is made.
   await check(authTab(signSheet, "Sign up").getAttribute("aria-pressed").then((v) => v === "true"), "new visitors start on Sign up");
   const signUpBtn = authSubmit(signSheet, "Sign up");

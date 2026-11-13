@@ -12,7 +12,7 @@ import { FriendsRow } from "./Friends";
 import { DmList } from "../../components/DmList";
 import { MoreSheet } from "../../components/Safety";
 import { Avatar } from "../../components/Avatar";
-import { AuthForm } from "../../components/AuthForm";
+import { AuthForm, type Tab } from "../../components/AuthForm";
 import { useIsMine } from "../../lib/mine";
 
 export function SignIn() {
@@ -31,10 +31,13 @@ export function SignIn() {
 /** Sign in over the current screen, so you don't lose your place. Opened by `withUser`. */
 export function SignInSheet() {
   const { signInAsk, closeSignIn } = useSession();
+  const [tab, setTab] = useState<Tab>("in");
   if (!signInAsk) return null;
+  // The reason reads "Sign in to buy"; on the Sign up tab it says "Sign up to buy" so the title matches the form.
+  const title = tab === "up" ? signInAsk.replace(/^Sign in\b/, "Sign up") : signInAsk;
   return (
-    <Sheet title={signInAsk} onClose={closeSignIn}>
-      <SignInForm onDone={() => {}} />
+    <Sheet title={title} onClose={closeSignIn}>
+      <SignInForm onDone={() => {}} onTab={setTab} />
     </Sheet>
   );
 }
