@@ -22,6 +22,7 @@ Checked 7 Nov 2026 with the live health check. "Practical completion" here means
 | Sign in emails | Sent through Resend from myhaul.co.za. Codes are 6 digits, passwords work too [CONFIRM `RESEND_API_KEY` is also a Supabase secret for team alerts] |
 | Team dashboard | Done and live |
 | Phone apps | Built (Capacitor). Store accounts, D-U-N-S, Mac for the iPhone build and push keys still to do |
+| Website | Live at https://myhaul.co.za (Cloudflare Pages, www goes to the root). Supabase sign in URLs still to update [Ofentse] |
 | Legal and company | Company registered. Company details in Terms and Privacy. Information Officer registered (Shupulu Choshane, named in the Privacy Policy). help@myhaul.co.za still open |
 | Live selling | Live: migration 0040, the live-token function and LiveKit Cloud keys are in |
 
@@ -137,7 +138,8 @@ Asked by Ofentse: use the real domain. Done in the browser:
 - Records copied from Afrihost's DNS editor (Cloudflare's scan missed most): Resend DKIM TXT (resend._domainkey, key checked against Afrihost's copy), send and rsend CNAMEs, MX to mail.myhaul.co.za, mail and webmail A records, autoconfig and autodiscover CNAMEs, the two SRV mail records, SPF and mailconf TXT on the root, DMARC TXT. All email records are DNS only (not proxied). Not copied: www, ftp and cpanel A records (www will point at the app), and the _autodiscover._tcp SRV record (Outlook only, minor).
 - Deleted the root A record that pointed at Afrihost's parking page, so the app can take the root.
 - Afrihost (Lehloma's ClientZone, Bronze Email package): nameservers replaced with Cloudflare's two in DNS Management, NS records. Afrihost says up to 2 hours.
-- **Still to do once Cloudflare says active:** add myhaul.co.za and www.myhaul.co.za as custom domains on the myhaul Pages project (Cloudflare refuses until the switch is done), www sends people to the root, Supabase Auth Site URL and redirect URLs, Google Places key referrers. Keep APP_URL on the old address until real payments are on (test payments are blocked on myhaul.co.za on purpose).
+- **Done 13 Nov, 14:00:** Cloudflare active. myhaul.co.za and www.myhaul.co.za added to the myhaul Pages project (both Active, SSL on). Redirect rule "Redirect from WWW to root" (301, keeps the query string). Checked: https://myhaul.co.za serves 0.1.0+b59e7cc, www lands on the root.
+- **Was still to do once Cloudflare said active (left: Supabase URLs, Google key):** add myhaul.co.za and www.myhaul.co.za as custom domains on the myhaul Pages project (Cloudflare refuses until the switch is done), www sends people to the root, Supabase Auth Site URL and redirect URLs, Google Places key referrers. Keep APP_URL on the old address until real payments are on (test payments are blocked on myhaul.co.za on purpose).
 - Note: there is an Afrihost Bronze Email package on the domain, so Afrihost mailboxes still work after the move (MX and mail records copied).
 
 ### 2026-11-13: D-U-N-S number received
