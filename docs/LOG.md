@@ -12,7 +12,7 @@ Checked 7 Nov 2026 with the live health check. "Practical completion" here means
 
 | Area | Status |
 | --- | --- |
-| Business rules, database, security rules, server functions | Done and tested. Live database up to 0043 (12 Nov) |
+| Business rules, database, security rules, server functions | Done and tested. Live database up to 0044 (13 Nov) |
 | Buyer side (feed, Explore, checkout, orders, returns, cancelling, friends, sharing, Inbox) | Done and live |
 | Seller side (sign up, checks, Create with camera and editor, orders, shipping, payouts) | Done. Editing or taking down a listing after posting is built, not live yet |
 | Payments (TradeSafe escrow) | Working in TradeSafe's developer sandbox (real test payments with Ozow). Needs the production account and keys |
@@ -133,7 +133,7 @@ Asked by Ofentse: use the real domain. Done in the browser:
 Asked by Ofentse: tapping the won update should open a screen first, with the video on the left and the details and payment on the right. Showed three mocks; Ofentse picked option C, the green banner.
 - `/i/<item>` for the auction winner now opens `WonScreen` (screens/buyer/Won.tsx): green banner with the video tile on the left (tap to watch it full screen) and "You won", the item, shop, size and winning price on the right. Under it: time left to pay (counts down, amber), bids, the seller (opens the shop), the three steps (Won, Pay, Ships), and one green Pay button that opens checkout at the winning bid.
 - After paying it says Paid and points to the order. If the 2 hours pass, it says the win was cancelled. Everyone else still gets the full screen video for that link.
-- No database change. Ships with the tiles work (needs migration 0044, then main).
+- No database change. Live 13 Nov with the tiles work.
 
 ### 2026-11-12: TikTok style tiles, sorted posts, red sold out, a swipe lesson that never blocks
 
@@ -144,7 +144,7 @@ Asked by Ofentse: tiles like TikTok with the price on top (colour says the kind 
 - Sold out: Buy button on the feed and the live show card turns solid red "Sold out"; red text in the live card and shared cards.
 - Swipe lesson: no longer blocks anything. The first touch, scroll or key anywhere ends it for good and still goes through (a tap presses the button under it, a swipe moves the feed). Leaving the page ends it too.
 - Post screen: the Live tab waits for the account's switches before showing (it could flash up). The e2e check that Live is hidden was out of date (live selling is on), now it checks Live shows.
-- **Not live yet:** needs migration 0044, then main.
+- **Live:** migration 0044 applied 13 Nov, main pushed.
 - Open: auction tiles show the starting price, not the current bid [CONFIRM if you want the current bid]. Made to order is white because the design only has green, orange and red [CONFIRM].
 
 ### 2026-11-12: Max bids answer after 5 seconds (feed auctions only)
