@@ -2,7 +2,7 @@
 // Sign in: username or email, and password. Forgot password: a code by email, then a new password.
 // Sign up: everything is checked on this one page before the account is made:
 //   name, email (confirmed with a 6 digit code, or the link in the email), a free @username, password twice,
-//   birthday (18 or older) and the terms. Then Sign up, then the optional steps (photo, delivery address).
+//   birthday (18 or older) and a tick for the terms, shown only after the email is confirmed. Then Sign up, then the optional steps (photo, delivery address).
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
 import { useSession } from "../session";
@@ -132,6 +132,7 @@ function SignUpTab({ onDone, toSignIn }: { onDone: () => void; toSignIn: () => v
   const [password, setPassword] = useState("");
   const [again, setAgain] = useState("");
   const [birthday, setBirthday] = useState("");
+  const [agreed, setAgreed] = useState(false);
   const age = birthday ? ageFrom(birthday) : null;
   const code$ = useAction();
   const { busy, error, run } = useAction();
@@ -190,6 +191,7 @@ function SignUpTab({ onDone, toSignIn }: { onDone: () => void; toSignIn: () => v
     !free && "a free username",
     (!!passwordProblem(password) || password !== again) && "a password",
     !(age !== null && age >= 18) && "your birthday",
+    !agreed && "a tick to agree to the Terms and Privacy Policy",
   ].filter(Boolean) as string[];
 
   const signUp = () => run(async () => {
@@ -225,6 +227,12 @@ function SignUpTab({ onDone, toSignIn }: { onDone: () => void; toSignIn: () => v
         </Field>
       )}
 
+      {/* Step 2 only appears once the email is confirmed (Ofentse, 13 Nov), so nobody fills in a form for an email they can't reach. */}
+      {!verified ? (
+        <p className="small muted" style={{ textAlign: "center", margin: "14px 0 6px" }}>
+          {codeSent ? "Confirm your email to carry on." : "Step 1 of 2: confirm your email. Then pick a username and password."}
+        </p>
+      ) : (<>
       <FieldWith label="Username">{(id) => (
         <span className={`handle-input ${free ? "ok" : taken || (touched && problem) ? "bad" : ""}`}>
           <span>@</span>
@@ -254,11 +262,13 @@ function SignUpTab({ onDone, toSignIn }: { onDone: () => void; toSignIn: () => v
         </div>
       </div>
 
-      <p className="small muted" style={{ textAlign: "center", margin: "16px 0 10px" }}>
-        By tapping Sign up, you agree to our <a href="/terms.html" target="_blank" rel="noreferrer">Terms of Use</a> and <a href="/privacy.html" target="_blank" rel="noreferrer">Privacy Policy</a>.
-      </p>
+      <label className="agree">
+        <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
+        <span>I agree to the <a href="/terms.html" target="_blank" rel="noreferrer">Terms of Use</a> and the <a href="/privacy.html" target="_blank" rel="noreferrer">Privacy Policy</a>, and I'm 18 or older.</span>
+      </label>
       <button className="btn green block big" disabled={busy || missing.length > 0}>{busy ? "Making your account…" : "Sign up"}</button>
       {missing.length > 0 && <p className="small muted" style={{ textAlign: "center", margin: "8px 0 0" }}>Still needed: {missing.join(", ")}.</p>}
+      </>)}
       <button type="button" className="link" style={{ marginTop: 14, display: "block", marginInline: "auto" }} onClick={toSignIn}>Already have an account? Sign in</button>
     </form>
   );

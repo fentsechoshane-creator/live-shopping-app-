@@ -108,6 +108,14 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-13: Sign up in two steps, a Terms tick, round tick boxes
+
+Asked by Ofentse: confirm the email before anything else, a tick to agree to the Terms and Privacy Policy, and all tick boxes round and sleek.
+- Sign up step 1: name and email, then the 6 digit code (or the link). Step 2 (username, password twice, birthday, the tick, Sign up) only appears once the email is confirmed.
+- The tick: "I agree to the Terms of Use and the Privacy Policy, and I'm 18 or older", unticked by default, Sign up stays off until it's ticked. Replaces the "By tapping Sign up" line. Whether POPIA needs more than this is for the lawyer [CONFIRM].
+- Every checkbox in the app is now a round iOS style tick (green with a white tick when on), set once in styles.css.
+- e2e: checks the rest waits for the email, and that Sign up stays off without the tick.
+
 ### 2026-11-13: Silver glass notes, "How auctions work" folds away
 
 - All notes and disclaimers (plain and amber `.note`, the in app legal `.important`, and the Terms page's yellow box) now use a silver frosted glass finish (`--glass-bg`, `--glass-edge`, light and dark). Amber warnings keep a thin amber edge on the left so they still read as warnings. Green notes unchanged.

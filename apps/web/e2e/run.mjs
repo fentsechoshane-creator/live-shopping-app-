@@ -116,6 +116,7 @@ async function signUpForm(scope, email, name, handle) {
   await scope.getByLabel("Password", { exact: true }).fill(PASSWORD);
   await scope.getByLabel("Password again", { exact: true }).fill(PASSWORD);
   await pickBirthday(scope, "1999", "4", "12");
+  await scope.getByRole("checkbox", { name: /I agree to the Terms/ }).check();
   await authSubmit(scope, "Sign up").click();
   accounts.add(email);
   // Then the optional steps, both skipped here.
@@ -184,6 +185,7 @@ try {
   const signUpBtn = authSubmit(signSheet, "Sign up");
   await signSheet.getByLabel("Name", { exact: true }).fill("Thandi Mokoena");
   await signSheet.getByLabel("Email", { exact: true }).fill("buyer@test.co.za");
+  await check(signSheet.getByLabel("Username", { exact: true }).count().then((n) => n === 0), "the rest waits until the email is confirmed");
   await signSheet.getByRole("button", { name: "Send code" }).click();
   await signSheet.getByLabel("Code from the email").fill("123456");
   await signSheet.getByText("Email confirmed").waitFor();
@@ -205,6 +207,8 @@ try {
   await signSheet.getByText("You need to be 18 or older").waitFor();
   await check(signUpBtn.isDisabled(), "under 18 can't sign up");
   await pickBirthday(signSheet, "1999", "4", "12");
+  await check(signUpBtn.isDisabled(), "must tick the Terms and Privacy Policy");
+  await signSheet.getByRole("checkbox", { name: /I agree to the Terms/ }).check();
   await shot("create-account");
   await signUpBtn.click();
   accounts.add("buyer@test.co.za");
