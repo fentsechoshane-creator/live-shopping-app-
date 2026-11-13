@@ -10,7 +10,7 @@ The slow parts are the accounts and the business number, not the app. Start thos
 | # | Step | Who | How long |
 | --- | --- | --- | --- |
 | 1 | Fix the company name at CIPC if it's still wrong. The D-U-N-S number and both store accounts must match the registered name exactly. | Ofentse | Depends on CIPC [CONFIRM] |
-| 2 | Get a free D-U-N-S number for myHaul (Pty) Ltd (use Apple's look up tool first, it may already exist). | Ofentse | Up to about 2 weeks |
+| 2 | D-U-N-S number for myHaul (Pty) Ltd. **Done 13 Nov 2026.** Apple can take a few working days to see a new number. | Ofentse | Done |
 | 3 | Domain myhaul.co.za on Netlify, mailbox help@myhaul.co.za. Both stores check the website and the support email, and Apple uses the domain to confirm the company. | Ofentse | 1 to 3 days |
 | 4 | Apple Developer Program as an organisation (USD 99 a year). Needs the D-U-N-S number, the website, and someone who can sign for the company. | Ofentse | A few days after step 2 |
 | 5 | Google Play Console as an organisation (USD 25 once). Needs the D-U-N-S number and company documents. | Ofentse | A few days to 2 weeks for checks |

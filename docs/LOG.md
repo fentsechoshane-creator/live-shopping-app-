@@ -108,6 +108,11 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-13: D-U-N-S number received
+
+- Ofentse got the D-U-N-S number for myHaul (Pty) Ltd. STORE.md step 2 marked done.
+- Next: Apple Developer Program as an organisation (USD 99 a year) and Google Play Console as an organisation (USD 25 once). The help@myhaul.co.za mailbox is still open and both stores want a support email on the company domain.
+
 ### 2026-11-12: Auction tiles show the current bid; Information Officer named
 
 - Ofentse picked "current bid" for auction tiles. Tiles now show the current bid (or the winning bid once it ends), the starting price only when there are no bids. One batched `auctionInfo` call per grid (`useAuctionPrices` in PostGrid.tsx). No database change.
