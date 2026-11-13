@@ -1635,6 +1635,8 @@ button.g3 { border: 0; padding: 0; display: block; width: 100%; }
 .live-tile-bg[data-cat="clothes"] { background: linear-gradient(160deg, #5b4636, #15171b); }
 .live-tile-bg[data-cat="designer"] { background: linear-gradient(160deg, #2f3a4a, #15171b); }
 .live-tile-bg[data-cat="food"] { background: linear-gradient(160deg, #6b4a4a, #15171b); }
+.live-tile-bg[data-cat="fragrance"] { background: linear-gradient(160deg, #5a4a6b, #15171b); }
+.live-tile-bg[data-cat="home"] { background: linear-gradient(160deg, #4a5a4f, #15171b); }
 .live-tile .live-pill { position: absolute; left: 8px; top: 8px; height: 22px; font-size: 12px; }
 .live-tile .live-viewers { position: absolute; right: 8px; top: 8px; height: 22px; font-size: 12px; }
 .live-tile-foot { position: absolute; left: 0; right: 0; bottom: 0; padding: 28px 10px 10px; display: flex; gap: 8px; align-items: flex-end;

@@ -35,18 +35,20 @@ export type DeliveryOption = "pudo_locker" | "courier" | "collect_cpt" | "baker_
  * locker, and prices are flat, set about 10% above the published Courier Guy and PUDO prices, VAT included. Couriers
  * charge by box size (length x width x height / 5000) when that is more than the weight, which is why Medium and
  * Large cost more. [CONFIRM against Bob Go's live prices once the live key is in.] */
-export type ParcelSize = "small" | "medium" | "large";
+export type ParcelSize = "small" | "medium" | "large" | "xl";
 export const PARCEL_SIZES: Record<ParcelSize, { label: string; hint: string; maxKg: number; door: Cents; locker: Cents | null;
   /** What we book with the courier (centimetres). */ box: { length: number; width: number; height: number } }> = {
   small: { label: "Small", hint: "Clothes and beauty. Fits a courier bag (60 x 41 x 8 cm), up to 5 kg.", maxKg: 5, door: rand(110), locker: rand(95), box: { length: 60, width: 41, height: 8 } },
   medium: { label: "Medium", hint: "A shoe box, boots or a bag. Up to 60 x 41 x 19 cm and 10 kg.", maxKg: 10, door: rand(190), locker: rand(130), box: { length: 60, width: 41, height: 19 } },
   large: { label: "Large", hint: "Small appliance or decor. Up to 60 x 41 x 41 cm and 15 kg.", maxKg: 15, door: rand(250), locker: rand(185), box: { length: 60, width: 41, height: 41 } },
+  // Furniture (13 Nov). Courier to the door only, too big for lockers. Price is a guess until Bob Go quotes [CONFIRM].
+  xl: { label: "Extra large", hint: "Furniture and big items. Up to 120 x 80 x 80 cm and 40 kg. Courier to the door only.", maxKg: 40, door: rand(650), locker: null, box: { length: 120, width: 80, height: 80 } },
 };
 export const PARCEL_SIZE_IDS = Object.keys(PARCEL_SIZES) as ParcelSize[];
 
 /** The parcel size for an order: the biggest item, and at least Medium for 3 or more items in a bundle. */
 export function orderParcelSize(sizes: (ParcelSize | null | undefined)[]): ParcelSize {
-  const rank: ParcelSize[] = ["small", "medium", "large"];
+  const rank: ParcelSize[] = ["small", "medium", "large", "xl"];
   let r = Math.max(0, ...sizes.map((s) => rank.indexOf(s ?? "small")));
   if (sizes.length >= 3) r = Math.max(r, 1);
   return rank[r];

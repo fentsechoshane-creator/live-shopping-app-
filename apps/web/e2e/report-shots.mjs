@@ -118,9 +118,9 @@ try {
 
   await page.goto(`${BASE}/me?tab=selling`);
   await page.getByRole("button", { name: "Open my shop" }).click();
-  await page.getByRole("button", { name: /Clothes and thrift/ }).waitFor();
+  await page.getByRole("button", { name: /Fashion/ }).waitFor();
   await shot("seller-1-category");
-  await page.getByRole("button", { name: /Clothes and thrift/ }).click();
+  await page.getByRole("button", { name: /Fashion/ }).click();
   await page.getByLabel("Shop name").fill("Naledi Thrift");
   await shot("seller-2-name");
   await page.getByRole("button", { name: "Continue" }).click();

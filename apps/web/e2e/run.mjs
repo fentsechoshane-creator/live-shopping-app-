@@ -530,7 +530,7 @@ try {
   await page.goto(`${BASE}/me?tab=selling`);
   await page.getByRole("button", { name: "Open my shop" }).click();
   await page.waitForURL(/sell\/start/);
-  await page.getByRole("button", { name: /Clothes and thrift/ }).click();
+  await page.getByRole("button", { name: /Fashion/ }).click();
   await page.getByLabel("Shop name").fill("Naledi Thrift");
   await shot("onboard-name");
   await page.getByRole("button", { name: "Continue" }).click();

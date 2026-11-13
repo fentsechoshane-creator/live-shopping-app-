@@ -29,7 +29,7 @@ Deno.serve(handler(async (req, body) => {
 
   if (body?.check === "route") {
     const { data: product } = await db.from("products").select("id, shop_id, price_cents, parcel_size, mode, status").eq("id", String(body.productId ?? "")).maybeSingle();
-    if (!product || product.status !== "live" || product.mode === "order_now") throw new UserError("That item isn't available.");
+    if (!product || product.status !== "live" || (product.mode === "order_now" && !product.parcel_size)) throw new UserError("That item isn't available.");
     const parcel = (product.parcel_size ?? "small") as ParcelSize;
     if (body.delivery === "pudo_locker") {
       if (deliveryFee("pudo_locker", parcel) === null) return json({ ok: false, message: "This parcel is too big for a locker. Pick courier or collection." });

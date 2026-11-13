@@ -26,6 +26,12 @@ export function CreateListing({ shop, media, onMedia, onCamera, onStep, startAtD
   onEdit?: () => void;
 }) {
   const food = shop.category === "food";
+  // Made to order is open to home and beauty shops too (13 Nov). It ships by courier once made, unlike food.
+  const madeOk = shop.category === "home" || shop.category === "beauty";
+  const [made, setMade] = useState(false);
+  // Appliances (plug in or batteries): new and sealed, with a receipt or warranty card our team checks.
+  const [appliance, setAppliance] = useState(false);
+  const sealedRule = shop.category === "beauty" || shop.category === "fragrance";
   const founding = !!shop.foundingUntil && new Date(shop.foundingUntil) > new Date();
   const [step, setStepState] = useState(startAtDetails && media.length ? 1 : 0);
   const [title, setTitle] = useState("");
@@ -61,7 +67,7 @@ export function CreateListing({ shop, media, onMedia, onCamera, onStep, startAtD
   const [features] = useLoad(() => api.myFeatures(), []);
   const auctionUnlock = canUse("timed_auction", { verified: shop.checks.idStatus === "approved" && shop.checks.bankStatus === "approved",
     goodOrders: shop.goodOrders, trustScore: shop.trustScore, category: shop.category, overrides: features });
-  const mode = food ? "order_now" : auction ? "auction" : "buy_now";
+  const mode = food || made ? "order_now" : auction ? "auction" : "buy_now";
   const cover = media[0] ?? null;
   const urls = useMemo(() => media.map((m) => URL.createObjectURL(m)), [media]);
   useEffect(() => () => urls.forEach((u) => URL.revokeObjectURL(u)), [urls]);
@@ -111,11 +117,11 @@ export function CreateListing({ shop, media, onMedia, onCamera, onStep, startAtD
     if (n === 0) return media.length ? [] : ["Add a photo or video first."];
     if (n === 1) {
       if (title.trim().length < 3) return ["Give it a short title, like “Vintage denim jacket, size M”."];
-      return validateListing({ title, description: "", price: 100, label, condition: condition ?? undefined, hasProof: !!proof, mode })
+      return validateListing({ title, description: "", price: 100, label, condition: condition ?? undefined, hasProof: !!proof, mode, appliance })
         .filter((e) => !/price/i.test(e));
     }
     if (n === 2) {
-      const errs = validateListing({ title, description, price: priceCents, label, condition: condition ?? undefined, hasProof: !!proof, mode })
+      const errs = validateListing({ title, description, price: priceCents, label, condition: condition ?? undefined, hasProof: !!proof, mode, appliance })
         .filter((e) => /price/i.test(e));
       const rp = auction ? reserveProblem(priceCents, reserveCents) : null;
       const sizeErr = !food && !parcelSize ? ["Pick a parcel size, so buyers see the right delivery price."] : [];
@@ -129,11 +135,12 @@ export function CreateListing({ shop, media, onMedia, onCamera, onStep, startAtD
     setStep(step + 1);
   };
   const post = () => run(async () => {
-    const errs = validateListing({ title, description, price: priceCents, label, condition: condition ?? undefined, hasProof: !!proof, mode });
+    const errs = validateListing({ title, description, price: priceCents, label, condition: condition ?? undefined, hasProof: !!proof, mode, appliance });
     if (errs.length) throw new Error(errs[0]);
     const res = await api.createListing({
       title: title.trim(), description: description.trim(), priceCents, mode, label: food ? "new" : label, condition,
-      sizes: auction ? sizes.slice(0, 1) : sizes, stock: food ? 99 : auction ? 1 : stock, leadDays: food ? leadDays : null, allergens: food ? allergens.trim() || null : null,
+      sizes: auction ? sizes.slice(0, 1) : sizes, stock: food || made ? 99 : auction ? 1 : stock, leadDays: food || made ? leadDays : null, allergens: food ? allergens.trim() || null : null,
+      ...(appliance ? { appliance: true } : {}),
       ...(auction ? { auctionDays, reserveCents } : {}),
       ...(!food ? { parcelSize: parcelSize ?? "small" } : {}),
       caption: caption.trim() || title.trim(),
@@ -249,7 +256,7 @@ export function CreateListing({ shop, media, onMedia, onCamera, onStep, startAtD
               <>
                 <div className="wz-label">It is</div>
                 <div className="wz-options" role="radiogroup" aria-label="Type of item">
-                  {(Object.keys(LISTING_LABELS) as ListingLabel[]).map((l) => (
+                  {(Object.keys(LISTING_LABELS) as ListingLabel[]).filter((l) => !appliance || l === "new").map((l) => (
                     <button key={l} role="radio" aria-checked={label === l} className="wz-option" onClick={() => setLabel(l)}>
                       <span className="radio" /><span className="grow"><b>{LISTING_LABELS[l].label}</b><small>{LISTING_LABELS[l].help}</small></span>
                     </button>
@@ -262,6 +269,27 @@ export function CreateListing({ shop, media, onMedia, onCamera, onStep, startAtD
                       {CONDITIONS.map((c) => <button key={c.value} aria-pressed={condition === c.value} onClick={() => setCondition(c.value)}>{c.label}</button>)}
                     </div>
                   </>
+                )}
+                {shop.category === "home" && (
+                  <div className="max-card" style={{ marginTop: 12 }}>
+                    <div>
+                      <div className="t">It's an appliance</div>
+                      <div className="small muted">Plugs in or takes batteries, like a toaster or kettle. Must be new and sealed, with the receipt or warranty card.</div>
+                    </div>
+                    <button className="switch" role="switch" aria-checked={appliance} aria-label="It's an appliance"
+                      onClick={() => { const on = !appliance; setAppliance(on); if (on) { setLabel("new"); setCondition(null); } }} />
+                  </div>
+                )}
+                {appliance && (
+                  <label className="wz-file">
+                    <Icon name="shield" size={20} /><span className="grow"><b>{proof ? proof.name : "Add the receipt or warranty card"}</b><small>A photo is fine. Only our team sees it, and we check it before it goes live.</small></span>
+                    <input type="file" accept="image/*,application/pdf" hidden aria-label="Receipt or warranty card" onChange={(e) => setProof(e.target.files?.[0] ?? null)} />
+                  </label>
+                )}
+                {sealedRule && label === "pre_loved" && (
+                  <div className="note amber" style={{ marginTop: 12 }}>{shop.category === "fragrance"
+                    ? "Pre loved perfume must be in its original bottle. No decants or refills."
+                    : "Makeup and skincare must be sealed or in original packaging where you don't touch the product, like a pump or tube."}</div>
                 )}
                 {label === "authentic_designer" && (
                   <label className="wz-file">
@@ -283,11 +311,12 @@ export function CreateListing({ shop, media, onMedia, onCamera, onStep, startAtD
 
         {step === 2 && (
           <>
-            <h1>{food ? "Price and allergens" : auction ? "Auction" : "Price and stock"}</h1>
+            <h1>{food ? "Price and allergens" : auction ? "Auction" : made ? "Price and timing" : "Price and stock"}</h1>
             {!food && (
               <div className="seg-choice" role="radiogroup" aria-label="How it sells">
-                <button role="radio" aria-checked={!auction} onClick={() => setAuction(false)}><b>Buy now</b><span>Fixed price</span></button>
-                <button role="radio" aria-checked={auction} disabled={!auctionUnlock.ok} onClick={() => setAuction(true)}>
+                <button role="radio" aria-checked={!auction && !made} onClick={() => { setAuction(false); setMade(false); }}><b>Buy now</b><span>Fixed price</span></button>
+                {madeOk && <button role="radio" aria-checked={made} onClick={() => { setMade(true); setAuction(false); if (leadDays < 5) setLeadDays(7); }}><b>Made to order</b><span>You make it after they pay</span></button>}
+                <button role="radio" aria-checked={auction} disabled={!auctionUnlock.ok} onClick={() => { setAuction(true); setMade(false); }}>
                   <b>{auctionUnlock.ok ? "Auction" : <><Icon name="lock" size={13} /> Auction</>}</b><span>{auctionUnlock.ok ? "Buyers bid" : features?.auctions === "off" ? "Turned off" : "After 5 good orders"}</span>
                 </button>
               </div>
@@ -320,8 +349,18 @@ export function CreateListing({ shop, media, onMedia, onCamera, onStep, startAtD
               </>
             ) : !food ? (
               <>
-                <div className="wz-label">How many do you have?</div>
-                <Stepper value={stock} min={1} max={999} onChange={setStock} label="Stock" />
+                {made ? (
+                  <>
+                    <div className="wz-label">Days to make it</div>
+                    <Stepper value={leadDays} min={1} max={45} onChange={setLeadDays} label="Days to make it" />
+                    <div className="wz-hint">Buyers see this before they pay. It ships by courier once it's ready.</div>
+                  </>
+                ) : (
+                  <>
+                    <div className="wz-label">How many do you have?</div>
+                    <Stepper value={stock} min={1} max={999} onChange={setStock} label="Stock" />
+                  </>
+                )}
                 <div className="wz-label">Sizes <span className="muted">(optional)</span></div>
                 <div className="chips">
                   {QUICK_SIZES.map((s) => (
@@ -345,7 +384,7 @@ export function CreateListing({ shop, media, onMedia, onCamera, onStep, startAtD
                       right={`R${PARCEL_SIZES[z].door / 100}`} />
                   ))}
                 </div>
-                <p className="small muted" style={{ marginTop: 4 }}>The buyer pays delivery by size. If the parcel is bigger or heavier than you pick, the courier's extra charge comes off your payout. Anything bigger than Large is collection only.</p>
+                <p className="small muted" style={{ marginTop: 4 }}>The buyer pays delivery by size. If the parcel is bigger or heavier than you pick, the courier's extra charge comes off your payout. Extra large is courier to your buyer's door only, too big for lockers.</p>
               </>
             )}
           </>
@@ -385,7 +424,9 @@ export function CreateListing({ shop, media, onMedia, onCamera, onStep, startAtD
               {auction
                 ? <SumRow k="Auction" v={`From ${R(priceCents)}, ${reserveCents ? `reserve ${R(reserveCents)}` : "no reserve"}, ${auctionDays} ${auctionDays === 1 ? "day" : "days"}`} onEdit={() => setStep(2)} />
                 : <SumRow k="Price" v={R(priceCents)} sub={fee > 0 ? `You get ${R(priceCents - fee)} after the 6% fee` : `No fee for founding sellers. You get all of it.`} onEdit={() => setStep(2)} />}
-              {!food && <SumRow k="Stock" v={`${stock} ${stock === 1 ? "item" : "items"}${sizes.length ? ` · ${sizes.join(", ")}` : ""}`} onEdit={() => setStep(2)} />}
+              {!food && !made && <SumRow k="Stock" v={`${stock} ${stock === 1 ? "item" : "items"}${sizes.length ? ` · ${sizes.join(", ")}` : ""}`} onEdit={() => setStep(2)} />}
+              {made && <SumRow k="Made to order" v={`${leadDays} ${leadDays === 1 ? "day" : "days"} to make`} sub={sizes.length ? sizes.join(", ") : undefined} onEdit={() => setStep(2)} />}
+              {appliance && <SumRow k="Appliance" v="New and sealed" sub={proof ? "Receipt or warranty added. We check it first." : "Add the receipt or warranty card"} onEdit={() => setStep(1)} />}
               {!food && parcelSize && <SumRow k="Parcel" v={PARCEL_SIZES[parcelSize].label} sub={`Buyers pay R${PARCEL_SIZES[parcelSize].door / 100} for courier${PARCEL_SIZES[parcelSize].locker ? `, R${PARCEL_SIZES[parcelSize].locker / 100} to a locker` : ""}`} onEdit={() => setStep(2)} />}
               {food && <SumRow k="Notice" v={`${leadDays} days`} sub={allergens || undefined} onEdit={() => setStep(1)} />}
               <SumRow k="Caption" v={caption || title} onEdit={() => setStep(3)} />

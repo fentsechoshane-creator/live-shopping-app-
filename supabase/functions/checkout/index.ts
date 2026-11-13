@@ -28,11 +28,14 @@ Deno.serve(handler(async (req, body) => {
 
   const product = must(
     await db.from("products")
-      .select("id, title, price_cents, mode, sizes, stock, status, lead_days, shop_id, parcel_size, held_for, held_until, auction_state, auction_winner, auction_price_cents, auction_pay_by, shops!inner(id, owner_id, status, name, founding_until, seller_checks(escrow_token, bank_status))")
+      .select("id, title, price_cents, mode, sizes, stock, status, lead_days, shop_id, parcel_size, held_for, held_until, auction_state, auction_winner, auction_price_cents, auction_pay_by, shops!inner(id, owner_id, status, name, category, founding_until, seller_checks(escrow_token, bank_status))")
       .eq("id", productId).single(),
     "load product",
   ) as any;
   const shop = product.shops;
+  // Food made to order is collected or delivered by the baker on a date. Other made to order items (home, beauty, 13 Nov)
+  // ship by courier like Buy now once they're made.
+  const food = product.mode === "order_now" && shop.category === "food";
   // Auctions: only the winner can pay, at the winning bid, within 2 hours of the end.
   const auction = product.mode === "auction";
   if (auction) {
@@ -71,7 +74,7 @@ Deno.serve(handler(async (req, body) => {
     itemPrice = offer.price_cents;
   }
   if (product.sizes?.length && !product.sizes.includes(size)) throw new UserError("Pick a size.");
-  const allowed = product.mode === "order_now" ? FOOD : NON_FOOD;
+  const allowed = food ? FOOD : NON_FOOD;
   if (!allowed.includes(delivery)) throw new UserError("That delivery option is not available for this item.");
   // Courier and lockers are booked by us through Bob Go, priced by parcel size (migration 0028).
   const parcelSize = orderParcelSize([product.parcel_size, ...bundleSizes] as any);
@@ -100,7 +103,7 @@ Deno.serve(handler(async (req, body) => {
     if (!route.ok) throw new UserError(route.message ?? "That delivery option isn't available. Pick another one.", 409);
     quotedDeliveryCents = route.quoteCents ?? null;
   }
-  if (product.mode === "order_now") {
+  if (food) {
     const earliest = new Date(Date.now() + (product.lead_days ?? 2) * 86400_000).toISOString().slice(0, 10);
     if (!foodDate || foodDate < earliest) throw new UserError(`Pick a date from ${earliest}.`);
     if (!foodSlot) throw new UserError("Pick a time slot.");
@@ -151,9 +154,9 @@ Deno.serve(handler(async (req, body) => {
     id: orderId, buyer_id: uid, shop_id: shop.id, product_id: product.id, mode: product.mode, size: size ?? null,
     item_price_cents: t.itemPrice, delivery, delivery_fee_cents: t.deliveryFee, protection_fee_cents: t.protectionFee,
     credit_cents: t.creditUsed, credit_topup_cents: t.creditTopUp, total_cents: t.total, seller_fee_cents: t.sellerFee, seller_payout_cents: t.sellerPayout,
-    delivery_details: deliveryDetails, food_date: foodDate ?? null, food_slot: foodSlot ?? null, food_message: foodMessage ?? null,
+    delivery_details: deliveryDetails, food_date: food ? foodDate ?? null : null, food_slot: food ? foodSlot ?? null : null, food_message: food ? foodMessage ?? null : null,
     bundle_product_ids: bundleIds, offer_id: offerId ?? null,
-    parcel_size: product.mode === "order_now" ? null : parcelSize, delivery_kept_cents: t.deliveryKept, pickup_point: savedPoint,
+    parcel_size: food ? null : parcelSize, delivery_kept_cents: t.deliveryKept, pickup_point: savedPoint,
     delivery_discount_cents: t.deliveryDiscount, delivery_perk: t.deliveryPerk, charges_taken_cents: t.chargesTaken,
   }), "create order");
 

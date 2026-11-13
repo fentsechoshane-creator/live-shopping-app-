@@ -30,7 +30,13 @@ export interface ListingInput {
   condition?: Condition;
   hasProof?: boolean;
   mode: "buy_now" | "order_now" | "auction";
+  /** Plugs in or takes batteries (13 Nov): new and sealed only, with a receipt or warranty card we check. */
+  appliance?: boolean;
 }
+
+/** Second hand electronics are not allowed: an easy way to sell stolen phones (Ofentse, 13 Nov). */
+export const BANNED_ELECTRONICS_WORDS = ["iphone", "samsung galaxy", "cellphone", "cell phone", "smartphone", "laptop", "macbook",
+  "ipad", "tablet", "playstation", "ps5", "ps4", "xbox", "nintendo switch", "airpods", "smartwatch", "apple watch"];
 
 // TradeSafe refuses payments under about R49 (R42.61 before VAT, seen live on 6 Nov 2026), so nothing on myHaul
 // sells for less than R50. Checkout checks the final amount too (offers and bundles can be lower than a listing).
@@ -49,5 +55,10 @@ export function validateListing(l: ListingInput): string[] {
     errors.push("Unbranded dupes cannot mention a brand name.");
   if (l.label === "pre_loved" && !l.condition) errors.push("Pick a condition for pre loved items.");
   if (l.label === "authentic_designer" && !l.hasProof) errors.push("Upload proof that the item is authentic.");
+  if (l.appliance && l.label !== "new") errors.push("Appliances must be new and sealed. Second hand appliances are not allowed.");
+  if (l.appliance && !l.hasProof) errors.push("Add a photo of the receipt or warranty card.");
+  // Bags, cases and sleeves for them are fine.
+  if (l.label !== "new" && BANNED_ELECTRONICS_WORDS.some((w) => new RegExp(` ${w}s?(?! ?(bag|sleeve|case|cover|stand|pouch|strap))`).test(text)))
+    errors.push("Second hand phones, laptops, tablets and consoles are not allowed on myHaul.");
   return errors;
 }

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { categoryTitle } from "../../lib/emoji";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { canUse, TIER_INFO, tierFor, TRUST_POINTS } from "@app/core";
 import { api, type MyProfile, type MyShop, type Order } from "../../api";
@@ -71,7 +72,7 @@ export function Profile() {
   const toShip = (sales ?? []).filter((o) => o.status === "paid").length;
   const founding = hasShop && shop!.foundingUntil && new Date(shop!.foundingUntil) > new Date();
   const standing = profile.trustScore >= 70 ? "Trusted" : profile.trustScore >= 40 ? "Good standing" : "Under review";
-  const categoryText = shop ? { clothes: "Clothes and thrift", beauty: "Hair and beauty", food: "Food and bakes", designer: "Designer resale" }[shop.category] : "";
+  const categoryText = shop ? categoryTitle(shop.category) : "";
 
   const ratings = (sales ?? []).map((o) => o.review?.stars).filter((x): x is number => typeof x === "number");
   const rating = ratings.length ? ratings.reduce((a, b) => a + b, 0) / ratings.length : null;

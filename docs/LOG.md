@@ -117,6 +117,20 @@ Asked by Ofentse (screenshot of Explore "Selling now" with the old white cards, 
 - Every page now has a cover behind the status bar (`.screen::before`, sticky, the height of the safe area), so content no longer scrolls under the clock and battery.
 - Shipped on its own ahead of the new categories (those still wait for migration 0045).
 
+### 2026-11-13: More categories, made to order for home and beauty, appliances, Extra large parcels
+
+Asked by Ofentse: the categories were too narrow (normal clothes, furniture and appliances, perfume). Decided with him:
+- Categories (one list in `lib/emoji.ts`, `CATEGORY_INFO`): 👗 Fashion (new, local brands and thrift; id stays `clothes`), 👜 Designer, 💄 Makeup and beauty (makeup, skin, hair, nails), 🌸 Perfume (new `fragrance`), 🛋️ Home and furniture (new `home`), 🧁 Food and bakes. Used by Explore, the welcome picks, seller onboarding, profile and live tiles.
+- Made to order (`order_now`) now also for Home and furniture and for Beauty, not only food. Only food needs the certificate and uses baker collection or delivery on a date. Home and beauty made to order ship by courier or locker once made, with a parcel size and "Days to make it" (default 7, up to 45). Checkout shows a "Made to order" note. Create has a third choice, Made to order, for those shops.
+- Appliances (plug in or batteries): a switch on Home listings. Must be New (sealed), with a receipt or warranty card uploaded; it goes through the same team check as designer proof (`products.appliance`, `submit_designer_proof`).
+- No second hand electronics: second hand phones, laptops, tablets, consoles, smartwatches, AirPods are refused in the app (core `BANNED_ELECTRONICS_WORDS`) and by the database. Bags, cases and sleeves for them are fine.
+- Beauty and perfume: pre loved makeup must be sealed or in original packaging; pre loved perfume in its original bottle (note on the listing screen, rule in the Terms).
+- Extra large parcel (`xl`): up to 120 x 80 x 80 cm and 40 kg, courier to the door only, R650 [CONFIRM with Bob Go's real price]. For furniture.
+- Research (competitors): Yaga SA allows clothes, beauty (sealed), home and kitchen, furniture, kids, books, and electronics only if reset and working; perfume only in the original bottle. Whatnot's biggest are cards, women's fashion, toys, beauty. TikTok Shop asks for documents for beauty, food and electronics.
+- Migration 0045 (`more_categories`): adds `fragrance` and `home` to shop_category, widens the interests check, `xl` parcels on products and orders, `products.appliance`, and a new `products_guard`. Functions changed: checkout (food check uses shop category; non food made to order uses courier rules), delivery (route checks for made to order with a parcel size). Terms 7.3 and new 7.4.
+- **Not live yet:** needs migration 0045, the checkout and delivery functions, then main.
+- Open [CONFIRM]: the XL price; buyers get 1 day to inspect made to order items (same as food) which may be short for furniture; demo has no sample home or perfume shop yet.
+
 ### 2026-11-13: Sign up in two steps, a Terms tick, round tick boxes
 
 Asked by Ofentse: confirm the email before anything else, a tick to agree to the Terms and Privacy Policy, and all tick boxes round and sleek.

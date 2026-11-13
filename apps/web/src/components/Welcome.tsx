@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { CATEGORY_EMOJI } from "../lib/emoji";
+import { CATEGORY_EMOJI, CATEGORY_INFO } from "../lib/emoji";
 import { Wordmark } from "./ui";
 import type { Category } from "../api";
 import { Icon } from "./Icon";
@@ -10,12 +10,7 @@ import { useSession } from "../session";
 const WELCOMED = "lsa-welcomed";
 export const hasSeenWelcome = () => { try { return localStorage.getItem(WELCOMED) === "1"; } catch { return true; } };
 
-const INTERESTS: { id: Category; label: string; sub: string }[] = [
-  { id: "clothes", label: "Thrift", sub: "Pre loved and vintage" },
-  { id: "designer", label: "Designer", sub: "Checked resale" },
-  { id: "beauty", label: "Hair and beauty", sub: "Wigs, skin, nails" },
-  { id: "food", label: "Bakes", sub: "Cakes made to order" },
-];
+const INTERESTS: { id: Category; label: string; sub: string }[] = CATEGORY_INFO.map((c) => ({ id: c.id, label: c.short, sub: c.buyerSub }));
 
 /** Three quick screens: a word or two and a small picture each, over the real feed. */
 const SLIDES: { title: string; line: string; art: "buy" | "safe" | "checked" }[] = [

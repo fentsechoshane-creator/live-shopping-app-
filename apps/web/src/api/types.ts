@@ -15,7 +15,7 @@ export interface PickupPoint { id: number; provider: string; name: string; addre
 export interface ShopPickup extends StreetAddress { name: string; phone: string }
 export interface ShipmentEvent { at: string; status: string; message: string | null; location: string | null }
 
-export type Category = "clothes" | "beauty" | "food" | "designer";
+export type Category = "clothes" | "beauty" | "food" | "designer" | "fragrance" | "home";
 export type ReviewStatus = "not_started" | "pending" | "approved" | "rejected";
 
 export interface User {
@@ -342,6 +342,8 @@ export interface ListingInput {
   caption: string;
   /** Courier size, picked by the seller (not for food). */
   parcelSize?: ParcelSize;
+  /** Plugs in or takes batteries: new only, and the receipt or warranty card is checked before it goes live. */
+  appliance?: boolean;
 }
 
 export interface Payout {
