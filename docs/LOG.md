@@ -18,11 +18,12 @@ Checked 7 Nov 2026 with the live health check. "Practical completion" here means
 | Payments (TradeSafe escrow) | Working in TradeSafe's developer sandbox (real test payments with Ozow). Needs the production account and keys |
 | Delivery (Bob Go) | Working in Bob Go's sandbox (courier bookings, tracking, locker checks). Needs the live key, a balance, and a price check |
 | Video (Mux) | Keys in and working |
-| Sign in emails | Supabase's built in email only sends to the team, a few an hour [CONFIRM if a sender was added]. Needs Resend or another sender before real people can join |
+| Still missing (13 Nov) | TradeSafe and Bob Go live keys (block launch). Apple push (needs D-U-N-S) and Firebase push for the phone apps. Google address key in Cloudflare. Optional: Claude key for photo suggestions, Telegram alerts |
+| Sign in emails | Sent through Resend from myhaul.co.za. Codes are 6 digits, passwords work too [CONFIRM `RESEND_API_KEY` is also a Supabase secret for team alerts] |
 | Team dashboard | Done and live |
 | Phone apps | Built (Capacitor). Store accounts, D-U-N-S, Mac for the iPhone build and push keys still to do |
 | Legal and company | Company registered. Company details in Terms and Privacy. Information Officer registered (Shupulu Choshane, named in the Privacy Policy). help@myhaul.co.za still open |
-| Live selling | Built and tested in demo (shows, chat, Buy now, quick auctions, planned shows, reminders). Not live: needs migration 0040, the live-token function and a LiveKit Cloud project |
+| Live selling | Live: migration 0040, the live-token function and LiveKit Cloud keys are in |
 
 ## Run the current version
 
