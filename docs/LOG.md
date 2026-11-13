@@ -108,6 +108,11 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-13: Silver glass notes, "How auctions work" folds away
+
+- All notes and disclaimers (plain and amber `.note`, the in app legal `.important`, and the Terms page's yellow box) now use a silver frosted glass finish (`--glass-bg`, `--glass-edge`, light and dark). Amber warnings keep a thin amber edge on the left so they still read as warnings. Green notes unchanged.
+- "How auctions work" in the bid sheet is now a closed fold like Recent bids (`.fold.glass`), so the sheet is lighter.
+
 ### 2026-11-13: Device emojis
 
 Asked by Ofentse: use the phone's own emojis, they look cleaner. Picked: chat and comments, category chips, and celebration moments.

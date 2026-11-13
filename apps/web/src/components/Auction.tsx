@@ -82,6 +82,7 @@ export function AuctionSheet({ item, info, onInfo, onClose, onPay }: {
   const [typing, setTyping] = useState<string | null>(null);
   const [maxOn, setMaxOn] = useState(false);
   const [showBids, setShowBids] = useState(false);
+  const [showHow, setShowHow] = useState(false);
   const ends = info?.endsAt ? new Date(info.endsAt).getTime() : 0;
   const left = ends - now;
   const open = info?.state === "open" && left > 0;
@@ -211,9 +212,18 @@ export function AuctionSheet({ item, info, onInfo, onClose, onPay }: {
               </div>
             </div>
           )}
-          <div className="note" style={{ marginTop: 12 }}>
-            <b>How auctions work.</b> Bids go up in fixed steps. A bid in the last minute resets the clock to 1 minute, so nobody wins by sniping.
-            The winner pays within 2 hours and the money is held safely. No change of mind returns, but you're covered if it's wrong or faulty.
+          {/* Closed by default so the sheet stays light (Ofentse, 13 Nov). Same open and close as Recent bids. */}
+          <div className={`fold glass ${showHow ? "open" : ""}`}>
+            <button className="fold-head" onClick={() => setShowHow(!showHow)} aria-expanded={showHow} aria-controls="how-auctions">
+              <span>How auctions work</span>
+              <Icon name="down" size={18} />
+            </button>
+            <div className="fold-body" id="how-auctions">
+              <p className="fold-text">
+                Bids go up in fixed steps. A bid in the last minute resets the clock to 1 minute, so nobody wins by sniping.
+                The winner pays within 2 hours and the money is held safely. No change of mind returns, but you're covered if it's wrong or faulty.
+              </p>
+            </div>
           </div>
         </>
       )}
