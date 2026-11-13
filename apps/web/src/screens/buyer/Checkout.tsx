@@ -17,7 +17,9 @@ export function CheckoutSheet({ item, onClose, offer, auctionPrice }: { item: Fe
   const p = item.product;
   const price = auctionPrice ?? (offer ? offer.priceCents : p.priceCents);
   const extra = offer ? offer.productIds.length - 1 : 0;
-  const food = p.mode === "order_now";
+  // Food made to order is collected or delivered by the baker on a date. Other made to order items ship by courier once made.
+  const food = p.mode === "order_now" && item.shop.category === "food";
+  const madeToOrder = p.mode === "order_now" && !food;
   // Lockers come from Bob Go. They can be switched off for a build with VITE_LOCKERS=0.
   const options = (Object.keys(DELIVERY_OPTIONS) as DeliveryOption[]).filter((d) => !!DELIVERY_OPTIONS[d].foodOnly === food && (d !== "pudo_locker" || FEATURES.lockers));
   // Courier and locker prices depend on the parcel size the seller picked (the biggest item in a bundle).
@@ -155,6 +157,7 @@ export function CheckoutSheet({ item, onClose, offer, auctionPrice }: { item: Fe
         </>
       )}
 
+      {madeToOrder && <div className="note" style={{ marginBottom: 14 }}><b>Made to order.</b> The seller makes it after you pay, about {p.leadDays ?? 7} days, then it ships. Your money is held safely until it arrives.</div>}
       {food && (
         <>
           <Field label="Date" hint={`Order at least ${p.leadDays ?? 2} days ahead.`}>

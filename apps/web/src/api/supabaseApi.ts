@@ -841,14 +841,16 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
     },
     async createListing(input: ListingInput, video, proof, onProgress, photos = [], edit = null) {
       const errors = validateListing({ title: input.title, description: input.description, price: input.priceCents, label: input.label,
-        condition: input.condition ?? undefined, hasProof: !!proof, mode: input.mode });
+        condition: input.condition ?? undefined, hasProof: !!proof, mode: input.mode, appliance: input.appliance });
       if (errors.length) throw new Error(errors[0]);
       const shopId = await myShopId();
       if (!shopId) throw new Error("Start your shop first.");
       const row = {
         shop_id: shopId, title: input.title, description: input.description, price_cents: input.priceCents, mode: input.mode,
         label: input.label, condition: input.condition, sizes: input.sizes, stock: input.stock, lead_days: input.leadDays, allergens: input.allergens,
-        ...(input.mode !== "order_now" ? { parcel_size: input.parcelSize ?? "small" } : {}),
+        // Made to order home and beauty items ship by courier too, so they have a parcel size; food doesn't.
+        ...(input.parcelSize || input.mode !== "order_now" ? { parcel_size: input.parcelSize ?? "small" } : {}),
+        ...(input.appliance ? { appliance: true } : {}),
         ...(input.mode === "auction" ? {
           stock: 1, reserve_cents: input.reserveCents ?? null,
           auction_ends_at: new Date(Date.now() + (input.auctionDays ?? 3) * 86400e3).toISOString(),
@@ -869,11 +871,12 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
         res = await sb.from("products").insert({ ...row, status: "draft" }).select("id").single();
       }
       const productId = (check(res as any) as any).id as string;
-      if (proof && input.label === "authentic_designer") {
+      if (proof && (input.label === "authentic_designer" || input.appliance)) {
         const p = await upload("private", proof, "proof");
         check(await sb.rpc("submit_designer_proof", { p_product: productId, p_path: p }));
         live = false;
-        message = "We check the proof before designer items go live. This usually takes a day.";
+        message = input.appliance ? "We check the receipt or warranty before appliances go live. This usually takes a day."
+          : "We check the proof before designer items go live. This usually takes a day.";
       }
       // One clip: photos go straight to storage, videos to Mux when it's set up.
       const uploadClip = async (file: File, progress?: (pct: number) => void) => {

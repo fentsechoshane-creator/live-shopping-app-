@@ -6,14 +6,9 @@ import { useSession } from "../../session";
 import { Choice, ErrorNote, Field, Loading, Progress, useAction, useGoBack } from "../../components/ui";
 import { Icon } from "../../components/Icon";
 import { forgetMyShop } from "../../lib/mine";
-import { CATEGORY_EMOJI } from "../../lib/emoji";
+import { CATEGORY_EMOJI, CATEGORY_INFO } from "../../lib/emoji";
 
-const CATEGORIES: { id: Category; title: string; sub: string }[] = [
-  { id: "clothes", title: "Clothes and thrift", sub: "Pre loved and new fashion" },
-  { id: "beauty", title: "Hair and beauty", sub: "Bundles, wigs and skincare" },
-  { id: "food", title: "Food and bakes", sub: "Made to order in Cape Town" },
-  { id: "designer", title: "Designer resale", sub: "Checked for authenticity" },
-];
+const CATEGORIES: { id: Category; title: string; sub: string }[] = CATEGORY_INFO;
 const BANKS = ["Absa", "Capitec", "FNB", "Nedbank", "Standard Bank", "TymeBank", "African Bank", "Discovery Bank", "Investec"];
 const RULES = [
   ["Pack every order on video", "Before you can ship: a short video in the app showing the order code, the item from every side and the parcel being sealed, plus a photo of the sealed parcel. No video loses a dispute; 3 bad videos in 90 days pauses your listings."],

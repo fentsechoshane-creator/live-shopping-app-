@@ -695,7 +695,8 @@ export function createDemoApi(): Api {
       if (input.delivery === "pudo_locker" && !DEMO_POINTS.some((x) => x.id === input.pickupPoint?.id)) throw new Error("Pick a locker.");
       if (input.delivery === "courier" && !(dd.street && dd.suburb && dd.city && dd.province && /^\d{4}$/.test(dd.postalCode ?? "")))
         throw new Error("Check the delivery address: street, suburb, city, province and a 4 digit postal code.");
-      if (p.mode === "order_now" && (!input.foodDate || !input.foodSlot)) throw new Error("Pick a date and time slot.");
+      const foodOrder = p.mode === "order_now" && sh.category === "food";
+      if (foodOrder && (!input.foodDate || !input.foodSlot)) throw new Error("Pick a date and time slot.");
       if (p.heldFor && p.heldFor !== u.id && p.heldUntil && new Date(p.heldUntil) > new Date()) throw new Error("The seller is holding this item for someone else right now.");
       let itemPrice = auction ? p.auctionPriceCents! : p.priceCents;
       let bundleIds: string[] = [];
@@ -728,7 +729,7 @@ export function createDemoApi(): Api {
         id: oid, status: "pending_payment", mode: p.mode, product: { id: p.id, title }, bundleIds, offerId: input.offerId ?? null, shop: { id: sh.id, name: sh.name, handle: sh.handle },
         buyerId: u.id, shopOwnerId: sh.ownerId, size: input.size ?? null, delivery: input.delivery, deliveryDetails: input.deliveryDetails as Record<string, string>,
         foodDate: input.foodDate ?? null, foodSlot: input.foodSlot ?? null, totals, checkoutUrl: `/mock-pay/${oid}`, trackingRef: null, packingCode: packingCodeFor(oid),
-        parcelSize: p.mode === "order_now" ? null : parcelSize, pickupPoint: point, courierName: null, hasLabel: false, trackingStatus: null,
+        parcelSize: foodOrder ? null : parcelSize, pickupPoint: point, courierName: null, hasLabel: false, trackingStatus: null,
         paidAt: null, shipBy: null, shippedAt: null, deliveredAt: null, releasableAt: null, createdAt: now().toISOString(), ret: null, review: null,
       };
       s.orders.unshift(o);
@@ -1816,13 +1817,14 @@ export function createDemoApi(): Api {
       const sh = myShopRow();
       if (!sh) throw new Error("Start your shop first.");
       const errors = validateListing({ title: input.title, description: input.description, price: input.priceCents, label: input.label,
-        condition: input.condition ?? undefined, hasProof: !!proof, mode: input.mode });
+        condition: input.condition ?? undefined, hasProof: !!proof, mode: input.mode, appliance: input.appliance });
       if (errors.length) throw new Error(errors[0]);
       for (const pct of [20, 50, 80, 100]) { await wait(120); onProgress?.(pct); }
       let live = canSell(sh);
       let message = live ? undefined : "Saved as a draft. It goes live once your ID and bank account are checked.";
-      if (input.mode === "order_now" && sh.checks.certStatus !== "approved") { live = false; message = "Order now needs an approved Certificate of Acceptability."; }
+      if (input.mode === "order_now" && sh.category === "food" && sh.checks.certStatus !== "approved") { live = false; message = "Order now needs an approved Certificate of Acceptability."; }
       if (input.label === "authentic_designer") { live = false; message = "We check the proof before designer items go live. This usually takes a day."; }
+      if (input.appliance) { live = false; message = "We check the receipt or warranty before appliances go live. This usually takes a day."; }
       if (input.mode === "auction") {
         notOff("auctions");
         if (featureState(sh.ownerId, "auctions") !== "on" && goodOrders(sh.id) < 5) throw new Error("Auctions unlock after 5 delivered orders with good ratings.");
@@ -1832,7 +1834,7 @@ export function createDemoApi(): Api {
       const pid = id();
       s.products.push({
         id: pid, shopId: sh.id, title: input.title, description: input.description, priceCents: input.priceCents, mode: input.mode, label: input.label,
-        condition: input.condition, sizes: input.sizes, stock: input.stock, leadDays: input.leadDays, allergens: input.allergens, parcelSize: input.mode === "order_now" ? null : input.parcelSize ?? "small",
+        condition: input.condition, sizes: input.sizes, stock: input.stock, leadDays: input.leadDays, allergens: input.allergens, parcelSize: input.mode === "order_now" && !input.parcelSize ? null : input.parcelSize ?? "small",
         status: live ? "live" : "draft", proofStatus: proof ? "pending" : "not_started",
         ...(input.mode === "auction" ? { stock: 1, reserveCents: input.reserveCents ?? null, auctionState: live ? "open" : null, auctionRound: 0,
           auctionEndsAt: new Date(Date.now() + (input.auctionDays ?? 3) * 86400e3).toISOString() } : {}),

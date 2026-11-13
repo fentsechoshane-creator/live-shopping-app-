@@ -8,7 +8,7 @@ export interface SellerState {
   /** Delivered orders that were kept and not rated below 4 stars. */
   goodOrders: number;
   trustScore: number;
-  category: "clothes" | "beauty" | "food" | "designer";
+  category: "clothes" | "beauty" | "food" | "designer" | "fragrance" | "home";
   foodCertApproved?: boolean;
   /** Switches the team set for this account on the dashboard. Missing means auto. */
   overrides?: Partial<Record<AccountFeature, FeatureState>>;
@@ -21,6 +21,7 @@ const SWITCH: Record<Feature, AccountFeature[]> = {
 };
 
 export const GOOD_ORDERS_FOR_AUCTIONS = 5;
+export const ORDER_NOW_CATEGORIES: SellerState["category"][] = ["food", "home", "beauty"];
 
 export function canUse(feature: Feature, s: SellerState): { ok: boolean; reason?: string } {
   const off = SWITCH[feature].find((k) => s.overrides?.[k] === "off");
@@ -34,7 +35,9 @@ export function canUse(feature: Feature, s: SellerState): { ok: boolean; reason?
     case "chat":
       return { ok: true };
     case "order_now":
-      if (s.category !== "food") return { ok: false, reason: "Order now is for food sellers." };
+      // Made to order (13 Nov): food (needs the certificate), home and furniture, and beauty.
+      if (!ORDER_NOW_CATEGORIES.includes(s.category)) return { ok: false, reason: "Order now is for food, home and furniture, and beauty shops." };
+      if (s.category !== "food") return { ok: true };
       return s.foodCertApproved ? { ok: true } : { ok: false, reason: "Upload your Certificate of Acceptability. We check it within 2 working days." };
     case "timed_auction":
     case "go_live":

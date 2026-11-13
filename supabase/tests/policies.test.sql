@@ -97,7 +97,16 @@ select pg_temp.expect_error($$insert into products (shop_id, title, price_cents,
 select pg_temp.expect_error($$insert into products (shop_id, title, price_cents, label, status) values (my_shop_id(), 'Nike style runner', 40000, 'unbranded_dupe', 'draft')$$, 'brand');
 insert into products (shop_id, title, price_cents, label, status) values (my_shop_id(), 'Chunky white runner', 40000, 'unbranded_dupe', 'live');
 select pg_temp.expect_error($$insert into products (shop_id, title, price_cents, mode, status) values (my_shop_id(), 'Vintage belt', 25000, 'auction', 'live')$$, 'Auctions unlock');
-select pg_temp.expect_error($$insert into products (shop_id, title, price_cents, mode, status) values (my_shop_id(), 'Birthday cake', 65000, 'order_now', 'live')$$, 'Certificate');
+-- A fashion shop can't use Order now (0045: food, home and beauty only).
+select pg_temp.expect_error($$insert into products (shop_id, title, price_cents, mode, status) values (my_shop_id(), 'Birthday cake', 65000, 'order_now', 'live')$$, 'Order now is for');
+-- Appliances: new only, and the receipt or warranty is checked before going live (0045).
+select pg_temp.expect_error($$insert into products (shop_id, title, price_cents, label, condition, appliance, status) values (my_shop_id(), 'Old toaster', 20000, 'pre_loved', 'good', true, 'draft')$$, 'Appliances must be new');
+select pg_temp.expect_error($$insert into products (shop_id, title, price_cents, appliance, parcel_size, status) values (my_shop_id(), 'Toaster, 2 slice', 45000, true, 'large', 'live')$$, 'receipt');
+insert into products (shop_id, title, price_cents, appliance, parcel_size, status) values (my_shop_id(), 'Kettle, 1.7 L', 39900, true, 'large', 'draft');
+select pg_temp.expect_error($$insert into products (shop_id, title, price_cents, parcel_size, status) values (my_shop_id(), 'Huge box', 39900, 'xxl', 'draft')$$, 'parcel_size');
+insert into products (shop_id, title, price_cents, parcel_size, status) values (my_shop_id(), 'Pine coffee table', 189900, 'xl', 'draft');
+select pg_temp.expect_error($$insert into products (shop_id, title, price_cents, label, condition, status) values (my_shop_id(), 'iPhone 13, 128 GB', 600000, 'pre_loved', 'good', 'draft')$$, 'phones');
+insert into products (shop_id, title, price_cents, label, condition, status) values (my_shop_id(), 'Leather laptop bag', 45000, 'pre_loved', 'good', 'draft');
 select pg_temp.expect_error($$insert into products (shop_id, title, price_cents, label, status) values (my_shop_id(), 'Designer shirt', 120000, 'authentic_designer', 'live')$$, 'proof');
 select pg_temp.expect_error($$insert into products (shop_id, title, price_cents, label, status) values (my_shop_id(), 'Old denim jacket', 45000, 'pre_loved', 'draft')$$, 'condition');
 select pg_temp.expect_error($$insert into products (shop_id, title, price_cents, proof_status) values (my_shop_id(), 'Designer shirt', 120000, 'approved')$$, 'permission denied');

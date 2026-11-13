@@ -7,12 +7,9 @@ import { RewardChip } from "../../components/Rewards";
 import { ProductArt } from "../../components/Scene";
 import { Blank, ErrorNote, Field, Loading, R, Sheet, swatch } from "../../components/ui";
 import { useMyShopId } from "../../lib/mine";
-import { CATEGORY_EMOJI } from "../../lib/emoji";
+import { CATEGORY_EMOJI, CATEGORY_INFO } from "../../lib/emoji";
 
-const CATS: { id: Category | "all"; label: string }[] = [
-  { id: "all", label: "All" }, { id: "clothes", label: "Thrift" }, { id: "designer", label: "Designer" },
-  { id: "beauty", label: "Hair and beauty" }, { id: "food", label: "Bakes" },
-];
+const CATS: { id: Category | "all"; label: string }[] = [{ id: "all", label: "All" }, ...CATEGORY_INFO.map((c) => ({ id: c.id, label: c.short }))];
 const SORTS: { id: SearchSort; label: string }[] = [
   { id: "best", label: "Best match" }, { id: "new", label: "Newest" }, { id: "low", label: "Price: low to high" }, { id: "high", label: "Price: high to low" },
 ];

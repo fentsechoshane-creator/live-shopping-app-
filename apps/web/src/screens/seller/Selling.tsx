@@ -130,7 +130,7 @@ export function SellerOrderDetail() {
           </div>
           <button className="btn green block" disabled={busy || !packing || !parcel || packProblems.length > 0}
             onClick={() => packing && parcel && act(() => api.shipOrder(o.id, "", packing, parcel), booked ? "Courier booked. Print the label." : "Marked as shipped")}>
-            {busy && booked ? "Booking the courier…" : o.mode === "order_now" ? "Ready, handed over" : booked ? "Book courier and mark shipped" : "Mark as shipped"}
+            {busy && booked ? "Booking the courier…" : booked ? "Book courier and mark shipped" : o.mode === "order_now" ? "Ready, handed over" : "Mark as shipped"}
           </button>
         </div>
       )}

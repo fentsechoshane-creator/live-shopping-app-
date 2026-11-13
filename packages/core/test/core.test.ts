@@ -202,6 +202,12 @@ describe("unlocks", () => {
     expect(canUse("order_now", { ...base, category: "food" }).ok).toBe(false);
     expect(canUse("order_now", { ...base, category: "food", foodCertApproved: true }).ok).toBe(true);
   });
+  it("made to order is for food, home and beauty (13 Nov)", () => {
+    expect(canUse("order_now", { ...base, category: "home" }).ok).toBe(true);
+    expect(canUse("order_now", { ...base, category: "beauty" }).ok).toBe(true);
+    expect(canUse("order_now", { ...base, category: "clothes" }).ok).toBe(false);
+    expect(canUse("order_now", { ...base, category: "fragrance" }).ok).toBe(false);
+  });
   it("unverified sellers cannot sell", () => {
     expect(canUse("buy_now", { ...base, verified: false }).ok).toBe(false);
   });
@@ -210,6 +216,13 @@ describe("unlocks", () => {
 describe("listing rules", () => {
   const ok = { title: "Oversized tee, sand", price: rand(349), label: "new" as const, mode: "buy_now" as const };
   it("accepts a normal listing", () => expect(validateListing(ok)).toEqual([]));
+  it("appliances must be new with a receipt, and no second hand phones (13 Nov)", () => {
+    expect(validateListing({ ...ok, label: "new", appliance: true }).join(" ")).toMatch(/receipt or warranty/);
+    expect(validateListing({ ...ok, label: "new", appliance: true, hasProof: true })).toEqual([]);
+    expect(validateListing({ ...ok, label: "pre_loved", condition: "good", appliance: true, hasProof: true }).join(" ")).toMatch(/must be new/);
+    expect(validateListing({ ...ok, title: "iPhone 13, 128 GB", label: "pre_loved", condition: "good" }).join(" ")).toMatch(/phones, laptops/);
+    expect(validateListing({ ...ok, title: "Leather laptop bag", label: "pre_loved", condition: "good" })).toEqual([]);
+  });
   it("blocks replicas even when labelled", () => {
     expect(validateListing({ ...ok, title: "Jordan 4 reps, 1:1" }).join(" ")).toMatch(/Counterfeit/);
   });
