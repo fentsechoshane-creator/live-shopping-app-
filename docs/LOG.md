@@ -108,6 +108,16 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-13: myhaul.co.za moved to Cloudflare DNS
+
+Asked by Ofentse: use the real domain. Done in the browser:
+- Cloudflare: myhaul.co.za added as a site on the Free plan. Nameservers: stevie.ns.cloudflare.com and tanner.ns.cloudflare.com.
+- Records copied from Afrihost's DNS editor (Cloudflare's scan missed most): Resend DKIM TXT (resend._domainkey, key checked against Afrihost's copy), send and rsend CNAMEs, MX to mail.myhaul.co.za, mail and webmail A records, autoconfig and autodiscover CNAMEs, the two SRV mail records, SPF and mailconf TXT on the root, DMARC TXT. All email records are DNS only (not proxied). Not copied: www, ftp and cpanel A records (www will point at the app), and the _autodiscover._tcp SRV record (Outlook only, minor).
+- Deleted the root A record that pointed at Afrihost's parking page, so the app can take the root.
+- Afrihost (Lehloma's ClientZone, Bronze Email package): nameservers replaced with Cloudflare's two in DNS Management, NS records. Afrihost says up to 2 hours.
+- **Still to do once Cloudflare says active:** add myhaul.co.za and www.myhaul.co.za as custom domains on the myhaul Pages project (Cloudflare refuses until the switch is done), www sends people to the root, Supabase Auth Site URL and redirect URLs, Google Places key referrers. Keep APP_URL on the old address until real payments are on (test payments are blocked on myhaul.co.za on purpose).
+- Note: there is an Afrihost Bronze Email package on the domain, so Afrihost mailboxes still work after the move (MX and mail records copied).
+
 ### 2026-11-13: D-U-N-S number received
 
 - Ofentse got the D-U-N-S number for myHaul (Pty) Ltd. STORE.md step 2 marked done.
