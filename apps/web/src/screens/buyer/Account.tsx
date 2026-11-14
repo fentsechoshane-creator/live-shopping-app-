@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useScrolledPast } from "../../lib/scrolled";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api, authMethod, type ShopReviews } from "../../api";
 import { useLoad, useSession } from "../../session";
@@ -87,14 +88,17 @@ export function Inbox() {
   return (
     <div className="screen" {...handlers}>
       {pull > 0 && <div className="pull-hint" style={{ height: pull }}>{pull >= 70 ? "Let go to refresh" : "Pull to refresh"}</div>}
-      <div className="row between inbox-head">
-        <h1 className="large-title">Inbox</h1>
-        <Link to="/friends" className="icon-btn" aria-label="New message"><Icon name="edit" size={20} /></Link>
+      {/* Frozen title and switch, like Instagram's inbox. */}
+      <div className="screen-head lined">
+        <div className="row between inbox-head">
+          <h1 className="large-title">Inbox</h1>
+          <Link to="/friends" className="icon-btn" aria-label="New message"><Icon name="edit" size={20} /></Link>
+        </div>
+        <Segmented<InboxTab> label="Inbox" value={tab} onChange={setTab} options={[
+          { value: "messages", label: <>Messages{unreadChats > 0 && <span className="count">{unreadChats}</span>}</> },
+          { value: "updates", label: <>Updates{unreadUpdates > 0 && <span className="count">{unreadUpdates}</span>}</> },
+        ]} />
       </div>
-      <Segmented<InboxTab> label="Inbox" value={tab} onChange={setTab} options={[
-        { value: "messages", label: <>Messages{unreadChats > 0 && <span className="count">{unreadChats}</span>}</> },
-        { value: "updates", label: <>Updates{unreadUpdates > 0 && <span className="count">{unreadUpdates}</span>}</> },
-      ]} />
       <div style={{ marginTop: 16 }} {...swipeTabs} className="swipe-area">
         {tab === "messages" && (chats && friendChats ? (
           <>
@@ -186,6 +190,7 @@ export function ShopPage() {
   const [reacted] = useLoad(() => (data && tab !== "posts" ? api.reactedPosts(tab === "likes" ? "like" : "repost", data.shop.id) : Promise.resolve([])), [data?.shop.id, tab]);
   const [reviews] = useLoad(() => (data ? api.shopReviews(data.shop.id) : Promise.resolve(null)), [data?.shop.id]);
   const [showReviews, setShowReviews] = useState(false);
+  const [headRef, pastHead] = useScrolledPast<HTMLDivElement>();
   if (error) return <div className="screen"><ErrorNote error={error} /></div>;
   if (data === undefined) return <div className="screen"><Loading /></div>;
   if (!data) return <div className="screen"><BackButton /><Blank icon="store" title="Shop not found" line="It may have closed or changed its name." /></div>;
@@ -194,14 +199,15 @@ export function ShopPage() {
   const share = async () => { if ((await shareOrCopy(`/s/${shop.handle}`)) === "copied") toast("Link copied"); };
   return (
     <div className="screen profile">
-      <div className="pbar">
+      <div className={`pbar ${pastHead ? "compact" : ""}`}>
         <button className="bare" onClick={goBack} aria-label="Back"><Icon name="back" /></button>
+        <span className="pbar-title" aria-hidden={!pastHead}>{shop.name}</span>
         <div className="row" style={{ gap: 2 }}>
           <button className="bare" onClick={share} aria-label="Share shop"><Icon name="share" /></button>
           <button className="bare" onClick={() => setMore(true)} aria-label="More options"><Icon name="more" size={20} strokeWidth={3} /></button>
         </div>
       </div>
-      <div className="phead">
+      <div className="phead" ref={headRef}>
         <Avatar url={avatars?.[shop.id]} name={shop.name} className="pavatar green" />
         <div className="pstats">
           <button onClick={() => setTab("posts")}><b>{items.length}</b><span>Posts</span></button>

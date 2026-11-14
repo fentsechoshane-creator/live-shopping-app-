@@ -38,6 +38,22 @@
 | Touch | Nothing you tap is smaller than 40px. |
 | Words | Plain South African English. No hyphens or em dashes in app text. Say what happens: "Pay R311", "Ask for a return". Helper text is one short line or it goes. |
 
+## Layout rules (from TikTok and Instagram, 14 Nov 2026)
+
+These keep the screens from breaking on any phone. Every new screen follows them.
+
+1. **Two kinds of screens.**
+   - Video screens (feed, video viewer, live, camera, editor) run full screen, under the clock. A soft dark fade sits behind the clock so it stays readable. Buttons at the top start below the clock area.
+   - List screens (Explore, Inbox, Me, shop and person pages, orders, settings) never let content scroll under the clock. Their top bar is frozen and solid, and it covers the clock area.
+2. **What is frozen at the top.** Explore: search, filters and category chips (`.screen-head`). Inbox: the title and the Messages/Updates switch. Profiles and shops: the icon bar (`.pbar`), and the Posts/Likes/Reposts tabs stick under it. When the name scrolls away, it appears small in the middle of the top bar, like Instagram.
+3. **Frozen bars are solid.** Nothing shows through them (`--bar-bg` is the page colour). A thin line appears under them.
+4. **Bottom bar.** Always in the same place. Solid enough on list screens that text underneath never shows through; dark glass over video. It hides while the keyboard is open.
+5. **Safe areas.** Use `var(--sat)` (top, the clock) and `var(--sab)` (bottom, the home bar), never `env()` directly. Tests switch a notch on by setting these two.
+6. **Video overlays.** The caption, product and buttons sit above the bottom bar with a gap, inside the bottom dark fade. Text never runs under the right side buttons. Captions show one line until tapped.
+7. **Grids.** Profiles and shops: 3 across, 3:4, 2 px gaps, edge to edge. Explore: 2 across, 3:4, rounded, details in pills on the picture. Price top left, views bottom right.
+8. **Sheets** open from the bottom and stop below the clock area, with the home bar space added at the bottom.
+9. **Tap targets** are at least 44 x 44 px.
+
 ## Screen map (prototype to real app)
 
 | Prototype screen | Real app | Status |
