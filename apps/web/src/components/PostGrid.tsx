@@ -89,6 +89,18 @@ export function useAuctionPrices(products: ProductPublic[]): Record<string, numb
   return prices;
 }
 
+/** The price pill (top left) and views (bottom right) used on every tile, also by Explore's bigger tiles. */
+export function TileTags({ product, views, bidCents }: { product: ProductPublic; views?: number; bidCents?: number }) {
+  const kind = priceKind(product);
+  const cents = product.mode === "auction" ? bidCents ?? product.priceCents : product.priceCents;
+  return (
+    <>
+      <span className={`g3price ${kind}`}>{kind === "auction" && <Icon name="clock" size={11} strokeWidth={2.6} />}{kind === "sold" ? "Sold out" : R(cents)}</span>
+      {views !== undefined && <span className="g3views"><Icon name="play" size={11} />{shortCount(views)}</span>}
+    </>
+  );
+}
+
 /** One TikTok style tile: the price at the top, coloured by the kind of price, and the views at the bottom right. */
 export function GridTile({ product, views, chip, onClick, label, bidCents, children }: {
   product: ProductPublic; views?: number; chip?: string; onClick: () => void; label?: string;

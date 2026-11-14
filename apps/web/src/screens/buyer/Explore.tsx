@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { TileTags, priceKind, shortCount, useAuctionPrices, useProductViews } from "../../components/PostGrid";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, PROVINCES, type Category, type FeedItem, type Province, type SearchFilters, type SearchSort } from "../../api";
 import { useLoad, useSession } from "../../session";
@@ -62,6 +63,8 @@ export function Explore() {
     return [...seen.values()];
   }, [items]);
   const shown = searching ? results : items;
+  const views = useProductViews((shown ?? []).map((it) => it.product.id));
+  const bids = useAuctionPrices((shown ?? []).map((it) => it.product));
   const chips: { label: string; clear: () => void }[] = [
     ...(f.sort && f.sort !== "best" ? [{ label: SORTS.find((x) => x.id === f.sort)!.label, clear: () => setF({ ...f, sort: "best" }) }] : []),
     ...(f.size ? [{ label: `Size ${f.size}`, clear: () => setF({ ...f, size: null }) }] : []),
@@ -119,19 +122,23 @@ export function Explore() {
           {shown.length === 0 && <Blank icon="search" title="No results"
             line={filterCount ? "Nothing matches these filters. Try removing one." : q ? `Nothing matches "${q}". Try another word, or browse a category above.` : "Nothing in this category yet. Try another one."}
             action={filterCount ? "Clear filters" : undefined} onAction={filterCount ? () => setF(EMPTY) : undefined} />}
+          {/* TikTok style, full picture (14 Nov): price pill on top coloured by kind, title and shop in a pill, views bottom right. */}
           <div className="grid2">
-            {shown.map((it) => (
-              <button key={it.postId} className="tile" onClick={() => nav(`/s/${it.shop.handle}?item=${it.product.id}`)} aria-label={`${it.product.title}, ${R(it.product.priceCents)}`}>
-                <div className="media"><ProductArt productId={it.product.id} video={it.video} fallback={it.video.demo?.bg ?? swatch(it.product.id)} />
-                  {it.product.mode === "order_now" && <span className="vchip vglass amber"><span className="d" />Made to order</span>}
-                </div>
-                <div className="body">
-                  <div className="t">{it.product.title}</div>
-                  <div className="p">{R(it.product.priceCents)}</div>
-                  <div className="small muted" style={{ marginTop: 2 }}>@{it.shop.handle}{it.product.sizes.length > 0 && ` · ${it.product.sizes.slice(0, 3).join(", ")}`}</div>
-                </div>
-              </button>
-            ))}
+            {shown.map((it) => {
+              const kind = priceKind(it.product);
+              return (
+                <button key={it.postId} className={`tile tt ${kind === "sold" ? "sold" : ""}`} onClick={() => nav(`/s/${it.shop.handle}?item=${it.product.id}`)}
+                  aria-label={`${it.product.title}, ${R(bids[it.product.id] ?? it.product.priceCents)}. @${it.shop.handle}${views[it.product.id] !== undefined ? `. ${views[it.product.id]} views` : ""}`}>
+                  <div className="media"><ProductArt productId={it.product.id} video={it.video} fallback={it.video.demo?.bg ?? swatch(it.product.id)} />
+                    <TileTags product={it.product} bidCents={bids[it.product.id]} />
+                    <span className="tt-cap">
+                      <span className="tt-text"><b>{it.product.title}</b><small>@{it.shop.handle}{it.product.sizes.length > 0 && ` · ${it.product.sizes.slice(0, 3).join(", ")}`}</small></span>
+                      {views[it.product.id] !== undefined && <span className="tt-views"><Icon name="play" size={10} />{shortCount(views[it.product.id])}</span>}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
           </div>
           {searching && more && shown.length > 0 && <button className="btn block" style={{ marginTop: 16 }} onClick={loadMore}>Show more</button>}
         </>
