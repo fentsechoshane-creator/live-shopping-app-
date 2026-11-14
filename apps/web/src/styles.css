@@ -19,7 +19,7 @@
   --ink: #000000;
   --ink-2: rgba(60, 60, 67, 0.85);
   --ink-3: rgba(60, 60, 67, 0.6);
-  --hairline: rgba(60, 60, 67, 0.14);
+  --hairline: rgba(60, 60, 67, 0.24); /* a touch darker on white (14 Nov), still 0.5 px thin */
 
   --glass: rgba(255, 255, 255, 0.62);
   --glass-strong: rgba(255, 255, 255, 0.84);

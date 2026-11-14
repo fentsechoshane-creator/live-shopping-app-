@@ -109,6 +109,10 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-14: Slightly darker outlines
+
+Asked by Ofentse: outlines a bit more defined, still as thin as possible. Light mode `--hairline` 0.14 to 0.24 opacity, still 0.5 px. Dark mode unchanged.
+
 ### 2026-11-14: White background, like Instagram
 
 Ofentse compared grey and white mockups and picked white.
