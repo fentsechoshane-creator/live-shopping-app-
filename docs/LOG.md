@@ -109,6 +109,14 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-14: Speed and hardening before launch, security score
+
+Asked by Ofentse: fix what we can on our side before launch, check security, score it.
+- Migration 0046 (`speed_and_hardening`): 58 security rules now ask "who is this user?" once per query, not once per row; an index on every foreign key (46); background trigger functions no longer listed as callable; `max_reply_seconds` gets a fixed search path. Same behaviour, just cheaper. New database tests fail if any of these come back.
+- Checked: all 24 team functions check for the team (`admin_person_row` is internal and not callable); everything a signed out visitor can call is meant to be public; Mux webhook signed, TradeSafe by secret, Bob Go re-reads tracking from Bob Go; no secrets in the code (only the public anon key); 0 known holes in app packages; strict CSP and security headers; ID and proof files in the private bucket.
+- Score given: about 72%. Gaps, mostly outside the code: two step sign in on our own accounts (SECURITY 9.1, not done), Supabase free plan (no backups, no leaked password check), spend caps not set, minimum password length [CONFIRM], no second step for team logins in the app.
+- **Not live yet:** 0046 goes with 0045 on the next deploy.
+
 ### 2026-11-14: Profile photos everywhere an account shows
 
 Asked by Ofentse: Explore's Shops to follow had no photos; every place an account is shown or searched must show its photo.

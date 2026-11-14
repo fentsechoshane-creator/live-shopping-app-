@@ -1633,3 +1633,19 @@ select pg_temp.act_as('00000000-0000-0000-0000-00000000041a'); -- bought it earl
 do $$ begin assert (select count(*) from product_thumbs(array['50000000-0000-0000-0000-000000000041'::uuid])) = 1, 'the buyer still sees it'; end $$;
 reset role;
 select 'thumbnail tests passed' as result;
+
+-- 0046: every rule asks "who is this user?" once per query, and every foreign key has an index.
+do $$ begin
+  assert (select count(*) from pg_policies where schemaname = 'public'
+          and ((qual ~ '\mauth\.(uid|role|jwt)\(\)' and qual !~* 'select auth\.(uid|role|jwt)\(\)')
+            or (with_check ~ '\mauth\.(uid|role|jwt)\(\)' and with_check !~* 'select auth\.(uid|role|jwt)\(\)'))) = 0,
+    'a policy still calls auth per row';
+  assert (select count(*) from pg_constraint c join pg_namespace n on n.oid = c.connamespace
+          where c.contype = 'f' and n.nspname = 'public'
+            and not exists (select 1 from pg_index i where i.indrelid = c.conrelid
+                            and (i.indkey::int2[])[0:array_length(c.conkey, 1) - 1] = c.conkey)) = 0,
+    'a foreign key has no index';
+  assert not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+          where n.nspname = 'public' and p.prorettype = 'trigger'::regtype and has_function_privilege('anon', p.oid, 'execute')),
+    'a trigger function is callable by visitors';
+end $$;
