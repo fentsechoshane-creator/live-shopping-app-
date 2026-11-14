@@ -109,6 +109,12 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-14: White background, like Instagram
+
+Ofentse compared grey and white mockups and picked white.
+- Light mode page colour `--bg` is now white (was iOS grey #f2f2f7). `--surface-2` is #efeff1 for fills.
+- Search, filter button and unselected chips are soft grey fills with no outline (Instagram style). Cards and grouped lists keep their thin edge so they still read on white. Dark mode unchanged.
+
 ### 2026-11-14: Layout rules from TikTok and Instagram
 
 Asked by Ofentse: the clock cover was wonky; follow what TikTok and Instagram do so the UI never breaks. Rules written into DESIGN.md "Layout rules".

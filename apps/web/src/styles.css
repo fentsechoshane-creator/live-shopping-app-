@@ -13,9 +13,9 @@
   /* SF Pro Rounded on Apple devices: prices, big numbers and the wordmark. Our one typographic signature. */
   --font-round: ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont, Inter, system-ui, sans-serif;
 
-  --bg: #f2f2f7;            /* page behind everything (iOS grouped background) */
+  --bg: #ffffff;            /* page behind everything: white like Instagram (Ofentse, 14 Nov). Was iOS grey #f2f2f7 */
   --surface: #ffffff;       /* solid cards and grouped lists */
-  --surface-2: #f2f2f7;     /* filled inputs, soft buttons */
+  --surface-2: #efeff1;     /* filled inputs, soft buttons, search */
   --ink: #000000;
   --ink-2: rgba(60, 60, 67, 0.85);
   --ink-3: rgba(60, 60, 67, 0.6);
@@ -1831,3 +1831,10 @@ input[type="checkbox"]:disabled { opacity: 0.45; cursor: default; }
 .tabs.glass:not(.on-video) { background: var(--glass-strong); -webkit-backdrop-filter: blur(24px) saturate(1.8); backdrop-filter: blur(24px) saturate(1.8); }
 .tabs { transition: opacity 0.18s ease, transform 0.2s ease; }
 body.typing .tabs { opacity: 0; transform: translateY(24px); pointer-events: none; }
+
+/* White background (14 Nov): search, filter and chips are soft grey fills like Instagram instead of white with an outline.
+   Dark mode is unchanged. */
+:root:not([data-theme="dark"]) .search, :root:not([data-theme="dark"]) .filter-btn:not(.on),
+:root:not([data-theme="dark"]) .chip:not([aria-pressed="true"]):not(.on):not(.plain) { background: var(--surface-2); box-shadow: none; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .search, :root:not([data-theme="light"]) .filter-btn:not(.on),
+  :root:not([data-theme="light"]) .chip:not([aria-pressed="true"]):not(.on):not(.plain) { background: var(--surface); box-shadow: 0 0 0 0.5px var(--hairline); } }

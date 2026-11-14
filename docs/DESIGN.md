@@ -40,6 +40,8 @@
 
 ## Layout rules (from TikTok and Instagram, 14 Nov 2026)
 
+Light mode pages are white like Instagram (not iOS grey); fills like search and chips are soft grey #efeff1; cards keep a thin edge.
+
 These keep the screens from breaking on any phone. Every new screen follows them.
 
 1. **Two kinds of screens.**
