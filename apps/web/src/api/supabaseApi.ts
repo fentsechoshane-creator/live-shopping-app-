@@ -368,7 +368,7 @@ export function createSupabaseApi(url: string, anonKey: string): Api {
     },
     async blocked() {
       const rows = check(await sb.rpc("my_blocks")) as any[];
-      return rows.map((r) => ({ userId: r.user_id, name: r.name, shopId: r.shop_id, shopHandle: r.shop_handle }));
+      return rows.map((r) => ({ userId: r.user_id, name: r.name, shopId: r.shop_id, shopHandle: r.shop_handle, avatarUrl: r.avatar_path ? avatarUrl(r.avatar_path) : null }));
     },
     async savePushToken(token, platform) {
       const res = await sb.from("device_tokens").upsert({ token, user_id: await uid(), platform, last_seen_at: new Date().toISOString() }, { onConflict: "token" });

@@ -365,6 +365,8 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
 .shop-row { display: flex; gap: 10px; overflow-x: auto; margin: 0 -16px; padding: 2px 16px; scrollbar-width: none; }
 .shop-card { min-width: 108px; max-width: 108px; border-radius: 16px; background: var(--surface); box-shadow: 0 0 0 0.5px var(--hairline); padding: 10px 8px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; }
 .shop-card .avatar { width: 42px; height: 42px; font-size: 17px; }
+.shop-face { padding: 0; border-radius: 50%; }
+.shop-card .avatar.has-photo img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
 .shop-card b { font-size: 13px !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .shop-card .small { font-size: 11.5px; }
 .shop-card .btn { min-height: 28px !important; padding: 0 12px !important; font-size: 12px !important; margin-top: 2px; }

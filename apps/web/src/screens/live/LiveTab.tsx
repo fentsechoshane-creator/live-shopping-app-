@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { api, type LiveShow } from "../../api";
 import { useLoad, useSession } from "../../session";
 import { Icon } from "../../components/Icon";
-import { Avatar } from "../../components/Avatar";
+import { Avatar, useShopAvatars } from "../../components/Avatar";
 import { Loading } from "../../components/ui";
 import { showTime } from "./Watch";
 
@@ -14,6 +14,7 @@ export function LiveTab() {
   const [shows, error, reload] = useLoad(() => api.liveShows(), []);
   useEffect(() => { const t = window.setInterval(reload, 20000); return () => window.clearInterval(t); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const faces = useShopAvatars((shows ?? []).map((x) => x.shop.id));
   if (error) return <div className="live-list"><div className="blank on-video"><Icon name="live" size={44} strokeWidth={1.5} /><b>Couldn't load shows</b><span>{error}</span></div></div>;
   if (!shows) return <div className="live-list"><Loading /></div>;
   // Shops you follow first.
@@ -43,7 +44,7 @@ export function LiveTab() {
             <span className="live-pill"><span className="dot-live" />LIVE</span>
             {s.peakViewers > 0 && <span className="live-viewers vglass"><Icon name="eye" size={13} />{s.peakViewers}</span>}
             <span className="live-tile-foot">
-              <Avatar name={s.shop.name} size={28} />
+              <Avatar url={faces[s.shop.id]} name={s.shop.name} size={28} />
               <span><b>{s.shop.handle}</b><span>{s.title}</span></span>
             </span>
           </button>
@@ -54,7 +55,7 @@ export function LiveTab() {
         {later.map((s) => (
           <div key={s.id} className="live-later-row vglass">
             <button className="live-later-main" onClick={() => nav(`/live/${s.id}`)}>
-              <Avatar name={s.shop.name} size={40} />
+              <Avatar url={faces[s.shop.id]} name={s.shop.name} size={40} />
               <span><b>{s.title}</b><span>@{s.shop.handle} · {showTime(s.startsAt)}</span></span>
             </button>
             {s.mine ? <button className="btn small vglass" onClick={() => nav(`/live/host/${s.id}`)}>Start</button> : (

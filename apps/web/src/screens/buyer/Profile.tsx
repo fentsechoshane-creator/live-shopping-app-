@@ -13,7 +13,7 @@ import { CertUpload } from "../seller/Selling";
 import { GridTile, PostGrid, useAuctionPrices, useProductViews } from "../../components/PostGrid";
 import { shareOrCopy } from "../../native";
 import { useTabSwipe } from "../../components/gestures";
-import { Avatar } from "../../components/Avatar";
+import { Avatar, useShopAvatars } from "../../components/Avatar";
 import { EditListing } from "../../components/EditListing";
 import { cleanHandle, handleProblem } from "../../lib/handle";
 import { squarePhoto } from "../../lib/image";
@@ -255,6 +255,7 @@ function ReactionGrid({ kind }: { kind: "like" | "repost" }) {
 function FollowingSheet({ onClose }: { onClose: () => void }) {
   const { following, toggleFollow } = useSession();
   const [shops] = useLoad(() => api.following(), [following.size]);
+  const faces = useShopAvatars((shops ?? []).map((s) => s.id));
   const nav = useNavigate();
   return (
     <Sheet title="Following" onClose={onClose}>
@@ -267,7 +268,7 @@ function FollowingSheet({ onClose }: { onClose: () => void }) {
         <div className="group">
           {shops.map((s) => (
             <div className="cell" key={s.id}>
-              <Link to={`/s/${s.handle}`} className="row grow"><span className="avatar">{s.name[0]}</span>
+              <Link to={`/s/${s.handle}`} className="row grow"><Avatar url={faces[s.id]} name={s.name} />
                 <span className="grow"><span className="t" style={{ display: "block" }}>{s.name}</span><span className="s" style={{ display: "block" }}>@{s.handle}</span></span></Link>
               <button className="btn" style={{ minHeight: 32, fontSize: 13 }} onClick={() => toggleFollow(s.id)}>Following</button>
             </div>
