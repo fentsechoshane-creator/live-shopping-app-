@@ -109,6 +109,14 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-14: Explore tiles TikTok style, cover behind the iPhone clock
+
+Asked by Ofentse (screenshot of Explore "Selling now" with the old white cards, and a Follow button showing through the clock): do the TikTok tiles everywhere, as full pictures with pills.
+- Explore "Selling now" and search results: full picture 3:4 tiles, no white box. Price pill top left in the same colours as profile grids (`TileTags` from PostGrid.tsx), and a full width glass pill at the bottom with the title, @shop and sizes, and the views on the right. Auction tiles show the current bid. Sold out gets the red tint.
+- Profile and shop grids already match TikTok: 3 across, 3:4, 2 px gaps, edge to edge. Explore stays 2 across like TikTok's Discover.
+- Every page now has a cover behind the status bar (`.screen::before`, sticky, the height of the safe area), so content no longer scrolls under the clock and battery.
+- Shipped on its own ahead of the new categories (those still wait for migration 0045).
+
 ### 2026-11-13: Sign up in two steps, a Terms tick, round tick boxes
 
 Asked by Ofentse: confirm the email before anything else, a tick to agree to the Terms and Privacy Policy, and all tick boxes round and sleek.

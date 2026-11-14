@@ -1789,3 +1789,25 @@ input[type="checkbox"]:active { transform: scale(0.92); }
 input[type="checkbox"]:focus-visible { outline: 2px solid var(--tint); outline-offset: 2px; }
 input[type="checkbox"]:disabled { opacity: 0.45; cursor: default; }
 @media (prefers-reduced-motion: reduce) { input[type="checkbox"], input[type="checkbox"]::after { transition: none; } }
+
+/* Explore tiles, TikTok style and full picture (14 Nov): no white box, the details sit on the picture as pills. */
+.tile.tt { background: transparent; box-shadow: none; }
+.tile.tt .media { aspect-ratio: 3 / 4; border-radius: var(--r); overflow: hidden; }
+.tile.tt .media::after { content: ""; position: absolute; inset: auto 0 0 0; height: 45%; background: linear-gradient(transparent, rgba(0, 0, 0, 0.45)); pointer-events: none; }
+.tile.tt.sold .media > :first-child { filter: grayscale(0.5) brightness(0.8); }
+.tile.tt.sold .media::after { inset: 0; height: auto; background: linear-gradient(rgba(255, 59, 48, 0.2), rgba(255, 59, 48, 0.2)), linear-gradient(transparent 55%, rgba(0, 0, 0, 0.45)); }
+.tile.tt .media .g3price { top: 8px; left: 8px; font-size: 13px; padding: 4px 10px; }
+.tile.tt .media .g3views { right: 9px; bottom: 11px; font-size: 12.5px; }
+.tile .media .g3price svg, .tile .media .g3views svg { position: static; width: 11px; height: 11px; flex: none; }
+.tt-cap { position: absolute; z-index: 1; left: 6px; right: 6px; bottom: 6px; display: flex; align-items: flex-end; gap: 6px; padding: 6px 10px 7px; border-radius: 14px;
+  color: #fff; text-align: left; background: rgba(0, 0, 0, 0.36); -webkit-backdrop-filter: blur(14px) saturate(1.4); backdrop-filter: blur(14px) saturate(1.4); box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.22); }
+.tt-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.tt-cap b { font-size: 13.5px; font-weight: 700; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tt-cap small { font-size: 11.5px; opacity: 0.85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tt-views { flex: none; display: inline-flex; align-items: center; gap: 3px; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.tile .media .tt-views svg { position: static; inset: auto; width: 10px; height: 10px; fill: #fff; transform: none; }
+
+/* A cover behind the iPhone clock and battery (14 Nov): pages scrolled under the status bar and the clock got lost. */
+.screen::before { content: ""; position: sticky; top: 0; z-index: 30; display: block; height: env(safe-area-inset-top, 0px);
+  margin: calc(-12px - env(safe-area-inset-top, 0px)) -16px 12px; background: var(--bg); pointer-events: none; }
+.screen.profile::before { margin-top: calc(-4px - env(safe-area-inset-top, 0px)); margin-bottom: 4px; }
