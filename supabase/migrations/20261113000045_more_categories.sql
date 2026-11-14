@@ -119,3 +119,14 @@ begin
   end if;
   return new;
 end $$;
+
+-- The blocked list shows each person's profile photo too (14 Nov: every account shows its photo).
+drop function my_blocks();
+create function my_blocks() returns table (user_id uuid, name text, shop_id uuid, shop_handle text, avatar_path text)
+language sql stable security definer set search_path = public as $$
+  select b.blocked_id, coalesce(nullif(p.display_name, ''), 'User'), s.id, s.handle, p.avatar_path
+  from blocks b join profiles p on p.id = b.blocked_id left join shops s on s.owner_id = b.blocked_id
+  where b.blocker_id = auth.uid() order by b.created_at desc;
+$$;
+revoke execute on function my_blocks() from public, anon;
+grant execute on function my_blocks() to authenticated;
