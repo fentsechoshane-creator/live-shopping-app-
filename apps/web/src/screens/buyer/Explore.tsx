@@ -74,7 +74,9 @@ export function Explore() {
 
   return (
     <div className="screen">
-      <div className="row" style={{ gap: 10, marginTop: 6 }}>
+      {/* Frozen at the top like TikTok's Discover: search, filters and categories stay put while results scroll. */}
+      <div className="screen-head lined">
+      <div className="row" style={{ gap: 10 }}>
         <label className="search">
           <Icon name="search" size={18} />
           <span className="visually-hidden">Search</span>
@@ -85,7 +87,7 @@ export function Explore() {
         </button>
         <RewardChip className="dark" />
       </div>
-      <div className="chips scroll" style={{ margin: "14px -16px 4px" }} role="group" aria-label="Category">
+      <div className="chips scroll" style={{ margin: "10px -16px 0" }} role="group" aria-label="Category">
         {CATS.map((c) => <button key={c.id} className="chip" aria-pressed={cat === c.id} onClick={() => setCat(c.id)}>{c.id !== "all" && <span className="emo" aria-hidden="true">{CATEGORY_EMOJI[c.id]}</span>}{c.label}</button>)}
       </div>
       {chips.length > 0 && (
@@ -94,6 +96,7 @@ export function Explore() {
           <button className="chip plain" onClick={() => setF(EMPTY)}>Clear all</button>
         </div>
       )}
+      </div>
       <ErrorNote error={searching ? searchError : error} />
       {!shown && !(searching ? searchError : error) && <Loading />}
 

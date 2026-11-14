@@ -109,6 +109,15 @@ Fixed in this round: Safari double back on the edge swipe (now only in the insta
 
 ## Log
 
+### 2026-11-14: Layout rules from TikTok and Instagram
+
+Asked by Ofentse: the clock cover was wonky; follow what TikTok and Instagram do so the UI never breaks. Rules written into DESIGN.md "Layout rules".
+- Safe areas now go through `--sat` and `--sab` (one place), so tests can switch a notch on. The old `.screen::before` clock cover is gone.
+- Frozen, solid top bars on list screens: Explore (search, filters, categories), Inbox (title and switch), profiles and shops (icon bar, with the name appearing small when it scrolls away, and the Posts/Likes/Reposts tabs sticking under it). Sticky offsets cancel the page padding so the bar sits flush at the very top.
+- Feed: the dark fade behind the clock is now the clock height plus 120 px on any phone.
+- Bottom bar: more solid on list screens so text doesn't show through; hides while typing and comes back 0.4 s after, so a tap on Save right after typing isn't caught by it (the tests found this); hidden on seller setup and the payment page, which have their own Continue button.
+
+
 ### 2026-11-14: Explore tiles TikTok style, cover behind the iPhone clock
 
 Asked by Ofentse (screenshot of Explore "Selling now" with the old white cards, and a Follow button showing through the clock): do the TikTok tiles everywhere, as full pictures with pills.

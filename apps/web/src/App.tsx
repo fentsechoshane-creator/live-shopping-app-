@@ -95,6 +95,18 @@ function Tabs() {
     if (!user) { e.preventDefault(); return nav("/signin?next=%2Fpost"); }
     if (!shop || shop.status !== "open") { e.preventDefault(); setAsk(true); }
   };
+  // Like TikTok and Instagram, the bottom bar hides while you type, so it never floats above the keyboard.
+  useEffect(() => {
+    const typing = (el: EventTarget | null) => el instanceof HTMLElement && (el.matches("textarea, [contenteditable=true]") ||
+      (el instanceof HTMLInputElement && !["checkbox", "radio", "range", "button", "submit", "file"].includes(el.type)));
+    // It comes back a moment after typing ends, so a tap on Save right after typing lands on Save, not on the bar.
+    let t = 0;
+    const on = (e: FocusEvent) => { if (typing(e.target) && matchMedia("(pointer: coarse)").matches) { clearTimeout(t); document.body.classList.add("typing"); } };
+    const off = () => { clearTimeout(t); t = window.setTimeout(() => document.body.classList.remove("typing"), 400); };
+    document.addEventListener("focusin", on);
+    document.addEventListener("focusout", off);
+    return () => { document.removeEventListener("focusin", on); document.removeEventListener("focusout", off); clearTimeout(t); document.body.classList.remove("typing"); };
+  }, []);
   return (
     <>
     <nav className={`tabs glass ${onVideo ? "on-video" : ""}`} aria-label="Main">
@@ -300,7 +312,8 @@ export function App() {
         </Routes>
         </Suspense>
         </ErrorBoundary>
-        {!fullScreen && <Tabs />}
+        {/* Step by step flows hide the bottom bar, like Instagram and TikTok, so their own Continue button is never covered. */}
+        {!fullScreen && !loc.pathname.startsWith("/sell/start") && !loc.pathname.startsWith("/mock-pay") && <Tabs />}
         <SideMenu />
         <InviteCatcher />
         {user && !welcome && !fullScreen && !loc.pathname.startsWith("/mock-pay") && <RewardSurprise />}

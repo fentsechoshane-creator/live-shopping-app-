@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useScrolledPast } from "../../lib/scrolled";
 import { categoryTitle } from "../../lib/emoji";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { canUse, TIER_INFO, tierFor, TRUST_POINTS } from "@app/core";
@@ -62,6 +63,7 @@ export function Profile() {
     }
   }, [shop, reloadShop]);
 
+  const [headRef, pastHead] = useScrolledPast<HTMLDivElement>();
   if (!user) return null;
   if (!profile) return <div className="screen"><Loading /></div>;
   const name = profile.displayName || profile.handle || user.email?.split("@")[0] || "You";
@@ -85,8 +87,9 @@ export function Profile() {
           <b>Your account is suspended.</b> {suspension.reason} You can still see your orders. Email support if you think this is a mistake.
         </div>
       )}
-      <div className="pbar">
+      <div className={`pbar ${pastHead ? "compact" : ""}`}>
         <button className="bare" onClick={() => setSheet("edit")} aria-label="Edit profile"><Icon name="edit" /></button>
+        <span className="pbar-title" aria-hidden={!pastHead}>{name}</span>
         <div className="row" style={{ gap: 4 }}>
           <RewardChip className="sm" />
           <button className="bare" onClick={share} aria-label="Share profile"><Icon name="share" /></button>
@@ -94,7 +97,7 @@ export function Profile() {
         </div>
       </div>
 
-      <div className="phead">
+      <div className="phead" ref={headRef}>
         <button className="pavatar-btn" onClick={() => setSheet("edit")} aria-label="Change profile photo">
           <Avatar url={profile.avatarUrl} name={name} className={`pavatar ${hasShop ? "green" : ""}`} />
         </button>
