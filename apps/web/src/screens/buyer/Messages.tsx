@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Avatar } from "../../components/Avatar";
 import { QUICK_EMOJI } from "../../lib/emoji";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { isRude, looksOffApp, ORDER_STATUS_TEXT, MIN_PRICE } from "@app/core";
@@ -39,7 +40,7 @@ export function ConversationList({ list: given }: { list?: Conversation[] } = {}
     <div className="group">
       {list.map((c) => (
         <Link key={c.id} to={`/messages/${c.id}`} className="cell">
-          <span className="avatar">{c.otherName[0]?.toUpperCase()}</span>
+          <Avatar url={c.otherAvatarUrl} name={c.otherName} />
           <span className="grow" style={{ minWidth: 0 }}>
             <span className="t" style={{ display: "block" }}>{c.otherName}{c.iAmSeller && <span className="seller-tag" style={{ marginLeft: 6 }}>Your shop</span>}</span>
             <span className="s" style={{ display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontWeight: c.unread ? 700 : 400 }}>{c.lastBody ?? "Say hi"}</span>
@@ -144,7 +145,7 @@ export function Thread() {
       <div className="chat-top">
         <button className="bare" onClick={goBack} aria-label="Back"><Icon name="back" /></button>
         <Link to={`/s/${c.shopHandle}`} className="row grow" style={{ gap: 10, minWidth: 0 }}>
-          <span className="avatar">{c.otherName[0]?.toUpperCase()}</span>
+          <Avatar url={c.otherAvatarUrl} name={c.otherName} />
           <span style={{ minWidth: 0 }}>
             <b style={{ display: "block" }}>{c.otherName}</b>
             <span className="small muted">{data.typing ? "typing…" : c.iAmSeller ? "Buyer" : replyText(replyMin) ?? `@${c.shopHandle}`}</span>

@@ -4,7 +4,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, type FeedItem, type LiveChatMessage, type LiveShow } from "../../api";
 import { useSession } from "../../session";
 import { Icon } from "../../components/Icon";
-import { Avatar } from "../../components/Avatar";
+import { Avatar, useShopAvatars } from "../../components/Avatar";
 import { Scene, type SceneKind } from "../../components/Scene";
 import { Blank, Loading } from "../../components/ui";
 import { AuctionSheet, useAuctions, useNow } from "../../components/Auction";
@@ -52,6 +52,7 @@ export function WatchLive() {
   const now = useNow();
   const [buying, setBuying] = useState<{ item: FeedItem; price?: number } | null>(null);
   const [bidding, setBidding] = useState(false);
+  const hostFace = useShopAvatars([show?.shop.id]);
   const info = auctionId ? auctions[auctionId] : undefined;
 
   // A seller opening their own show goes to the host screen.
@@ -77,7 +78,7 @@ export function WatchLive() {
   const header = (
     <div className="live-top">
       <Link to={`/s/${show.shop.handle}`} className="live-shop">
-        <Avatar name={show.shop.name} size={36} />
+        <Avatar url={hostFace[show.shop.id]} name={show.shop.name} size={36} />
         <span><b>{show.shop.handle}</b><span className="live-title">{show.title}</span></span>
       </Link>
       {!show.mine && (

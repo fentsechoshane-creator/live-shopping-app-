@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Avatar, useShopAvatars } from "../../components/Avatar";
 import { TileTags, priceKind, shortCount, useAuctionPrices, useProductViews } from "../../components/PostGrid";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, PROVINCES, type Category, type FeedItem, type Province, type SearchFilters, type SearchSort } from "../../api";
@@ -65,6 +66,8 @@ export function Explore() {
     (items ?? []).forEach((it) => seen.set(it.shop.id, it.shop));
     return [...seen.values()];
   }, [items]);
+  // The sellers' profile photos on "Shops to follow" (first letter when they haven't added one).
+  const faces = useShopAvatars(shops.map((x) => x.id));
   const shown = searching ? results : items;
   const views = useProductViews((shown ?? []).map((it) => it.product.id));
   const bids = useAuctionPrices((shown ?? []).map((it) => it.product));
@@ -109,7 +112,7 @@ export function Explore() {
           <div className="shop-row">
             {shops.map((s) => (
               <div key={s.id} className="shop-card">
-                <button className="avatar" style={{ border: 0 }} onClick={() => nav(`/s/${s.handle}`)} aria-label={`Open ${s.name}`}>{s.name[0]}</button>
+                <button className="bare shop-face" onClick={() => nav(`/s/${s.handle}`)} aria-label={`Open ${s.name}`}><Avatar url={faces?.[s.id]} name={s.name} /></button>
                 <b style={{ fontSize: 14 }}>{s.name}</b>
                 <span className="small muted">Trust {s.trustScore}</span>
                 {s.id === myShop ? <span className="small muted" style={{ minHeight: 34, display: "grid", placeItems: "center" }}>Your shop</span> : (

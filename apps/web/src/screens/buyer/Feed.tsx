@@ -20,7 +20,7 @@ import { tap } from "../../native";
 import { ShareSheet } from "../../components/ShareSheet";
 import { useMessageShop } from "./Messages";
 import { rankFeed } from "../../lib/rank";
-import { Avatar } from "../../components/Avatar";
+import { Avatar, useShopAvatars } from "../../components/Avatar";
 import { AuctionSheet, auctionButton, useAuctions, useNow } from "../../components/Auction";
 import { HoldToBid } from "../../components/HoldToBid";
 import { timeLeft } from "@app/core";
@@ -405,6 +405,7 @@ function OwnerBar({ item, auction }: { item: FeedItem; auction?: AuctionInfo }) 
 }
 
 function ProductDetails({ item, onOffer }: { item: FeedItem; onOffer: () => void }) {
+  const shopFace = useShopAvatars([item.shop.id]);
   const p = item.product;
   const messageShop = useMessageShop();
   const mine = useIsMine(item.shop.id);
@@ -428,7 +429,7 @@ function ProductDetails({ item, onOffer }: { item: FeedItem; onOffer: () => void
       </div>}
       <Link to={`/s/${item.shop.handle}`} className="group" style={{ display: "block" }}>
         <div className="cell">
-          <span className="avatar">{item.shop.name[0]}</span>
+          <Avatar url={shopFace[item.shop.id]} name={item.shop.name} />
           <span className="grow"><span className="t" style={{ display: "block" }}>{item.shop.name}</span><span className="s" style={{ display: "block" }}>Trust score {item.shop.trustScore}</span></span>
           <TierPill tier={item.shop.tier} />
         </div>

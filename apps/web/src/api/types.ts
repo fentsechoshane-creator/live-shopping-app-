@@ -129,7 +129,7 @@ export interface FriendChat { id: string; other: Person; lastBody: string | null
 /** A post sent in a friend chat, shown as a card. `available` is false once it's sold or taken down. */
 export interface SharedPost { postId: string; productId: string; title: string; priceCents: Cents; mode: SaleMode; shopName: string; shopHandle: string; thumb: string | null; available: boolean }
 export interface FriendMessage { id: string; body: string; mine: boolean; createdAt: string; readAt: string | null; shared: boolean; post: SharedPost | null }
-export interface BlockedPerson { userId: string; name: string; shopId: string | null; shopHandle: string | null }
+export interface BlockedPerson { userId: string; name: string; shopId: string | null; shopHandle: string | null; avatarUrl?: string | null }
 export interface OpenReport { id: string; targetKind: ReportTarget; targetId: string; reason: ReportReason; details: string; createdAt: string; summary: string }
 export interface TeamAlert { id: string; kind: string; severity: "urgent" | "normal"; title: string; body: string; link: string | null; createdAt: string; seen: boolean }
 

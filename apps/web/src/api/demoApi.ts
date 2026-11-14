@@ -967,7 +967,7 @@ export function createDemoApi(): Api {
       return s.blocks.filter((b) => b.blockerId === u.id).map((b) => {
         const person = s.users.find((x) => x.id === b.blockedId);
         const sh = s.shops.find((x) => x.ownerId === b.blockedId);
-        return { userId: b.blockedId, name: person?.displayName || "User", shopId: sh?.id ?? null, shopHandle: sh?.handle ?? null };
+        return { userId: b.blockedId, name: person?.displayName || "User", shopId: sh?.id ?? null, shopHandle: sh?.handle ?? null, avatarUrl: mediaUrl(person?.avatar) ?? null };
       });
     },
     async savePushToken() { /* demo: nothing to send to */ },

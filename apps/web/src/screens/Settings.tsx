@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Avatar } from "../components/Avatar";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 import { useLoad, useSession } from "../session";
@@ -21,7 +22,7 @@ export function BlockedAccounts() {
         <div className="group">
           {list.map((b) => (
             <div key={b.userId} className="cell">
-              <span className="avatar">{b.name[0]?.toUpperCase()}</span>
+              <Avatar url={b.avatarUrl} name={b.name} />
               <span className="grow"><span className="t" style={{ display: "block" }}>{b.name}</span>{b.shopHandle && <span className="s" style={{ display: "block" }}>@{b.shopHandle}</span>}</span>
               <button className="btn" style={{ minHeight: 34, fontSize: 13 }} onClick={() => run(async () => { await api.unblock(b.userId); refreshBlocks(); toast("Unblocked"); reload(); })}>Unblock</button>
             </div>
